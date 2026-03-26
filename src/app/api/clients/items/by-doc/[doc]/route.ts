@@ -1,30 +1,8 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '../../../../../../lib/prisma';
 
-async function ensureCommercialFamilyColumns() {
-  await prisma.$executeRawUnsafe(`
-    CREATE TABLE IF NOT EXISTS "CommercialFamily" (
-      "id" SERIAL PRIMARY KEY,
-      "description" TEXT NOT NULL,
-      "erpCode" TEXT,
-      "priceBy" TEXT DEFAULT 'UNIT',
-      "createdAt" TIMESTAMP DEFAULT NOW(),
-      "updatedAt" TIMESTAMP
-    );
-  `);
-  await prisma.$executeRawUnsafe('ALTER TABLE "CommercialFamily" ADD COLUMN IF NOT EXISTS "erpCode" TEXT');
-  await prisma.$executeRawUnsafe('ALTER TABLE "CommercialFamily" ADD COLUMN IF NOT EXISTS "priceBy" TEXT DEFAULT \'UNIT\'');
-  await prisma.$executeRawUnsafe('UPDATE "CommercialFamily" SET "priceBy"=\'UNIT\' WHERE "priceBy" IS NULL');
-}
-
-async function ensureClientPaymentTermColumn() {
-  await prisma.$executeRawUnsafe('ALTER TABLE "Client" ADD COLUMN IF NOT EXISTS "paymentTermId" INTEGER');
-}
-
 export async function GET(request: Request, { params }: { params: { doc: string } }) {
   try {
-    await ensureCommercialFamilyColumns();
-    await ensureClientPaymentTermColumn();
     const url = new URL(request.url);
     const q = (url.searchParams.get('q') || '').trim().toLowerCase();
     const doc = String(params.doc || '').trim();

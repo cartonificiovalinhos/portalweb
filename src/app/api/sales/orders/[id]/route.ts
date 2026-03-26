@@ -1,27 +1,10 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '../../../../../lib/prisma';
-import { Prisma } from '@prisma/client';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '../../../../../lib/auth';
 
 function normalizeDoc(doc: string): string {
   return (doc || '').replace(/\D+/g, '');
-}
-
-async function ensureCommercialFamilyColumns() {
-  await prisma.$executeRawUnsafe(`
-    CREATE TABLE IF NOT EXISTS "CommercialFamily" (
-      "id" SERIAL PRIMARY KEY,
-      "description" TEXT NOT NULL,
-      "erpCode" TEXT,
-      "priceBy" TEXT DEFAULT 'UNIT',
-      "createdAt" TIMESTAMP DEFAULT NOW(),
-      "updatedAt" TIMESTAMP
-    );
-  `);
-  await prisma.$executeRawUnsafe('ALTER TABLE "CommercialFamily" ADD COLUMN IF NOT EXISTS "erpCode" TEXT');
-  await prisma.$executeRawUnsafe('ALTER TABLE "CommercialFamily" ADD COLUMN IF NOT EXISTS "priceBy" TEXT DEFAULT \'UNIT\'');
-  await prisma.$executeRawUnsafe('UPDATE "CommercialFamily" SET "priceBy"=\'UNIT\' WHERE "priceBy" IS NULL');
 }
 
 async function shouldRestrictToLinkedClients(userId: number): Promise<boolean> {
@@ -43,7 +26,6 @@ async function canAccessOrderByCustomerDoc(userId: number, customerDoc?: string 
 }
 
 export async function GET(_: Request, { params }: { params: { id: string } }) {
-  await ensureCommercialFamilyColumns();
   const session = await getServerSession(authOptions);
   const userId = session?.user ? Number((session.user as any).id) : null;
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -69,15 +51,16 @@ export async function GET(_: Request, { params }: { params: { id: string } }) {
     }
   });
   if (!order) return NextResponse.json({ error: 'Pedido não encontrado' }, { status: 404 });
-  const history: any[] = await prisma.$queryRaw(
-    Prisma.sql`SELECT id, "status", "changedAt", messages FROM "SalesOrderStatusHistory" WHERE "orderId" = ${id} ORDER BY "changedAt" DESC`
-  );
+  const history = await prisma.salesOrderStatusHistory.findMany({
+    where: { orderId: id },
+    orderBy: { changedAt: 'desc' },
+    select: { id: true, status: true, changedAt: true, messages: true },
+  });
   return NextResponse.json({ ...order, statusHistory: history });
 }
 
 export async function PATCH(request: Request, { params }: { params: { id: string } }) {
   try {
-    await ensureCommercialFamilyColumns();
     const session = await getServerSession(authOptions);
     const userId = session?.user ? Number((session.user as any).id) : null;
     if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });

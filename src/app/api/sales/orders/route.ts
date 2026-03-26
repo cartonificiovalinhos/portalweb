@@ -7,42 +7,6 @@ function normalizeDoc(doc: string): string {
   return (doc || '').replace(/\D+/g, '');
 }
 
-async function ensureCommercialFamilyColumns() {
-  await prisma.$executeRawUnsafe(`
-    CREATE TABLE IF NOT EXISTS "CommercialFamily" (
-      "id" SERIAL PRIMARY KEY,
-      "description" TEXT NOT NULL,
-      "erpCode" TEXT,
-      "priceBy" TEXT DEFAULT 'UNIT',
-      "createdAt" TIMESTAMP DEFAULT NOW(),
-      "updatedAt" TIMESTAMP
-    );
-  `);
-  await prisma.$executeRawUnsafe('ALTER TABLE "CommercialFamily" ADD COLUMN IF NOT EXISTS "erpCode" TEXT');
-  await prisma.$executeRawUnsafe('ALTER TABLE "CommercialFamily" ADD COLUMN IF NOT EXISTS "priceBy" TEXT DEFAULT \'UNIT\'');
-  await prisma.$executeRawUnsafe('UPDATE "CommercialFamily" SET "priceBy"=\'UNIT\' WHERE "priceBy" IS NULL');
-}
-
-async function ensureClientPaymentTermColumn() {
-  await prisma.$executeRawUnsafe('ALTER TABLE "Client" ADD COLUMN IF NOT EXISTS "paymentTermId" INTEGER');
-}
-
-async function ensureClientPaymentTermsTable() {
-  await prisma.$executeRawUnsafe(`
-    CREATE TABLE IF NOT EXISTS "ClientPaymentTerm" (
-      "id" SERIAL PRIMARY KEY,
-      "clientId" INTEGER NOT NULL,
-      "paymentTermId" INTEGER NOT NULL,
-      "position" INTEGER DEFAULT 0,
-      "createdAt" TIMESTAMP DEFAULT NOW(),
-      "updatedAt" TIMESTAMP
-    );
-  `);
-  await prisma.$executeRawUnsafe('CREATE UNIQUE INDEX IF NOT EXISTS "ClientPaymentTerm_clientId_paymentTermId_key" ON "ClientPaymentTerm" ("clientId","paymentTermId")');
-  await prisma.$executeRawUnsafe('CREATE INDEX IF NOT EXISTS "ClientPaymentTerm_clientId_idx" ON "ClientPaymentTerm" ("clientId")');
-  await prisma.$executeRawUnsafe('CREATE INDEX IF NOT EXISTS "ClientPaymentTerm_paymentTermId_idx" ON "ClientPaymentTerm" ("paymentTermId")');
-}
-
 function computeWeightKgFromFields(it: { width?: number | null; length?: number | null; grammage?: number | null; quantity?: number | null }): number {
   const w = Number(it.width ?? 0);
   const l = Number(it.length ?? 0);
@@ -66,8 +30,6 @@ function lineBase(it: { quantity?: number | null; unitPrice?: number | null; wid
 
 export async function GET(request: Request) {
   try {
-    await ensureCommercialFamilyColumns();
-    await ensureClientPaymentTermColumn();
     const session = await getServerSession(authOptions);
     const userId = session?.user ? Number((session.user as any).id) : null;
     if (!userId) return NextResponse.json([]);
@@ -128,9 +90,6 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    await ensureCommercialFamilyColumns();
-    await ensureClientPaymentTermColumn();
-    await ensureClientPaymentTermsTable();
     const body = await request.json();
     const session = await getServerSession(authOptions);
     const createdById = session?.user ? Number((session.user as any).id) : undefined;
