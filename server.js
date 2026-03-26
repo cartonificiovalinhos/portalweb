@@ -1,4 +1,5 @@
-require('dotenv').config({ override: false })
+process.env.UV_THREADPOOL_SIZE = '128';
+require('dotenv').config({ override: false });
 const { createServer } = require('http')
 const { parse } = require('url')
 const next = require('next')
