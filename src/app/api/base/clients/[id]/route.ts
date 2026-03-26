@@ -111,6 +111,43 @@ async function resolvePaymentTermIds(body: any): Promise<number[] | null> {
   return out;
 }
 
+export async function GET(_: Request, { params }: { params: { id: string } }) {
+  try {
+    const id = Number(params.id);
+    if (!Number.isFinite(id)) {
+      return NextResponse.json({ error: 'id inválido' }, { status: 400 });
+    }
+    const client = await prisma.client.findUnique({
+      where: { id: Math.trunc(id) },
+      select: {
+        id: true,
+        doc: true,
+        name: true,
+        cep: true,
+        logradouro: true,
+        numero: true,
+        bairro: true,
+        cidade: true,
+        estado: true,
+        creditLimit: true,
+        availableLimit: true,
+        titlesDue: true,
+        titlesOverdue: true,
+        paymentTermId: true,
+        paymentTerm: { select: { code: true, description: true } },
+      },
+    });
+    if (!client) return NextResponse.json({ error: 'Cliente não encontrado' }, { status: 404 });
+    return NextResponse.json({
+      ...client,
+      paymentTermCode: client.paymentTerm?.code ?? null,
+      paymentTermDescription: client.paymentTerm?.description ?? null,
+    });
+  } catch (err: any) {
+    return NextResponse.json({ error: String(err?.message || err) }, { status: 500 });
+  }
+}
+
 export async function PATCH(request: Request, { params }: { params: { id: string } }) {
   try {
     await ensureClientPaymentTermColumn();
