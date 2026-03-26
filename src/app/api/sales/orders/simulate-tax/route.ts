@@ -102,8 +102,15 @@ export async function POST(request: Request) {
 
     console.log('Simulate Tax Payload (New Order):', JSON.stringify(payload, null, 2));
 
+    // Get ERP URL from settings
+    const erpSetting = await prisma.systemSetting.findUnique({
+      where: { key: 'erpUrl' }
+    });
+    const erpUrl = erpSetting?.value || 'http://cvserver13:8484';
+    const apiUrl = erpUrl.endsWith('/') ? `${erpUrl}apiIntegrTotvsDts/` : `${erpUrl}/apiIntegrTotvsDts/`;
+
     // Call External API
-    const response = await fetch('http://cvserver13:8484/apiIntegrTotvsDts/', {
+    const response = await fetch(apiUrl, {
       method: 'POST',
       headers: {
         'Accept': 'application/json',

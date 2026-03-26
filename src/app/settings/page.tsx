@@ -14,6 +14,9 @@ export default function SettingsPage() {
   const [smtpSsl, setSmtpSsl] = useState(false);
   const [smtpTls, setSmtpTls] = useState(false);
 
+  // ERP
+  const [erpUrl, setErpUrl] = useState("");
+
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -29,6 +32,7 @@ export default function SettingsPage() {
         if (data.smtpPass) setSmtpPass(data.smtpPass);
         if (data.smtpSsl) setSmtpSsl(data.smtpSsl === 'true');
         if (data.smtpTls) setSmtpTls(data.smtpTls === 'true');
+        if (data.erpUrl) setErpUrl(data.erpUrl);
         setLoading(false);
       })
       .catch(err => {
@@ -48,7 +52,8 @@ export default function SettingsPage() {
         smtpUser,
         smtpPass,
         smtpSsl: String(smtpSsl),
-        smtpTls: String(smtpTls)
+        smtpTls: String(smtpTls),
+        erpUrl
       };
 
       const res = await fetch('/api/settings', {
@@ -153,6 +158,21 @@ export default function SettingsPage() {
               />
               <label htmlFor="tls" className="ml-2 block text-sm text-gray-900">Usa TLS?</label>
             </div>
+          </div>
+        </div>
+
+        {/* ERP Settings */}
+        <div className="border-b pb-4 mb-4">
+          <h2 className="text-lg font-semibold mb-3">Endereço Servidor ERP</h2>
+          <div>
+            <label className="block text-sm font-medium text-gray-700">URL/Portal</label>
+            <input 
+              type="text"
+              className="mt-1 block w-full md:w-1/2 border rounded px-3 py-2" 
+              value={erpUrl} 
+              onChange={(e) => setErpUrl(e.target.value)} 
+              placeholder="ex: http://cvserver13:8484"
+            />
           </div>
         </div>
 
