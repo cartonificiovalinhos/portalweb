@@ -244,11 +244,6 @@ function NewSalesOrderContent() {
   const [totalWithTax, setTotalWithTax] = useState(0);
 
     const searchClientItems = async (term: string) => {
-    if (!term) {
-      setSearchResults([]);
-      return;
-    }
-
     if (!order.customerId) {
       // If no customer selected, do not search
       setSearchResults([]);
@@ -623,7 +618,7 @@ function NewSalesOrderContent() {
               className={`ml-auto px-2 py-1 text-xs border rounded bg-white hover:bg-gray-100 ${!order.customerId ? 'opacity-50 cursor-not-allowed' : ''}`}
               disabled={!order.customerId}
               title={!order.customerId ? "Selecione um cliente primeiro" : ""}
-              onClick={() => { setAddingItems(true); setSearchTerm(''); setSearchResults([]); }}
+              onClick={() => { setAddingItems(true); setSearchTerm(''); searchClientItems(''); }}
             >
               Adicionar itens
             </button>

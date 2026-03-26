@@ -329,11 +329,6 @@ export default function SalesOrderMaintenancePage() {
   };
 
   const searchClientItems = async (term: string) => {
-    if (!term) {
-      setSearchResults([]);
-      return;
-    }
-    
     setSearchLoading(true);
     try {
       const params = new URLSearchParams();

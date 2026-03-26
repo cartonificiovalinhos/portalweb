@@ -1,18 +1,30 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '../../../../../../lib/prisma';
 
+function normalizeDoc(doc: string): string {
+  return (doc || '').replace(/\D+/g, '');
+}
+
 export async function GET(request: Request, { params }: { params: { doc: string } }) {
   try {
     const url = new URL(request.url);
     const q = (url.searchParams.get('q') || '').trim().toLowerCase();
-    const doc = String(params.doc || '').trim();
+    const docRaw = String(params.doc || '').trim();
+    const doc = normalizeDoc(docRaw);
+    if (!doc) return NextResponse.json([]);
 
     // Removed unnecessary activeEntityId check that was blocking results but not used in query
     // const session = await getServerSession(authOptions);
     // const activeEntityId: number | null = (session as any)?.activeEntityId ?? null;
     // if (!activeEntityId) return NextResponse.json([]);
 
-    const client = await prisma.client.findFirst({ where: { doc } }).catch(() => null);
+    const client = await prisma.client
+      .findFirst({
+        where: {
+          OR: [{ doc }, { doc: docRaw }],
+        },
+      })
+      .catch(() => null);
     if (!client) return NextResponse.json([]);
 
     // Lista vinculada via cadastro/ERP (ClientItem)
