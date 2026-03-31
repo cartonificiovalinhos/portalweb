@@ -10,12 +10,30 @@ export async function GET(request: Request) {
 
     if (clientIdParam) {
       if (!Number.isFinite(clientId) || (clientId as number) <= 0) return NextResponse.json([]);
-      const links = await prisma.clientPaymentTerm.findMany({
-        where: { clientId: clientId as number },
-        include: { paymentTerm: true },
-        orderBy: { position: 'asc' }
-      });
-      let all = links.map((l) => l.paymentTerm).filter(Boolean);
+      let all: any[] = [];
+      try {
+        const links = await prisma.clientPaymentTerm.findMany({
+          where: { clientId: clientId as number },
+          include: { paymentTerm: true },
+          orderBy: { position: 'asc' },
+        });
+        all = links.map((l) => l.paymentTerm).filter(Boolean);
+      } catch {
+        all = [];
+      }
+
+      if (all.length === 0) {
+        try {
+          const raw = await prisma.$queryRawUnsafe<any[]>(
+            'SELECT pt.* FROM clientpaymentterm cpt JOIN paymentterm pt ON pt.id = cpt.paymentTermId WHERE cpt.clientId = ? ORDER BY cpt.position ASC',
+            Math.trunc(clientId as number)
+          );
+          if (Array.isArray(raw) && raw.length > 0) all = raw;
+        } catch {
+          all = [];
+        }
+      }
+
       if (all.length === 0) {
         const c = await prisma.client.findUnique({
           where: { id: clientId as number },
@@ -25,10 +43,6 @@ export async function GET(request: Request) {
         if (fallbackId && Number.isFinite(fallbackId) && fallbackId > 0) {
           const term = await prisma.paymentTerm.findUnique({ where: { id: fallbackId } }).catch(() => null);
           if (term) {
-            await prisma.clientPaymentTerm.createMany({
-              data: [{ clientId: clientId as number, paymentTermId: term.id, position: 0 }],
-              skipDuplicates: true
-            }).catch(() => {});
             all = [term];
           }
         }
