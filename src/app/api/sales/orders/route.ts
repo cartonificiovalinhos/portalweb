@@ -331,10 +331,15 @@ export async function POST(request: Request) {
       if (!msg.includes('Could not figure out an ID in create')) throw e;
 
       const createdId = await prisma.$transaction(async (tx) => {
+        const nextOrderIdRows = await tx.$queryRawUnsafe<any[]>('SELECT COALESCE(MAX(id), 0) + 1 as id FROM salesorder');
+        const nextOrderId = nextOrderIdRows?.[0]?.id ? Number(nextOrderIdRows[0].id) : null;
+        if (!nextOrderId || !Number.isFinite(nextOrderId) || nextOrderId <= 0) return null;
+
         await tx.$executeRawUnsafe(
           `INSERT INTO salesorder
-            (code, entityId, customerName, customerDoc, clientId, triangularCustomerName, triangularCustomerDoc, paymentTerms, carrier, deliveryDate, notes, createdById, subtotal, discountTotal, total, createdAt, updatedAt)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
+            (id, code, entityId, customerName, customerDoc, clientId, triangularCustomerName, triangularCustomerDoc, paymentTerms, carrier, deliveryDate, notes, createdById, subtotal, discountTotal, total, createdAt, updatedAt)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
+          Math.trunc(nextOrderId),
           code,
           entityId ?? null,
           customerName,
@@ -352,23 +357,19 @@ export async function POST(request: Request) {
           total,
         );
 
-        const lastIdRows = await tx.$queryRawUnsafe<any[]>('SELECT LAST_INSERT_ID() as id');
-        let id = lastIdRows?.[0]?.id ? Number(lastIdRows[0].id) : null;
-        if (!id || !Number.isFinite(id)) {
-          const byCodeRows = await tx.$queryRawUnsafe<any[]>(
-            'SELECT id FROM salesorder WHERE code = ? ORDER BY id DESC LIMIT 1',
-            code,
-          );
-          id = byCodeRows?.[0]?.id ? Number(byCodeRows[0].id) : null;
-        }
-        if (!id || !Number.isFinite(id)) return null;
+        const id = Math.trunc(nextOrderId);
+
+        const nextItemIdRows = await tx.$queryRawUnsafe<any[]>('SELECT COALESCE(MAX(id), 0) + 1 as id FROM salesorderitem');
+        let nextItemId = nextItemIdRows?.[0]?.id ? Number(nextItemIdRows[0].id) : null;
+        if (!nextItemId || !Number.isFinite(nextItemId) || nextItemId <= 0) return null;
 
         for (const it of normalizedItems as any[]) {
           const creasesJson = it.creases !== undefined ? JSON.stringify(it.creases) : null;
           await tx.$executeRawUnsafe(
             `INSERT INTO salesorderitem
-              (orderId, inventoryItemId, sku, name, quantity, unit, unitPrice, discountPct, lineTotal, width, length, grammage, diameter, tube, weightKg, creases, clientOrderNumber, clientOrderItemNumber, itemDeliveryDate, internalResin, externalResin)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+              (id, orderId, inventoryItemId, sku, name, quantity, unit, unitPrice, discountPct, lineTotal, width, length, grammage, diameter, tube, weightKg, creases, clientOrderNumber, clientOrderItemNumber, itemDeliveryDate, internalResin, externalResin)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            Math.trunc(nextItemId),
             Math.trunc(id),
             it.inventoryItemId ?? null,
             it.sku ?? null,
@@ -391,6 +392,7 @@ export async function POST(request: Request) {
             it.internalResin ? 1 : 0,
             it.externalResin ? 1 : 0,
           );
+          nextItemId += 1;
         }
 
         return Math.trunc(id);
