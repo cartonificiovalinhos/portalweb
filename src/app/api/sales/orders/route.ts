@@ -194,16 +194,14 @@ export async function POST(request: Request) {
     const invMap = new Map<number, { priceBy?: string | null }>();
     if (invIds.length > 0) {
       const unique = Array.from(new Set(invIds));
-      const inList = unique.join(',');
-      const rows: any[] = await prisma.$queryRawUnsafe(`
-        SELECT inv."id" AS "inventoryItemId", cf."priceBy" AS "priceBy"
-        FROM "InventoryItem" inv
-        LEFT JOIN "CommercialFamily" cf ON cf."id" = inv."commercialFamilyId"
-        WHERE inv."id" IN (${inList})
-      `);
-      for (const r of rows) {
-        const id = Number(r.inventoryItemId);
-        if (Number.isFinite(id) && id > 0) invMap.set(id, { priceBy: r.priceBy != null ? String(r.priceBy) : null });
+      const invItems = await prisma.inventoryItem.findMany({
+        where: { id: { in: unique } },
+        select: { id: true, commercialFamily: { select: { priceBy: true } } },
+      });
+      for (const it of invItems) {
+        const id = Number(it.id);
+        if (!Number.isFinite(id) || id <= 0) continue;
+        invMap.set(id, { priceBy: it.commercialFamily?.priceBy != null ? String(it.commercialFamily.priceBy) : null });
       }
     }
 
