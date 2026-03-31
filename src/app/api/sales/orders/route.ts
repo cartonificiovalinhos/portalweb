@@ -255,6 +255,9 @@ export async function POST(request: Request) {
     const total = subtotal - discountTotal;
 
     if (clientId) {
+      await prisma
+        .$executeRawUnsafe('DELETE FROM clientpaymentterm WHERE clientId = ? AND id IS NULL', Math.trunc(clientId))
+        .catch(() => {});
       const client = await prisma.client.findUnique({
         where: { id: clientId },
         select: { id: true, paymentTermId: true }
@@ -281,11 +284,14 @@ export async function POST(request: Request) {
           if (!resolved) {
             return NextResponse.json({ error: 'Condição de pagamento inválida para este cliente' }, { status: 400 });
           }
-          const allowed = await prisma.clientPaymentTerm.findFirst({
-            where: { clientId, paymentTermId: resolved.id },
-            select: { id: true }
-          });
-          if (!allowed) {
+          const allowedRows = await prisma
+            .$queryRawUnsafe<any[]>(
+              'SELECT id FROM clientpaymentterm WHERE clientId = ? AND paymentTermId = ? AND id IS NOT NULL LIMIT 1',
+              Math.trunc(clientId),
+              Math.trunc(resolved.id),
+            )
+            .catch(() => []);
+          if (!allowedRows || allowedRows.length === 0) {
             return NextResponse.json({ error: 'Condição de pagamento não permitida para este cliente' }, { status: 400 });
           }
         } else if (client?.paymentTermId && resolved?.id && client.paymentTermId !== resolved.id) {

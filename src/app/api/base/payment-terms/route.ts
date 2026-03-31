@@ -25,7 +25,7 @@ export async function GET(request: Request) {
       if (all.length === 0) {
         try {
           const raw = await prisma.$queryRawUnsafe<any[]>(
-            'SELECT pt.* FROM clientpaymentterm cpt JOIN paymentterm pt ON pt.id = cpt.paymentTermId WHERE cpt.clientId = ? ORDER BY cpt.position ASC',
+            'SELECT pt.* FROM clientpaymentterm cpt JOIN paymentterm pt ON pt.id = cpt.paymentTermId WHERE cpt.clientId = ? AND cpt.id IS NOT NULL ORDER BY cpt.position ASC',
             Math.trunc(clientId as number)
           );
           if (Array.isArray(raw) && raw.length > 0) all = raw;
