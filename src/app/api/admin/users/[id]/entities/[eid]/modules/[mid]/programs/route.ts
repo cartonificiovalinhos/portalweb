@@ -109,16 +109,30 @@ export async function PUT(request: Request, { params }: { params: { id: string; 
         update: {},
         select: { id: true },
       });
-      const uem = await prisma.userEntityModule.upsert({
+      await prisma.$transaction(async (tx) => {
+        await tx.userEntityModule.createMany({
+          data: [{ userEntityId: ue.id, moduleId, allowed: true }],
+          skipDuplicates: true,
+        });
+        await tx.userEntityModule.updateMany({
+          where: { userEntityId: ue.id, moduleId },
+          data: { allowed: true },
+        });
+      });
+      const uem = await prisma.userEntityModule.findUnique({
         where: { userEntityId_moduleId: { userEntityId: ue.id, moduleId } },
-        create: { userEntityId: ue.id, moduleId, allowed: true },
-        update: { allowed: true },
         select: { id: true },
       });
-      await prisma.userEntityModuleProgram.upsert({
-        where: { userEntityModuleId_programId: { userEntityModuleId: uem.id, programId } },
-        create: { userEntityModuleId: uem.id, programId, allowed: true },
-        update: { allowed: true },
+      if (!uem?.id) return NextResponse.json({ error: 'Falha ao vincular módulo ao usuário' }, { status: 500 });
+      await prisma.$transaction(async (tx) => {
+        await tx.userEntityModuleProgram.createMany({
+          data: [{ userEntityModuleId: uem.id, programId, allowed: true }],
+          skipDuplicates: true,
+        });
+        await tx.userEntityModuleProgram.updateMany({
+          where: { userEntityModuleId: uem.id, programId },
+          data: { allowed: true },
+        });
       });
     } else {
       const ue = await prisma.userEntity.findUnique({
@@ -171,17 +185,22 @@ export async function PATCH(request: Request, { params }: { params: { id: string
         });
     if (!ue?.id) return NextResponse.json({ ok: true, action });
 
-    const uem = action === 'link_all'
-      ? await prisma.userEntityModule.upsert({
-          where: { userEntityId_moduleId: { userEntityId: ue.id, moduleId } },
-          create: { userEntityId: ue.id, moduleId, allowed: true },
-          update: { allowed: true },
-          select: { id: true },
-        })
-      : await prisma.userEntityModule.findUnique({
-          where: { userEntityId_moduleId: { userEntityId: ue.id, moduleId } },
-          select: { id: true },
+    if (action === 'link_all') {
+      await prisma.$transaction(async (tx) => {
+        await tx.userEntityModule.createMany({
+          data: [{ userEntityId: ue.id, moduleId, allowed: true }],
+          skipDuplicates: true,
         });
+        await tx.userEntityModule.updateMany({
+          where: { userEntityId: ue.id, moduleId },
+          data: { allowed: true },
+        });
+      });
+    }
+    const uem = await prisma.userEntityModule.findUnique({
+      where: { userEntityId_moduleId: { userEntityId: ue.id, moduleId } },
+      select: { id: true },
+    });
     if (!uem?.id) return NextResponse.json({ ok: true, action });
 
     if (action === 'link_all') {

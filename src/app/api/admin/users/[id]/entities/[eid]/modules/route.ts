@@ -94,10 +94,15 @@ export async function PUT(request: Request, { params }: { params: { id: string; 
         update: {},
         select: { id: true },
       });
-      await prisma.userEntityModule.upsert({
-        where: { userEntityId_moduleId: { userEntityId: ue.id, moduleId } },
-        create: { userEntityId: ue.id, moduleId, allowed: true },
-        update: { allowed: true },
+      await prisma.$transaction(async (tx) => {
+        await tx.userEntityModule.createMany({
+          data: [{ userEntityId: ue.id, moduleId, allowed: true }],
+          skipDuplicates: true,
+        });
+        await tx.userEntityModule.updateMany({
+          where: { userEntityId: ue.id, moduleId },
+          data: { allowed: true },
+        });
       });
     } else {
       const ue = await prisma.userEntity.findUnique({
