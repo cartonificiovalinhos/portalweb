@@ -7,6 +7,20 @@ function normalizeDoc(doc: string): string {
   return (doc || '').replace(/\D+/g, '');
 }
 
+async function ensurePaymentTermByCode(code: number): Promise<number | null> {
+  const c = Number(code);
+  if (!Number.isFinite(c) || c <= 0) return null;
+  const row = await prisma.paymentTerm
+    .upsert({
+      where: { code: Math.trunc(c) },
+      update: {},
+      create: { code: Math.trunc(c), description: `Condição ${Math.trunc(c)}`, installments: 1 },
+      select: { id: true },
+    })
+    .catch(() => null);
+  return row?.id ? Number(row.id) : null;
+}
+
 async function resolvePaymentTermId(body: any): Promise<number | null> {
   const num = (v: any): number | null => {
     if (v === null || v === undefined) return null;
@@ -42,6 +56,8 @@ async function resolvePaymentTermId(body: any): Promise<number | null> {
   if (codeCandidate) {
     const term = await prisma.paymentTerm.findFirst({ where: { code: codeCandidate }, select: { id: true } }).catch(() => null);
     if (term?.id) return term.id;
+    const createdId = await ensurePaymentTermByCode(codeCandidate);
+    if (createdId) return createdId;
   }
 
   const descCandidate =
@@ -92,6 +108,8 @@ async function resolvePaymentTermIdFromAny(v: any): Promise<number | null> {
 
   const byCode = await prisma.paymentTerm.findFirst({ where: { code: Math.trunc(n) }, select: { id: true } }).catch(() => null);
   if (byCode?.id) return byCode.id;
+  const createdId = await ensurePaymentTermByCode(Math.trunc(n));
+  if (createdId) return createdId;
 
   const byId = await prisma.paymentTerm.findFirst({ where: { id: Math.trunc(n) }, select: { id: true } }).catch(() => null);
   if (byId?.id) return byId.id;
@@ -209,6 +227,12 @@ export async function POST(request: Request) {
     const listProvided = paymentTermIds !== null;
     const paymentTermId = listProvided ? (paymentTermIds[0] ?? null) : await resolvePaymentTermId(body);
     if (!name) return NextResponse.json({ error: 'Nome é obrigatório' }, { status: 400 });
+    if (listProvided && paymentTermIds.length === 0) {
+      return NextResponse.json(
+        { error: 'condicoesPagamento informado, mas nenhuma condição foi reconhecida (verifique se o código existe em paymentterm.code)' },
+        { status: 400 }
+      );
+    }
 
     const syncPaymentTermIds = listProvided ? paymentTermIds : (paymentTermId ? [paymentTermId] : null);
 

@@ -5,25 +5,18 @@ function normalizeDoc(doc: string): string {
   return (doc || '').replace(/\D+/g, '');
 }
 
-async function ensureClientPaymentTermColumn() {
-  await prisma.$executeRawUnsafe('ALTER TABLE "Client" ADD COLUMN IF NOT EXISTS "paymentTermId" INTEGER');
-  await prisma.$executeRawUnsafe('CREATE INDEX IF NOT EXISTS "Client_paymentTermId_idx" ON "Client" ("paymentTermId")');
-}
-
-async function ensureClientPaymentTermsTable() {
-  await prisma.$executeRawUnsafe(`
-    CREATE TABLE IF NOT EXISTS "ClientPaymentTerm" (
-      "id" SERIAL PRIMARY KEY,
-      "clientId" INTEGER NOT NULL,
-      "paymentTermId" INTEGER NOT NULL,
-      "position" INTEGER DEFAULT 0,
-      "createdAt" TIMESTAMP DEFAULT NOW(),
-      "updatedAt" TIMESTAMP
-    );
-  `);
-  await prisma.$executeRawUnsafe('CREATE UNIQUE INDEX IF NOT EXISTS "ClientPaymentTerm_clientId_paymentTermId_key" ON "ClientPaymentTerm" ("clientId","paymentTermId")');
-  await prisma.$executeRawUnsafe('CREATE INDEX IF NOT EXISTS "ClientPaymentTerm_clientId_idx" ON "ClientPaymentTerm" ("clientId")');
-  await prisma.$executeRawUnsafe('CREATE INDEX IF NOT EXISTS "ClientPaymentTerm_paymentTermId_idx" ON "ClientPaymentTerm" ("paymentTermId")');
+async function ensurePaymentTermByCode(code: number): Promise<number | null> {
+  const c = Number(code);
+  if (!Number.isFinite(c) || c <= 0) return null;
+  const row = await prisma.paymentTerm
+    .upsert({
+      where: { code: Math.trunc(c) },
+      update: {},
+      create: { code: Math.trunc(c), description: `Condição ${Math.trunc(c)}`, installments: 1 },
+      select: { id: true },
+    })
+    .catch(() => null);
+  return row?.id ? Number(row.id) : null;
 }
 
 async function resolvePaymentTermId(body: any): Promise<number | null> {
@@ -61,6 +54,8 @@ async function resolvePaymentTermId(body: any): Promise<number | null> {
   if (codeCandidate) {
     const term = await prisma.paymentTerm.findFirst({ where: { code: codeCandidate }, select: { id: true } }).catch(() => null);
     if (term?.id) return term.id;
+    const createdId = await ensurePaymentTermByCode(codeCandidate);
+    if (createdId) return createdId;
   }
 
   const descCandidate =
@@ -111,6 +106,8 @@ async function resolvePaymentTermIdFromAny(v: any): Promise<number | null> {
 
   const byCode = await prisma.paymentTerm.findFirst({ where: { code: Math.trunc(n) }, select: { id: true } }).catch(() => null);
   if (byCode?.id) return byCode.id;
+  const createdId = await ensurePaymentTermByCode(Math.trunc(n));
+  if (createdId) return createdId;
 
   const byId = await prisma.paymentTerm.findFirst({ where: { id: Math.trunc(n) }, select: { id: true } }).catch(() => null);
   if (byId?.id) return byId.id;
@@ -138,10 +135,32 @@ export async function GET(_: Request, { params }: { params: { doc: string } }) {
     const raw = params.doc ?? '';
     const doc = normalizeDoc(raw);
     if (!doc) return NextResponse.json({ error: 'doc inválido' }, { status: 400 });
-    const rows: any[] = await prisma.$queryRawUnsafe(`SELECT "id","doc","name","cep","logradouro","numero","bairro","cidade","estado" FROM "Client" WHERE "doc"='${doc}' LIMIT 1`);
-    const item = rows[0] ?? null;
-    if (!item) return NextResponse.json({ error: 'Cliente não encontrado' }, { status: 404 });
-    return NextResponse.json(item);
+    const client = await prisma.client.findFirst({
+      where: { doc },
+      select: {
+        id: true,
+        doc: true,
+        name: true,
+        cep: true,
+        logradouro: true,
+        numero: true,
+        bairro: true,
+        cidade: true,
+        estado: true,
+        creditLimit: true,
+        availableLimit: true,
+        titlesDue: true,
+        titlesOverdue: true,
+        paymentTermId: true,
+        paymentTerm: { select: { code: true, description: true } },
+      },
+    });
+    if (!client) return NextResponse.json({ error: 'Cliente não encontrado' }, { status: 404 });
+    return NextResponse.json({
+      ...client,
+      paymentTermCode: client.paymentTerm?.code ?? null,
+      paymentTermDescription: client.paymentTerm?.description ?? null,
+    });
   } catch (err: any) {
     return NextResponse.json({ error: String(err?.message || err) }, { status: 500 });
   }
@@ -149,8 +168,6 @@ export async function GET(_: Request, { params }: { params: { doc: string } }) {
 
 export async function PATCH(request: Request, { params }: { params: { doc: string } }) {
   try {
-    await ensureClientPaymentTermColumn();
-    await ensureClientPaymentTermsTable();
     const raw = params.doc ?? '';
     const doc = normalizeDoc(raw);
     if (!doc) return NextResponse.json({ error: 'doc inválido' }, { status: 400 });
@@ -170,6 +187,12 @@ export async function PATCH(request: Request, { params }: { params: { doc: strin
     const paymentTermIds = await resolvePaymentTermIds(body);
     const listProvided = paymentTermIds !== null;
     const singleProvided = !listProvided && (body.paymentTermId !== undefined || body.paymentTermCode !== undefined || body.condPagto !== undefined || body.condPagtoCode !== undefined);
+    if (listProvided && paymentTermIds.length === 0) {
+      return NextResponse.json(
+        { error: 'condicoesPagamento informado, mas nenhuma condição foi reconhecida (verifique se o código existe em paymentterm.code)' },
+        { status: 400 }
+      );
+    }
     if (listProvided) {
       fields.paymentTermId = paymentTermIds[0] ?? null;
     } else if (singleProvided) {
@@ -180,7 +203,28 @@ export async function PATCH(request: Request, { params }: { params: { doc: strin
     const data: any = {};
     for (const k of setCols) data[k] = (fields as any)[k];
     const updated = await prisma.$transaction(async (tx) => {
-      const row = await tx.client.update({ where: { doc }, data, select: { id: true, doc: true, name: true, cep: true, logradouro: true, numero: true, bairro: true, cidade: true, estado: true, paymentTermId: true } });
+      const row = await tx.client.update({
+        where: { doc },
+        data,
+        select: {
+          id: true,
+          doc: true,
+          name: true,
+          cep: true,
+          logradouro: true,
+          numero: true,
+          bairro: true,
+          cidade: true,
+          estado: true,
+          creditLimit: true,
+          availableLimit: true,
+          titlesDue: true,
+          titlesOverdue: true,
+          paymentTermId: true,
+          paymentTerm: { select: { code: true, description: true } },
+        },
+      });
+
       if (listProvided || singleProvided) {
         const syncIds = listProvided ? paymentTermIds : (row.paymentTermId ? [row.paymentTermId] : []);
         await tx.clientPaymentTerm.deleteMany({ where: { clientId: row.id } });
@@ -195,9 +239,15 @@ export async function PATCH(request: Request, { params }: { params: { doc: strin
           });
         }
       }
+
       return row;
     });
-    return NextResponse.json(updated);
+
+    return NextResponse.json({
+      ...updated,
+      paymentTermCode: updated.paymentTerm?.code ?? null,
+      paymentTermDescription: updated.paymentTerm?.description ?? null,
+    });
   } catch (err: any) {
     return NextResponse.json({ error: String(err?.message || err) }, { status: 500 });
   }

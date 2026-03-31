@@ -5,25 +5,18 @@ function normalizeDoc(doc: string): string {
   return (doc || '').replace(/\D+/g, '');
 }
 
-async function ensureClientPaymentTermColumn() {
-  await prisma.$executeRawUnsafe('ALTER TABLE "Client" ADD COLUMN IF NOT EXISTS "paymentTermId" INTEGER');
-  await prisma.$executeRawUnsafe('CREATE INDEX IF NOT EXISTS "Client_paymentTermId_idx" ON "Client" ("paymentTermId")');
-}
-
-async function ensureClientPaymentTermsTable() {
-  await prisma.$executeRawUnsafe(`
-    CREATE TABLE IF NOT EXISTS "ClientPaymentTerm" (
-      "id" SERIAL PRIMARY KEY,
-      "clientId" INTEGER NOT NULL,
-      "paymentTermId" INTEGER NOT NULL,
-      "position" INTEGER DEFAULT 0,
-      "createdAt" TIMESTAMP DEFAULT NOW(),
-      "updatedAt" TIMESTAMP
-    );
-  `);
-  await prisma.$executeRawUnsafe('CREATE UNIQUE INDEX IF NOT EXISTS "ClientPaymentTerm_clientId_paymentTermId_key" ON "ClientPaymentTerm" ("clientId","paymentTermId")');
-  await prisma.$executeRawUnsafe('CREATE INDEX IF NOT EXISTS "ClientPaymentTerm_clientId_idx" ON "ClientPaymentTerm" ("clientId")');
-  await prisma.$executeRawUnsafe('CREATE INDEX IF NOT EXISTS "ClientPaymentTerm_paymentTermId_idx" ON "ClientPaymentTerm" ("paymentTermId")');
+async function ensurePaymentTermByCode(code: number): Promise<number | null> {
+  const c = Number(code);
+  if (!Number.isFinite(c) || c <= 0) return null;
+  const row = await prisma.paymentTerm
+    .upsert({
+      where: { code: Math.trunc(c) },
+      update: {},
+      create: { code: Math.trunc(c), description: `Condição ${Math.trunc(c)}`, installments: 1 },
+      select: { id: true },
+    })
+    .catch(() => null);
+  return row?.id ? Number(row.id) : null;
 }
 
 async function resolvePaymentTermId(body: any): Promise<number | null> {
@@ -55,6 +48,8 @@ async function resolvePaymentTermId(body: any): Promise<number | null> {
   if (codeCandidate) {
     const term = await prisma.paymentTerm.findFirst({ where: { code: codeCandidate }, select: { id: true } }).catch(() => null);
     if (term?.id) return term.id;
+    const createdId = await ensurePaymentTermByCode(codeCandidate);
+    if (createdId) return createdId;
   }
 
   return null;
@@ -89,6 +84,8 @@ async function resolvePaymentTermIdFromAny(v: any): Promise<number | null> {
 
   const byCode = await prisma.paymentTerm.findFirst({ where: { code: Math.trunc(n) }, select: { id: true } }).catch(() => null);
   if (byCode?.id) return byCode.id;
+  const createdId = await ensurePaymentTermByCode(Math.trunc(n));
+  if (createdId) return createdId;
 
   const byId = await prisma.paymentTerm.findFirst({ where: { id: Math.trunc(n) }, select: { id: true } }).catch(() => null);
   if (byId?.id) return byId.id;
@@ -150,10 +147,12 @@ export async function GET(_: Request, { params }: { params: { id: string } }) {
 
 export async function PATCH(request: Request, { params }: { params: { id: string } }) {
   try {
-    await ensureClientPaymentTermColumn();
-    await ensureClientPaymentTermsTable();
     const id = Number(params.id);
-    const body = await request.json();
+    if (!Number.isFinite(id)) return NextResponse.json({ error: 'id inválido' }, { status: 400 });
+    const body = await request.json().catch(() => null);
+    if (!body || typeof body !== 'object') {
+      return NextResponse.json({ error: 'JSON inválido' }, { status: 400 });
+    }
     const fields: any = {};
     if (body.doc !== undefined) fields.doc = normalizeDoc(String(body.doc || '')) || null;
     if (body.name !== undefined) fields.name = String(body.name || '').trim();
@@ -166,6 +165,12 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     const paymentTermIds = await resolvePaymentTermIds(body);
     const listProvided = paymentTermIds !== null;
     const singleProvided = !listProvided && (body.paymentTermId !== undefined || body.paymentTermCode !== undefined || body.condPagto !== undefined || body.condPagtoCode !== undefined);
+    if (listProvided && paymentTermIds.length === 0) {
+      return NextResponse.json(
+        { error: 'condicoesPagamento informado, mas nenhuma condição foi reconhecida (verifique se o código existe em paymentterm.code)' },
+        { status: 400 }
+      );
+    }
     if (listProvided) {
       fields.paymentTermId = paymentTermIds[0] ?? null;
     } else if (singleProvided) {
@@ -173,21 +178,39 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     }
     const setCols = Object.keys(fields);
     if (setCols.length === 0) return NextResponse.json({ message: 'Nada para atualizar' }, { status: 400 });
-    const assignments = setCols.map((k) => `${k}=?`).join(', ');
-    const values = setCols.map((k) => (fields as any)[k]);
-    await prisma.$transaction(async (tx) => {
-      await tx.$executeRawUnsafe(
-        `UPDATE "Client" SET ${assignments}, updatedAt=CURRENT_TIMESTAMP WHERE id=?`,
-        ...values,
-        id
-      );
+    const data: any = {};
+    for (const k of setCols) data[k] = (fields as any)[k];
+
+    const updated = await prisma.$transaction(async (tx) => {
+      const row = await tx.client.update({
+        where: { id: Math.trunc(id) },
+        data,
+        select: {
+          id: true,
+          doc: true,
+          name: true,
+          cep: true,
+          logradouro: true,
+          numero: true,
+          bairro: true,
+          cidade: true,
+          estado: true,
+          creditLimit: true,
+          availableLimit: true,
+          titlesDue: true,
+          titlesOverdue: true,
+          paymentTermId: true,
+          paymentTerm: { select: { code: true, description: true } },
+        },
+      });
+
       if (listProvided || singleProvided) {
-        const syncIds = listProvided ? paymentTermIds : (fields.paymentTermId ? [fields.paymentTermId] : []);
-        await tx.clientPaymentTerm.deleteMany({ where: { clientId: id } });
+        const syncIds = listProvided ? paymentTermIds : (row.paymentTermId ? [row.paymentTermId] : []);
+        await tx.clientPaymentTerm.deleteMany({ where: { clientId: row.id } });
         if (syncIds.length > 0) {
           await tx.clientPaymentTerm.createMany({
             data: syncIds.map((ptId, idx) => ({
-              clientId: id,
+              clientId: row.id,
               paymentTermId: ptId,
               position: idx,
             })),
@@ -195,9 +218,15 @@ export async function PATCH(request: Request, { params }: { params: { id: string
           });
         }
       }
+
+      return row;
     });
-    const row: any[] = await prisma.$queryRawUnsafe('SELECT * FROM "Client" WHERE id=?', id);
-    return NextResponse.json(row[0] ?? { ok: true });
+
+    return NextResponse.json({
+      ...updated,
+      paymentTermCode: updated.paymentTerm?.code ?? null,
+      paymentTermDescription: updated.paymentTerm?.description ?? null,
+    });
   } catch (err: any) {
     return NextResponse.json({ error: String(err?.message || err) }, { status: 500 });
   }
@@ -206,7 +235,8 @@ export async function PATCH(request: Request, { params }: { params: { id: string
 export async function DELETE(_: Request, { params }: { params: { id: string } }) {
   try {
     const id = Number(params.id);
-    await prisma.$executeRawUnsafe('DELETE FROM "Client" WHERE id=?', id);
+    if (!Number.isFinite(id)) return NextResponse.json({ error: 'id inválido' }, { status: 400 });
+    await prisma.client.delete({ where: { id: Math.trunc(id) } });
     return NextResponse.json({ ok: true });
   } catch (err: any) {
     return NextResponse.json({ error: String(err?.message || err) }, { status: 500 });

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '../../../../../lib/prisma';
+import bcrypt from 'bcryptjs';
 
 function normalizeDoc(doc: string): string {
   return (doc || '').replace(/\D+/g, '');
@@ -32,6 +33,10 @@ export async function PATCH(request: Request, { params }: { params: { doc: strin
     if (body.email !== undefined) data.email = body.email == null ? null : String(body.email);
     if (body.doc !== undefined) data.doc = normalizeDoc(String(body.doc || '')) || null;
     if (body.salesRepAdmin !== undefined) data.salesRepAdmin = Boolean(body.salesRepAdmin);
+    if (body.erpIntegrationMode !== undefined) data.erpIntegrationMode = String(body.erpIntegrationMode);
+    if (body.password !== undefined && String(body.password).length > 0) {
+      data.password = await bcrypt.hash(String(body.password), 10);
+    }
 
     if (data.email !== undefined && data.email !== null && data.email !== '') {
       const found = await prisma.user.findUnique({ where: { email: String(data.email) }, select: { doc: true } }).catch(() => null);

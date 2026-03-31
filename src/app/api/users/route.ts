@@ -48,9 +48,11 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   const data = await request.json();
-  const { name, email, password, erpIntegrationMode } = data || {};
+  const { name, email, password, erpIntegrationMode, salesRepAdmin } = data || {};
   const doc = normalizeDoc(String((data as any)?.doc || '')) || null;
-  const hashed = await bcrypt.hash(password, 10);
+  const passwordStr = String(password || '');
+  if (!passwordStr) return NextResponse.json({ error: 'password é obrigatório' }, { status: 400 });
+  const hashed = await bcrypt.hash(passwordStr, 10);
 
   let finalEmail = email;
   if (email) {
@@ -64,23 +66,27 @@ export async function POST(request: Request) {
   }
 
   if (doc) {
+    const update: any = {
+      name: String(name || ''),
+      email: finalEmail ?? null,
+      password: String(hashed),
+      erpIntegrationMode: String(erpIntegrationMode || 'TEST'),
+    };
+    if (salesRepAdmin !== undefined) update.salesRepAdmin = Boolean(salesRepAdmin);
+
+    const create: any = {
+      name: String(name || ''),
+      email: finalEmail ?? null,
+      password: String(hashed),
+      doc,
+      salesRepAdmin: Boolean(salesRepAdmin),
+      isSalesAdmin: false,
+      erpIntegrationMode: String(erpIntegrationMode || 'TEST'),
+    };
     const upserted = await prisma.user.upsert({
       where: { doc },
-      update: {
-        name: String(name || ''),
-        email: finalEmail ?? null,
-        password: String(hashed),
-        erpIntegrationMode: String(erpIntegrationMode || 'TEST'),
-      },
-      create: {
-        name: String(name || ''),
-        email: finalEmail ?? null,
-        password: String(hashed),
-        doc,
-        salesRepAdmin: false,
-        isSalesAdmin: false,
-        erpIntegrationMode: String(erpIntegrationMode || 'TEST'),
-      },
+      update,
+      create,
       select: {
         id: true,
         name: true,
@@ -97,7 +103,7 @@ export async function POST(request: Request) {
   }
   
   const created = await prisma.user.create({ 
-    data: { name, email: finalEmail, password: hashed, erpIntegrationMode: erpIntegrationMode || 'TEST' }, 
+    data: { name, email: finalEmail, password: hashed, erpIntegrationMode: erpIntegrationMode || 'TEST', salesRepAdmin: Boolean(salesRepAdmin), isSalesAdmin: false }, 
     select: { id: true, name: true, email: true, createdAt: true, updatedAt: true, salesRepAdmin: true, isSalesAdmin: true, erpIntegrationMode: true } 
   });
   return NextResponse.json(created);

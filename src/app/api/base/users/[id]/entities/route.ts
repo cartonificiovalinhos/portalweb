@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server';
-// Rebuild trigger: Fix webpack runtime error
 import { prisma } from '../../../../../../lib/prisma';
 
 function normalizeDoc(doc: string): string {
@@ -20,7 +19,6 @@ async function resolveEntityIdByCnpj(entityCnpj: string): Promise<number> {
   return match?.id || 0;
 }
 
-// GET: Lista todas as entidades com flag se estão vinculadas ao usuário
 export async function GET(request: Request, { params }: { params: { id: string } }) {
   try {
     const url = new URL(request.url);
@@ -40,19 +38,15 @@ export async function GET(request: Request, { params }: { params: { id: string }
       return NextResponse.json({
         entities: entities.map((e) => ({ ...e, linked: linkedSet.has(e.id) ? 1 : 0 })),
       });
-    } catch (err: any) {
-      // Fallback defensivo: se tabela de vínculo não existir ainda, retornar entidades sem vínculo
-      console.warn('Fallback GET /api/admin/users/[id]/entities sem JOIN (provável tabela ausente):', err?.message || err);
+    } catch {
       const ents = await prisma.entity.findMany({ orderBy: { id: 'asc' }, select: { id: true, name: true, cnpj: true } });
       return NextResponse.json({ entities: ents.map((e) => ({ ...e, linked: 0 })) });
     }
   } catch (err: any) {
-    console.error('GET /api/admin/users/[id]/entities error:', err);
     return NextResponse.json({ error: String(err?.message || err) }, { status: 500 });
   }
 }
 
-// PUT: Vincula/Desvincula entidade ao usuário
 export async function PUT(request: Request, { params }: { params: { id: string } }) {
   try {
     let userId = Number(params.id);
@@ -71,7 +65,6 @@ export async function PUT(request: Request, { params }: { params: { id: string }
     const linked = body?.linked === undefined ? true : Boolean(body?.linked);
     if (!entityId) return NextResponse.json({ error: 'entityId inválido' }, { status: 400 });
 
-    // Verificar existência de entidade
     const eRow = await prisma.entity.findUnique({ where: { id: entityId }, select: { id: true } });
     if (!eRow) return NextResponse.json({ error: 'Entidade não encontrada' }, { status: 404 });
 
