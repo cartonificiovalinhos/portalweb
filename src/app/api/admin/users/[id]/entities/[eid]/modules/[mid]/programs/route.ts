@@ -15,6 +15,60 @@ async function resolveEntityIdByCnpj(entityCnpj: string): Promise<number> {
   return match?.id || 0;
 }
 
+async function ensureUserEntityModuleId(userEntityId: number, moduleId: number): Promise<number | null> {
+  const ueId = Number(userEntityId);
+  const mId = Number(moduleId);
+  if (!Number.isFinite(ueId) || ueId <= 0) return null;
+  if (!Number.isFinite(mId) || mId <= 0) return null;
+  await prisma.$executeRawUnsafe(
+    'DELETE FROM userentitymodule WHERE userEntityId = ? AND moduleId = ? AND id IS NULL',
+    Math.trunc(ueId),
+    Math.trunc(mId),
+  ).catch(() => {});
+  await prisma.$executeRawUnsafe(
+    'INSERT IGNORE INTO userentitymodule (userEntityId, moduleId, allowed) VALUES (?, ?, 1)',
+    Math.trunc(ueId),
+    Math.trunc(mId),
+  ).catch(() => {});
+  await prisma.$executeRawUnsafe(
+    'UPDATE userentitymodule SET allowed = 1 WHERE userEntityId = ? AND moduleId = ?',
+    Math.trunc(ueId),
+    Math.trunc(mId),
+  ).catch(() => {});
+  const rows = await prisma
+    .$queryRawUnsafe<any[]>(
+      'SELECT id FROM userentitymodule WHERE userEntityId = ? AND moduleId = ? AND id IS NOT NULL ORDER BY id DESC LIMIT 1',
+      Math.trunc(ueId),
+      Math.trunc(mId),
+    )
+    .catch(() => null);
+  const id = rows?.[0]?.id ?? null;
+  return id === null || id === undefined ? null : Number(id);
+}
+
+async function getAllowedProgramIdSet(userEntityModuleId: number, programIds: number[]): Promise<Set<number>> {
+  const out = new Set<number>();
+  const uemId = Number(userEntityModuleId);
+  if (!Number.isFinite(uemId) || uemId <= 0) return out;
+  if (!Array.isArray(programIds) || programIds.length === 0) return out;
+  const list = programIds.map((n) => Math.trunc(Number(n))).filter((n) => Number.isFinite(n) && n > 0);
+  if (list.length === 0) return out;
+  const placeholders = list.map(() => '?').join(',');
+  const rows = await prisma
+    .$queryRawUnsafe<any[]>(
+      `SELECT programId FROM userentitymoduleprogram WHERE userEntityModuleId = ? AND allowed = 1 AND programId IN (${placeholders})`,
+      Math.trunc(uemId),
+      ...list,
+    )
+    .catch(() => []);
+  for (const r of rows || []) {
+    const pid = r?.programId;
+    const n = pid === null || pid === undefined ? NaN : Number(pid);
+    if (Number.isFinite(n)) out.add(Math.trunc(n));
+  }
+  return out;
+}
+
 // GET: Lista programas vinculados à entidade/módulo e flag se estão permitidos ao usuário
 export async function GET(request: Request, { params }: { params: { id: string; eid: string; mid: string } }) {
   try {
@@ -46,13 +100,6 @@ export async function GET(request: Request, { params }: { params: { id: string; 
 
     if (!entityModule?.id) return NextResponse.json({ programs: [] });
 
-    const uem = userEntity?.id
-      ? await prisma.userEntityModule.findUnique({
-          where: { userEntityId_moduleId: { userEntityId: userEntity.id, moduleId } },
-          select: { id: true },
-        })
-      : null;
-
     const emps = await prisma.entityModuleProgram.findMany({
       where: { entityModuleId: entityModule.id },
       include: { program: { select: { id: true, code: true, name: true } } },
@@ -60,13 +107,8 @@ export async function GET(request: Request, { params }: { params: { id: string; 
     });
 
     const programIds = emps.map((p) => p.programId);
-    const userLinks = uem?.id
-      ? await prisma.userEntityModuleProgram.findMany({
-          where: { userEntityModuleId: uem.id, programId: { in: programIds } },
-          select: { programId: true },
-        })
-      : [];
-    const userAllowedSet = new Set(userLinks.map((l) => l.programId));
+    const uemId = userEntity?.id ? await ensureUserEntityModuleId(userEntity.id, moduleId) : null;
+    const userAllowedSet = uemId ? await getAllowedProgramIdSet(uemId, programIds) : new Set<number>();
 
     return NextResponse.json({
       programs: emps.map((emp) => ({
@@ -109,43 +151,31 @@ export async function PUT(request: Request, { params }: { params: { id: string; 
         update: {},
         select: { id: true },
       });
-      await prisma.$transaction(async (tx) => {
-        await tx.userEntityModule.createMany({
-          data: [{ userEntityId: ue.id, moduleId, allowed: true }],
-          skipDuplicates: true,
-        });
-        await tx.userEntityModule.updateMany({
-          where: { userEntityId: ue.id, moduleId },
-          data: { allowed: true },
-        });
-      });
-      const uem = await prisma.userEntityModule.findUnique({
-        where: { userEntityId_moduleId: { userEntityId: ue.id, moduleId } },
-        select: { id: true },
-      });
-      if (!uem?.id) return NextResponse.json({ error: 'Falha ao vincular módulo ao usuário' }, { status: 500 });
-      await prisma.$transaction(async (tx) => {
-        await tx.userEntityModuleProgram.createMany({
-          data: [{ userEntityModuleId: uem.id, programId, allowed: true }],
-          skipDuplicates: true,
-        });
-        await tx.userEntityModuleProgram.updateMany({
-          where: { userEntityModuleId: uem.id, programId },
-          data: { allowed: true },
-        });
-      });
+      const uemId = await ensureUserEntityModuleId(ue.id, moduleId);
+      if (!uemId) return NextResponse.json({ error: 'Falha ao vincular módulo ao usuário (schema/dados inválidos)' }, { status: 500 });
+      await prisma.$executeRawUnsafe(
+        'INSERT IGNORE INTO userentitymoduleprogram (userEntityModuleId, programId, allowed) VALUES (?, ?, 1)',
+        Math.trunc(uemId),
+        Math.trunc(programId),
+      ).catch(() => {});
+      await prisma.$executeRawUnsafe(
+        'UPDATE userentitymoduleprogram SET allowed = 1 WHERE userEntityModuleId = ? AND programId = ?',
+        Math.trunc(uemId),
+        Math.trunc(programId),
+      ).catch(() => {});
     } else {
       const ue = await prisma.userEntity.findUnique({
         where: { userId_entityId: { userId, entityId } },
         select: { id: true },
       });
       if (!ue?.id) return NextResponse.json({ ok: true });
-      const uem = await prisma.userEntityModule.findUnique({
-        where: { userEntityId_moduleId: { userEntityId: ue.id, moduleId } },
-        select: { id: true },
-      });
-      if (!uem?.id) return NextResponse.json({ ok: true });
-      await prisma.userEntityModuleProgram.deleteMany({ where: { userEntityModuleId: uem.id, programId } });
+      const uemId = await ensureUserEntityModuleId(ue.id, moduleId);
+      if (!uemId) return NextResponse.json({ ok: true });
+      await prisma.$executeRawUnsafe(
+        'DELETE FROM userentitymoduleprogram WHERE userEntityModuleId = ? AND programId = ?',
+        Math.trunc(uemId),
+        Math.trunc(programId),
+      ).catch(() => {});
     }
     return NextResponse.json({ ok: true });
   } catch (err: any) {
@@ -185,23 +215,8 @@ export async function PATCH(request: Request, { params }: { params: { id: string
         });
     if (!ue?.id) return NextResponse.json({ ok: true, action });
 
-    if (action === 'link_all') {
-      await prisma.$transaction(async (tx) => {
-        await tx.userEntityModule.createMany({
-          data: [{ userEntityId: ue.id, moduleId, allowed: true }],
-          skipDuplicates: true,
-        });
-        await tx.userEntityModule.updateMany({
-          where: { userEntityId: ue.id, moduleId },
-          data: { allowed: true },
-        });
-      });
-    }
-    const uem = await prisma.userEntityModule.findUnique({
-      where: { userEntityId_moduleId: { userEntityId: ue.id, moduleId } },
-      select: { id: true },
-    });
-    if (!uem?.id) return NextResponse.json({ ok: true, action });
+    const uemId = await ensureUserEntityModuleId(ue.id, moduleId);
+    if (!uemId) return NextResponse.json({ ok: true, action });
 
     if (action === 'link_all') {
       const em = await prisma.entityModule.findUnique({
@@ -213,16 +228,23 @@ export async function PATCH(request: Request, { params }: { params: { id: string
         where: { entityModuleId: em.id },
         select: { programId: true },
       });
-      await prisma.userEntityModuleProgram.createMany({
-        data: empPrograms.map((p) => ({ userEntityModuleId: uem.id, programId: p.programId, allowed: true })),
-        skipDuplicates: true,
-      });
+      const ids = empPrograms.map((p) => Number(p.programId)).filter((n) => Number.isFinite(n) && n > 0);
+      if (ids.length > 0) {
+        await prisma.userEntityModuleProgram.createMany({
+          data: ids.map((pid) => ({ userEntityModuleId: uemId, programId: pid, allowed: true })),
+          skipDuplicates: true,
+        });
+        await prisma.userEntityModuleProgram.updateMany({
+          where: { userEntityModuleId: uemId, programId: { in: ids } },
+          data: { allowed: true },
+        });
+      }
       return NextResponse.json({ ok: true, action: 'link_all' });
     }
 
     if (action === 'unlink_all') {
       // Remove todos os programas vinculados ao usuário para este módulo
-      await prisma.userEntityModuleProgram.deleteMany({ where: { userEntityModuleId: uem.id } });
+      await prisma.userEntityModuleProgram.deleteMany({ where: { userEntityModuleId: uemId } });
       return NextResponse.json({ ok: true, action: 'unlink_all' });
     }
 

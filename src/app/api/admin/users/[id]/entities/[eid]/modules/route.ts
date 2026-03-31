@@ -15,6 +15,37 @@ async function resolveEntityIdByCnpj(entityCnpj: string): Promise<number> {
   return match?.id || 0;
 }
 
+async function ensureUserEntityModuleId(userEntityId: number, moduleId: number): Promise<number | null> {
+  const ueId = Number(userEntityId);
+  const mId = Number(moduleId);
+  if (!Number.isFinite(ueId) || ueId <= 0) return null;
+  if (!Number.isFinite(mId) || mId <= 0) return null;
+  await prisma.$executeRawUnsafe(
+    'DELETE FROM userentitymodule WHERE userEntityId = ? AND moduleId = ? AND id IS NULL',
+    Math.trunc(ueId),
+    Math.trunc(mId),
+  ).catch(() => {});
+  await prisma.$executeRawUnsafe(
+    'INSERT IGNORE INTO userentitymodule (userEntityId, moduleId, allowed) VALUES (?, ?, 1)',
+    Math.trunc(ueId),
+    Math.trunc(mId),
+  ).catch(() => {});
+  await prisma.$executeRawUnsafe(
+    'UPDATE userentitymodule SET allowed = 1 WHERE userEntityId = ? AND moduleId = ?',
+    Math.trunc(ueId),
+    Math.trunc(mId),
+  ).catch(() => {});
+  const rows = await prisma
+    .$queryRawUnsafe<any[]>(
+      'SELECT id FROM userentitymodule WHERE userEntityId = ? AND moduleId = ? AND id IS NOT NULL ORDER BY id DESC LIMIT 1',
+      Math.trunc(ueId),
+      Math.trunc(mId),
+    )
+    .catch(() => null);
+  const id = rows?.[0]?.id ?? null;
+  return id === null || id === undefined ? null : Number(id);
+}
+
 // GET: Lista módulos vinculados à entidade (apenas os vinculados) e flag se estão vinculados ao usuário
 export async function GET(request: Request, { params }: { params: { id: string; eid: string } }) {
   try {
@@ -43,16 +74,20 @@ export async function GET(request: Request, { params }: { params: { id: string; 
       orderBy: { moduleId: 'asc' },
     });
 
-    const userLinkedSet = userEntity?.id
-      ? new Set(
-          (
-            await prisma.userEntityModule.findMany({
-              where: { userEntityId: userEntity.id },
-              select: { moduleId: true },
-            })
-          ).map((m) => m.moduleId),
+    const userLinkedSet = new Set<number>();
+    if (userEntity?.id) {
+      const rows = await prisma
+        .$queryRawUnsafe<any[]>(
+          'SELECT moduleId FROM userentitymodule WHERE userEntityId = ?',
+          Math.trunc(userEntity.id),
         )
-      : new Set<number>();
+        .catch(() => []);
+      for (const r of rows || []) {
+        const mid = r?.moduleId;
+        const n = mid === null || mid === undefined ? NaN : Number(mid);
+        if (Number.isFinite(n)) userLinkedSet.add(Math.trunc(n));
+      }
+    }
 
     return NextResponse.json({
       modules: entityModules.map((em) => ({
@@ -94,28 +129,28 @@ export async function PUT(request: Request, { params }: { params: { id: string; 
         update: {},
         select: { id: true },
       });
-      await prisma.$transaction(async (tx) => {
-        await tx.userEntityModule.createMany({
-          data: [{ userEntityId: ue.id, moduleId, allowed: true }],
-          skipDuplicates: true,
-        });
-        await tx.userEntityModule.updateMany({
-          where: { userEntityId: ue.id, moduleId },
-          data: { allowed: true },
-        });
-      });
+      const ensuredId = await ensureUserEntityModuleId(ue.id, moduleId);
+      if (!ensuredId) {
+        return NextResponse.json({ error: 'Falha ao vincular módulo ao usuário (schema/dados inválidos)' }, { status: 500 });
+      }
     } else {
       const ue = await prisma.userEntity.findUnique({
         where: { userId_entityId: { userId, entityId } },
         select: { id: true },
       });
       if (!ue?.id) return NextResponse.json({ ok: true });
-      await prisma.$transaction([
-        prisma.userEntityModuleProgram.deleteMany({
-          where: { userEntityModule: { userEntityId: ue.id, moduleId } },
-        }),
-        prisma.userEntityModule.deleteMany({ where: { userEntityId: ue.id, moduleId } }),
-      ]);
+      const uemId = await ensureUserEntityModuleId(ue.id, moduleId);
+      if (uemId) {
+        await prisma.$executeRawUnsafe(
+          'DELETE FROM userentitymoduleprogram WHERE userEntityModuleId = ?',
+          Math.trunc(uemId),
+        ).catch(() => {});
+      }
+      await prisma.$executeRawUnsafe(
+        'DELETE FROM userentitymodule WHERE userEntityId = ? AND moduleId = ?',
+        Math.trunc(ue.id),
+        Math.trunc(moduleId),
+      ).catch(() => {});
     }
 
     return NextResponse.json({ ok: true });

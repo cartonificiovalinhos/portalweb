@@ -23,8 +23,6 @@ export async function GET() {
     // Módulos e programas permitidos na entidade ativa
     const modules: any[] = [];
     if (activeEntityId) {
-      // 1. Buscar módulos ativos vinculados à entidade
-      // Query raw original: SELECT m.* FROM Module m JOIN EntityModule em ...
       const entityModules = await prisma.entityModule.findMany({
         where: {
           entityId: activeEntityId,
@@ -41,21 +39,21 @@ export async function GET() {
       for (const em of entityModules) {
         const mod = em.module;
         
-        // 2. Checar permissão do usuário no módulo (UserEntityModule)
-        // O usuário precisa ter um registro em UserEntityModule com allowed=true
-        // para a combinação UserEntity (userId+entityId) e Module
-        const userEntityModule = await prisma.userEntityModule.findFirst({
-          where: {
-            userEntity: {
-              userId: uid,
-              entityId: activeEntityId
-            },
-            moduleId: mod.id,
-            allowed: true
-          }
-        });
-
-        if (!userEntityModule) continue;
+        const uemRows = await prisma
+          .$queryRawUnsafe<any[]>(
+            `SELECT uem.id as id
+             FROM userentitymodule uem
+             JOIN userentity ue ON ue.id = uem.userEntityId
+             WHERE ue.userId = ? AND ue.entityId = ? AND uem.moduleId = ? AND uem.allowed = 1 AND uem.id IS NOT NULL
+             ORDER BY uem.id DESC
+             LIMIT 1`,
+            uid,
+            activeEntityId,
+            mod.id,
+          )
+          .catch(() => []);
+        const userEntityModuleId = uemRows?.[0]?.id ? Number(uemRows[0].id) : null;
+        if (!userEntityModuleId || !Number.isFinite(userEntityModuleId)) continue;
 
         // 3. Buscar programas do módulo (Program)
         // Devem estar ativos, showInMenu=true, e permitidos na entidade (EntityModuleProgram)
@@ -70,32 +68,51 @@ export async function GET() {
 
         const allowedPrograms: any[] = [];
 
+        const programIds = allPrograms.map((p) => p.id);
+        const empRows = programIds.length
+          ? await prisma
+              .$queryRawUnsafe<any[]>(
+                `SELECT programId, allowed
+                 FROM entitymoduleprogram
+                 WHERE entityModuleId = ? AND programId IN (${programIds.map(() => '?').join(',')})`,
+                em.id,
+                ...programIds,
+              )
+              .catch(() => [])
+          : [];
+        const entityAllowedByProgramId = new Map<number, boolean>();
+        for (const r of empRows || []) {
+          const pid = r?.programId;
+          const allowed = r?.allowed;
+          const pNum = pid === null || pid === undefined ? NaN : Number(pid);
+          if (!Number.isFinite(pNum)) continue;
+          entityAllowedByProgramId.set(Math.trunc(pNum), Boolean(allowed));
+        }
+
+        const uempRows = programIds.length
+          ? await prisma
+              .$queryRawUnsafe<any[]>(
+                `SELECT programId
+                 FROM userentitymoduleprogram
+                 WHERE userEntityModuleId = ? AND allowed = 1 AND id IS NOT NULL AND programId IN (${programIds.map(() => '?').join(',')})`,
+                userEntityModuleId,
+                ...programIds,
+              )
+              .catch(() => [])
+          : [];
+        const userAllowedSet = new Set<number>();
+        for (const r of uempRows || []) {
+          const pid = r?.programId;
+          const pNum = pid === null || pid === undefined ? NaN : Number(pid);
+          if (!Number.isFinite(pNum)) continue;
+          userAllowedSet.add(Math.trunc(pNum));
+        }
+
         for (const prog of allPrograms) {
-          // Checar se o programa é permitido na entidade (EntityModuleProgram)
-          // Se não existir registro, assume allowed=true (COALESCE no SQL original)
-          const emp = await prisma.entityModuleProgram.findUnique({
-            where: {
-              entityModuleId_programId: {
-                entityModuleId: em.id,
-                programId: prog.id
-              }
-            }
-          });
-          
-          const isEntityAllowed = emp ? emp.allowed : true;
+          const isEntityAllowed = entityAllowedByProgramId.has(prog.id) ? Boolean(entityAllowedByProgramId.get(prog.id)) : true;
           if (!isEntityAllowed) continue;
 
-          // 4. Checar permissão do usuário no programa (UserEntityModuleProgram)
-          // Precisa existir registro com allowed=true
-          const uemp = await prisma.userEntityModuleProgram.findFirst({
-            where: {
-              userEntityModuleId: userEntityModule.id,
-              programId: prog.id,
-              allowed: true
-            }
-          });
-
-          if (uemp) {
+          if (userAllowedSet.has(prog.id)) {
             allowedPrograms.push({
               id: prog.id,
               code: prog.code,
