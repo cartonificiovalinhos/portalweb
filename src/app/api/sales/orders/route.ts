@@ -7,6 +7,17 @@ function normalizeDoc(doc: string): string {
   return (doc || '').replace(/\D+/g, '');
 }
 
+async function resolveEntityIdFromDoc(raw: unknown): Promise<number | undefined> {
+  const doc = typeof raw === 'string' ? normalizeDoc(raw) : '';
+  if (!doc) return undefined;
+  const direct = await prisma.entity.findFirst({ where: { cnpj: doc }, select: { id: true } }).catch(() => null);
+  if (direct?.id) return Number(direct.id);
+  const candidates = await prisma.entity.findMany({ select: { id: true, cnpj: true } }).catch(() => []);
+  const match = (candidates || []).find((e: any) => normalizeDoc(String(e?.cnpj || '')) === doc);
+  const id = match?.id;
+  return id ? Number(id) : undefined;
+}
+
 function computeWeightKgFromFields(it: { width?: number | null; length?: number | null; grammage?: number | null; quantity?: number | null }): number {
   const w = Number(it.width ?? 0);
   const l = Number(it.length ?? 0);
@@ -169,14 +180,8 @@ export async function POST(request: Request) {
       ? entityDoc
       : undefined;
     if (rawCnpj) {
-      const doc = rawCnpj.replace(/\D+/g, '');
-      if (doc) {
-        const rows: any[] = await prisma.$queryRawUnsafe(
-          `SELECT "id" FROM "Entity" WHERE regexp_replace("cnpj", '\\D', '', 'g')='${doc}' LIMIT 1`
-        );
-        const eid = rows[0]?.id as number | undefined;
-        if (eid) entityId = eid;
-      }
+      const eid = await resolveEntityIdFromDoc(rawCnpj);
+      if (eid) entityId = eid;
     }
     if (!entityId && createdById) {
       const u = await prisma.user.findUnique({ where: { id: createdById }, select: { lastEntityId: true } });

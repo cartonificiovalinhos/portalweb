@@ -31,7 +31,15 @@ export async function POST(request: Request) {
     
     // Fetch Entity for entityDoc
     let entityDoc = '';
-    if (user?.lastEntityId) {
+    const sessionEntityIdRaw = (session as any)?.entityId ?? (session as any)?.activeEntityId ?? null;
+    const sessionEntityId = sessionEntityIdRaw ? Number(sessionEntityIdRaw) : null;
+    if (sessionEntityId && Number.isFinite(sessionEntityId) && sessionEntityId > 0) {
+        const entity = await prisma.entity.findUnique({
+            where: { id: Math.trunc(sessionEntityId) },
+            select: { cnpj: true }
+        });
+        entityDoc = (entity?.cnpj || '').replace(/\D/g, '');
+    } else if (user?.lastEntityId) {
         const entity = await prisma.entity.findUnique({
             where: { id: user.lastEntityId },
             select: { cnpj: true }
@@ -110,14 +118,23 @@ export async function POST(request: Request) {
     const apiUrl = erpUrl.endsWith('/') ? `${erpUrl}apiIntegrTotvsDts/` : `${erpUrl}/apiIntegrTotvsDts/`;
 
     // Call External API
-    const response = await fetch(apiUrl, {
-      method: 'POST',
-      headers: {
-        'Accept': 'application/json',
-        'Content-Type': 'application/json; charset=UTF-8'
-      },
-      body: JSON.stringify(payload)
-    });
+    let response: Response;
+    try {
+      response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json; charset=UTF-8'
+        },
+        body: JSON.stringify(payload)
+      });
+    } catch (e: any) {
+      const msg = e?.message || String(e);
+      return NextResponse.json(
+        { error: `Falha ao conectar na API do ERP (${apiUrl}). Verifique a configuração em Configurações > URL do ERP. Detalhe: ${msg}` },
+        { status: 500 }
+      );
+    }
 
     if (!response.ok) {
         const text = await response.text();

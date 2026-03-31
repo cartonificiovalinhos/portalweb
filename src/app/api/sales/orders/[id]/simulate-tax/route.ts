@@ -3,13 +3,8 @@ import { prisma } from '../../../../../../lib/prisma';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '../../../../../../lib/auth';
 
-async function ensureClientPaymentTermColumn() {
-  await prisma.$executeRawUnsafe('ALTER TABLE "Client" ADD COLUMN IF NOT EXISTS "paymentTermId" INTEGER');
-}
-
 export async function POST(request: Request, { params }: { params: { id: string } }) {
   try {
-    await ensureClientPaymentTermColumn();
     const session = await getServerSession(authOptions);
     const userId = session?.user ? Number((session.user as any).id) : null;
     if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -71,7 +66,12 @@ export async function POST(request: Request, { params }: { params: { id: string 
             where: { id: userId },
             select: { lastEntityId: true }
         });
-        if (user?.lastEntityId) {
+        const sessionEntityIdRaw = (session as any)?.entityId ?? (session as any)?.activeEntityId ?? null;
+        const sessionEntityId = sessionEntityIdRaw ? Number(sessionEntityIdRaw) : null;
+        if (sessionEntityId && Number.isFinite(sessionEntityId) && sessionEntityId > 0) {
+             const entity = await prisma.entity.findUnique({ where: { id: Math.trunc(sessionEntityId) } });
+             if (entity) entityDoc = (entity.cnpj || '').replace(/\D/g, '');
+        } else if (user?.lastEntityId) {
              const entity = await prisma.entity.findUnique({ where: { id: user.lastEntityId } });
              if (entity) entityDoc = (entity.cnpj || '').replace(/\D/g, '');
         }
@@ -128,14 +128,23 @@ export async function POST(request: Request, { params }: { params: { id: string 
     const apiUrl = erpUrl.endsWith('/') ? `${erpUrl}apiIntegrTotvsDts/` : `${erpUrl}/apiIntegrTotvsDts/`;
 
     // Call External API
-    const response = await fetch(apiUrl, {
-      method: 'POST',
-      headers: {
-        'Accept': 'application/json',
-        'Content-Type': 'application/json; charset=UTF-8'
-      },
-      body: JSON.stringify(payload)
-    });
+    let response: Response;
+    try {
+      response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json; charset=UTF-8'
+        },
+        body: JSON.stringify(payload)
+      });
+    } catch (e: any) {
+      const msg = e?.message || String(e);
+      return NextResponse.json(
+        { error: `Falha ao conectar na API do ERP (${apiUrl}). Verifique a configuração em Configurações > URL do ERP. Detalhe: ${msg}` },
+        { status: 500 }
+      );
+    }
 
     if (!response.ok) {
         const text = await response.text();
