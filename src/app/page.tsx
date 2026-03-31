@@ -12,44 +12,31 @@ export default async function HomePage() {
   const uid = session?.user ? Number((session.user as any).id) : null;
   const activeEntityId = (session as any)?.entityId ? Number((session as any).entityId) : ((session as any)?.activeEntityId ? Number((session as any).activeEntityId) : null);
 
-  let modules: any[] = [];
+  let modules: Array<{ id: number; code: string; name: string }> = [];
 
   if (uid && activeEntityId) {
-    const rawModules = await prisma.module.findMany({
-      where: {
-        showDashboardTab: true,
-        isActive: true,
-        entityModules: {
-          some: {
-            entityId: activeEntityId
-          }
-        }
-      },
-      include: {
-        userEntityModules: {
-          where: {
-            userEntity: {
-              userId: uid,
-              entityId: activeEntityId
-            }
-          }
-        }
-      },
-      orderBy: {
-        name: 'asc',
-      },
-    });
+    const rows = await prisma
+      .$queryRawUnsafe<any[]>(
+        `SELECT DISTINCT m.id, m.code, m.name
+         FROM module m
+         JOIN entitymodule em ON em.moduleId = m.id AND em.entityId = ?
+         JOIN userentity ue ON ue.userId = ? AND ue.entityId = ?
+         JOIN userentitymodule uem ON uem.userEntityId = ue.id AND uem.moduleId = m.id AND uem.allowed = 1 AND uem.id IS NOT NULL
+         WHERE m.showDashboardTab = 1 AND m.isActive = 1
+         ORDER BY m.name ASC`,
+        Math.trunc(activeEntityId),
+        Math.trunc(uid),
+        Math.trunc(activeEntityId),
+      )
+      .catch(() => []);
 
-    modules = rawModules.filter(m => {
-      // Se não houver registro de permissão específica, assume negado (por segurança)
-      // Se houver, respeita o flag allowed
-      if (m.userEntityModules.length === 0) return false;
-      return m.userEntityModules[0].allowed;
-    }).map(m => ({
-      id: m.id,
-      code: m.code,
-      name: m.name
-    }));
+    modules = (rows || [])
+      .map((r) => ({
+        id: Number(r?.id),
+        code: String(r?.code || ''),
+        name: String(r?.name || ''),
+      }))
+      .filter((m) => Number.isFinite(m.id) && m.id > 0 && m.code && m.name);
   }
 
   return (
