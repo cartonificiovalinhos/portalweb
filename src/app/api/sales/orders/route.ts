@@ -301,28 +301,101 @@ export async function POST(request: Request) {
     }
 
     const code = `ORD-${Date.now()}`;
-    const created = await prisma.salesOrder.create({
-      data: {
+    const orderCreateData = {
+      code,
+      entityId,
+      customerName,
+      customerDoc: customerDocNorm || undefined,
+      clientId: clientId,
+      triangularCustomerName: triangularCustomerName || undefined,
+      triangularCustomerDoc: triangularCustomerDocNorm || undefined,
+      paymentTerms: paymentTerms !== undefined && paymentTerms !== null ? String(paymentTerms) : undefined,
+      carrier: carrier || undefined,
+      deliveryDate: parseDate(deliveryDate),
+      notes: notes || undefined,
+      createdById: createdById,
+      subtotal,
+      discountTotal,
+      total,
+      items: { create: normalizedItems },
+    } as const;
+
+    try {
+      const created = await prisma.salesOrder.create({
+        data: orderCreateData,
+        include: { items: true },
+      });
+      return NextResponse.json(created, { status: 201 });
+    } catch (e: any) {
+      const msg = String(e?.message || e);
+      if (!msg.includes('Could not figure out an ID in create')) throw e;
+
+      await prisma
+        .$executeRawUnsafe(
+          `INSERT INTO salesorder
+            (code, entityId, customerName, customerDoc, clientId, triangularCustomerName, triangularCustomerDoc, paymentTerms, carrier, deliveryDate, notes, createdById, subtotal, discountTotal, total)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          code,
+          entityId ?? null,
+          customerName,
+          customerDocNorm || null,
+          clientId ?? null,
+          triangularCustomerName || null,
+          triangularCustomerDocNorm || null,
+          paymentTerms !== undefined && paymentTerms !== null ? String(paymentTerms) : null,
+          carrier || null,
+          parseDate(deliveryDate) ?? null,
+          notes || null,
+          createdById ?? null,
+          subtotal,
+          discountTotal,
+          total,
+        )
+        .catch((inner) => {
+          throw inner;
+        });
+
+      const idRows = await prisma.$queryRawUnsafe<any[]>(
+        'SELECT id FROM salesorder WHERE code = ? LIMIT 1',
         code,
-        entityId,
-        customerName,
-        customerDoc: customerDocNorm || undefined,
-        clientId: clientId,
-        triangularCustomerName: triangularCustomerName || undefined,
-        triangularCustomerDoc: triangularCustomerDocNorm || undefined,
-        paymentTerms: paymentTerms !== undefined && paymentTerms !== null ? String(paymentTerms) : undefined,
-        carrier: carrier || undefined,
-        deliveryDate: parseDate(deliveryDate),
-        notes: notes || undefined,
-        createdById: createdById,
-        subtotal,
-        discountTotal,
-        total,
-        items: { create: normalizedItems },
-      },
-      include: { items: true },
-    });
-    return NextResponse.json(created, { status: 201 });
+      );
+      const createdId = idRows?.[0]?.id ? Number(idRows[0].id) : null;
+      if (!createdId || !Number.isFinite(createdId)) {
+        return NextResponse.json({ error: 'Falha ao obter ID do pedido após criação (fallback)' }, { status: 500 });
+      }
+
+      for (const it of normalizedItems as any[]) {
+        const creasesJson = it.creases !== undefined ? JSON.stringify(it.creases) : null;
+        await prisma.$executeRawUnsafe(
+          `INSERT INTO salesorderitem
+            (orderId, inventoryItemId, sku, name, quantity, unit, unitPrice, discountPct, lineTotal, width, length, grammage, diameter, tube, weightKg, creases, clientOrderNumber, clientOrderItemNumber, itemDeliveryDate, internalResin, externalResin)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          Math.trunc(createdId),
+          it.inventoryItemId ?? null,
+          it.sku ?? null,
+          it.name,
+          Math.trunc(Number(it.quantity ?? 1)),
+          it.unit ?? null,
+          Number(it.unitPrice ?? 0),
+          Number(it.discountPct ?? 0),
+          Number(it.lineTotal ?? 0),
+          it.width ?? null,
+          it.length ?? null,
+          it.grammage ?? null,
+          it.diameter ?? null,
+          it.tube ?? null,
+          it.weightKg ?? null,
+          creasesJson,
+          it.clientOrderNumber ?? null,
+          it.clientOrderItemNumber ?? null,
+          it.itemDeliveryDate instanceof Date ? it.itemDeliveryDate : (it.itemDeliveryDate ? new Date(it.itemDeliveryDate) : null),
+          it.internalResin ? 1 : 0,
+          it.externalResin ? 1 : 0,
+        );
+      }
+
+      return NextResponse.json({ id: createdId }, { status: 201 });
+    }
   } catch (err: any) {
     console.error('Create order error:', err);
     return NextResponse.json({ error: String(err?.message || err) }, { status: 500 });
