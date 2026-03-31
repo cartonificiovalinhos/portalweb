@@ -330,11 +330,11 @@ export async function POST(request: Request) {
       const msg = String(e?.message || e);
       if (!msg.includes('Could not figure out an ID in create')) throw e;
 
-      await prisma
-        .$executeRawUnsafe(
+      const createdId = await prisma.$transaction(async (tx) => {
+        await tx.$executeRawUnsafe(
           `INSERT INTO salesorder
-            (code, entityId, customerName, customerDoc, clientId, triangularCustomerName, triangularCustomerDoc, paymentTerms, carrier, deliveryDate, notes, createdById, subtotal, discountTotal, total)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            (code, entityId, customerName, customerDoc, clientId, triangularCustomerName, triangularCustomerDoc, paymentTerms, carrier, deliveryDate, notes, createdById, subtotal, discountTotal, total, createdAt, updatedAt)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
           code,
           entityId ?? null,
           customerName,
@@ -350,48 +350,54 @@ export async function POST(request: Request) {
           subtotal,
           discountTotal,
           total,
-        )
-        .catch((inner) => {
-          throw inner;
-        });
+        );
 
-      const idRows = await prisma.$queryRawUnsafe<any[]>(
-        'SELECT id FROM salesorder WHERE code = ? LIMIT 1',
-        code,
-      );
-      const createdId = idRows?.[0]?.id ? Number(idRows[0].id) : null;
+        const lastIdRows = await tx.$queryRawUnsafe<any[]>('SELECT LAST_INSERT_ID() as id');
+        let id = lastIdRows?.[0]?.id ? Number(lastIdRows[0].id) : null;
+        if (!id || !Number.isFinite(id)) {
+          const byCodeRows = await tx.$queryRawUnsafe<any[]>(
+            'SELECT id FROM salesorder WHERE code = ? ORDER BY id DESC LIMIT 1',
+            code,
+          );
+          id = byCodeRows?.[0]?.id ? Number(byCodeRows[0].id) : null;
+        }
+        if (!id || !Number.isFinite(id)) return null;
+
+        for (const it of normalizedItems as any[]) {
+          const creasesJson = it.creases !== undefined ? JSON.stringify(it.creases) : null;
+          await tx.$executeRawUnsafe(
+            `INSERT INTO salesorderitem
+              (orderId, inventoryItemId, sku, name, quantity, unit, unitPrice, discountPct, lineTotal, width, length, grammage, diameter, tube, weightKg, creases, clientOrderNumber, clientOrderItemNumber, itemDeliveryDate, internalResin, externalResin)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            Math.trunc(id),
+            it.inventoryItemId ?? null,
+            it.sku ?? null,
+            it.name,
+            Math.trunc(Number(it.quantity ?? 1)),
+            it.unit ?? null,
+            Number(it.unitPrice ?? 0),
+            Number(it.discountPct ?? 0),
+            Number(it.lineTotal ?? 0),
+            it.width ?? null,
+            it.length ?? null,
+            it.grammage ?? null,
+            it.diameter ?? null,
+            it.tube ?? null,
+            it.weightKg ?? null,
+            creasesJson,
+            it.clientOrderNumber ?? null,
+            it.clientOrderItemNumber ?? null,
+            it.itemDeliveryDate instanceof Date ? it.itemDeliveryDate : (it.itemDeliveryDate ? new Date(it.itemDeliveryDate) : null),
+            it.internalResin ? 1 : 0,
+            it.externalResin ? 1 : 0,
+          );
+        }
+
+        return Math.trunc(id);
+      });
+
       if (!createdId || !Number.isFinite(createdId)) {
         return NextResponse.json({ error: 'Falha ao obter ID do pedido após criação (fallback)' }, { status: 500 });
-      }
-
-      for (const it of normalizedItems as any[]) {
-        const creasesJson = it.creases !== undefined ? JSON.stringify(it.creases) : null;
-        await prisma.$executeRawUnsafe(
-          `INSERT INTO salesorderitem
-            (orderId, inventoryItemId, sku, name, quantity, unit, unitPrice, discountPct, lineTotal, width, length, grammage, diameter, tube, weightKg, creases, clientOrderNumber, clientOrderItemNumber, itemDeliveryDate, internalResin, externalResin)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-          Math.trunc(createdId),
-          it.inventoryItemId ?? null,
-          it.sku ?? null,
-          it.name,
-          Math.trunc(Number(it.quantity ?? 1)),
-          it.unit ?? null,
-          Number(it.unitPrice ?? 0),
-          Number(it.discountPct ?? 0),
-          Number(it.lineTotal ?? 0),
-          it.width ?? null,
-          it.length ?? null,
-          it.grammage ?? null,
-          it.diameter ?? null,
-          it.tube ?? null,
-          it.weightKg ?? null,
-          creasesJson,
-          it.clientOrderNumber ?? null,
-          it.clientOrderItemNumber ?? null,
-          it.itemDeliveryDate instanceof Date ? it.itemDeliveryDate : (it.itemDeliveryDate ? new Date(it.itemDeliveryDate) : null),
-          it.internalResin ? 1 : 0,
-          it.externalResin ? 1 : 0,
-        );
       }
 
       return NextResponse.json({ id: createdId }, { status: 201 });
