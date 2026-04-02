@@ -147,6 +147,7 @@ export const SalesOrderItemRow = ({
   const [isSaving, setIsSaving] = useState(false);
   const [weightInput, setWeightInput] = useState('');
   const [isEditingWeight, setIsEditingWeight] = useState(false);
+  const [isRowLocked, setIsRowLocked] = useState(false);
 
   useEffect(() => {
     setLocalItem(prev => {
@@ -230,8 +231,10 @@ export const SalesOrderItemRow = ({
 
   const showWidthLengthGram = supportsSheetDims(localItem);
   const showDiameterTube = supportsCoreDims(localItem);
-  const canEdit = isOrderEditable;
+  const canEdit = isOrderEditable && !isRowLocked;
   const disabledClass = "bg-gray-100 text-gray-500";
+  const lockToggleDisabled = !isOrderEditable || isSaving;
+  const isEffectivelyLocked = !isOrderEditable || isRowLocked;
 
   return (
     <>
@@ -338,6 +341,23 @@ export const SalesOrderItemRow = ({
         </td>
         <td className="p-2">
             <div className="flex items-center justify-center gap-2">
+                <button
+                  className={`inline-flex items-center justify-center w-8 h-8 border rounded shadow-sm ${isEffectivelyLocked ? 'bg-white border-gray-300 hover:bg-gray-50 text-gray-700' : 'text-green-600 border-green-200 bg-green-50 hover:bg-green-100'} ${lockToggleDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  title={isEffectivelyLocked ? 'Editar item' : 'Salvar item'}
+                  aria-label={isEffectivelyLocked ? 'Editar item' : 'Salvar item'}
+                  disabled={lockToggleDisabled}
+                  style={{ opacity: lockToggleDisabled ? 0.5 : 1, pointerEvents: lockToggleDisabled ? 'none' : 'auto' }}
+                  onClick={() => {
+                    if (lockToggleDisabled) return;
+                    setIsRowLocked((prev) => !prev);
+                  }}
+                >
+                  {isEffectivelyLocked ? (
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path></svg>
+                  ) : (
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M9 16.17 4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17Z"/></svg>
+                  )}
+                </button>
                 <button 
                 className="inline-flex items-center justify-center w-8 h-8 bg-white border border-gray-300 rounded shadow-sm hover:bg-gray-50 text-gray-700" 
                 title="Características/Detalhes" 
