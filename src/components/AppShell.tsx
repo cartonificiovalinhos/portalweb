@@ -5,6 +5,7 @@ import { useSession, signOut } from "next-auth/react";
 import Link from "next/link";
 import Sidebar from "./Sidebar";
 import ProgramGuard from "./ProgramGuard";
+import { KeyRound, Loader2 } from "lucide-react";
 
 type Entity = { id: number; name: string; cnpj?: string };
 type Program = { code: string; name: string };
@@ -22,6 +23,14 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const [autoSelected, setAutoSelected] = useState(false);
   const [cartCount, setCartCount] = useState(0);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [changePwOpen, setChangePwOpen] = useState(false);
+  const [pwCurrent, setPwCurrent] = useState("");
+  const [pwNew, setPwNew] = useState("");
+  const [pwRepeat, setPwRepeat] = useState("");
+  const [pwTwoFactor, setPwTwoFactor] = useState("");
+  const [pwRequire2fa, setPwRequire2fa] = useState(false);
+  const [pwSaving, setPwSaving] = useState(false);
+  const [pwError, setPwError] = useState<string | null>(null);
   const activeEntityId = (perms?.activeEntityId ?? null);
 
   useEffect(() => {
@@ -146,6 +155,23 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                 )}
             </Link>
 
+            <button
+              onClick={() => {
+                setPwError(null);
+                setPwCurrent("");
+                setPwNew("");
+                setPwRepeat("");
+                setPwTwoFactor("");
+                setPwRequire2fa(false);
+                setChangePwOpen(true);
+              }}
+              className="relative p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-full transition-colors"
+              title="Alterar senha"
+              aria-label="Alterar senha"
+            >
+              <KeyRound size={20} />
+            </button>
+
             <button 
                 onClick={() => signOut({ callbackUrl: "/login" })}
                 className="flex items-center gap-2 px-3 py-1.5 text-xs font-medium text-red-600 bg-white border border-red-200 rounded-lg hover:bg-red-50 transition-all shadow-sm ml-2"
@@ -166,6 +192,135 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           </ProgramGuard>
         </div>
       </main>
+
+      {changePwOpen && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50"
+          onClick={() => (pwSaving ? null : setChangePwOpen(false))}
+        >
+          <div className="bg-white w-full max-w-md rounded shadow-lg" onClick={(e) => e.stopPropagation()}>
+            <div className="px-4 py-3 border-b flex items-center">
+              <div className="font-semibold">Alterar senha</div>
+              <button
+                className="ml-auto text-gray-500 hover:text-black"
+                onClick={() => (pwSaving ? null : setChangePwOpen(false))}
+                aria-label="Fechar"
+              >
+                ×
+              </button>
+            </div>
+            <div className="p-4 space-y-3">
+              {pwError && <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded px-3 py-2">{pwError}</div>}
+
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Senha atual</label>
+                <input
+                  type="password"
+                  className="border rounded px-3 py-2 text-sm w-full"
+                  value={pwCurrent}
+                  onChange={(e) => setPwCurrent(e.target.value)}
+                  disabled={pwSaving}
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Nova senha</label>
+                <input
+                  type="password"
+                  className="border rounded px-3 py-2 text-sm w-full"
+                  value={pwNew}
+                  onChange={(e) => setPwNew(e.target.value)}
+                  disabled={pwSaving}
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Repetir nova senha</label>
+                <input
+                  type="password"
+                  className="border rounded px-3 py-2 text-sm w-full"
+                  value={pwRepeat}
+                  onChange={(e) => setPwRepeat(e.target.value)}
+                  disabled={pwSaving}
+                />
+              </div>
+
+              {pwRequire2fa && (
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Código 2FA</label>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    className="border rounded px-3 py-2 text-sm w-full"
+                    value={pwTwoFactor}
+                    onChange={(e) => setPwTwoFactor(e.target.value)}
+                    disabled={pwSaving}
+                  />
+                </div>
+              )}
+            </div>
+            <div className="px-4 py-3 border-t flex items-center justify-end gap-2">
+              <button
+                className="px-3 py-1.5 border rounded hover:bg-gray-100 disabled:opacity-50"
+                onClick={() => setChangePwOpen(false)}
+                disabled={pwSaving}
+              >
+                Cancelar
+              </button>
+              <button
+                className="px-3 py-1.5 rounded bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 inline-flex items-center gap-2"
+                disabled={pwSaving}
+                onClick={async () => {
+                  setPwError(null);
+                  const currentPassword = pwCurrent;
+                  const newPassword = pwNew;
+                  const repeat = pwRepeat;
+                  if (!currentPassword || !newPassword || !repeat) {
+                    setPwError("Preencha todos os campos.");
+                    return;
+                  }
+                  if (newPassword !== repeat) {
+                    setPwError("A nova senha e a repetição não conferem.");
+                    return;
+                  }
+
+                  setPwSaving(true);
+                  try {
+                    const res = await fetch("/api/auth/change-password", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({
+                        currentPassword,
+                        newPassword,
+                        twoFactorCode: pwRequire2fa ? pwTwoFactor : undefined,
+                      }),
+                    });
+                    const payload = await res.json().catch(() => ({}));
+
+                    if (res.status === 409 && payload?.requiresTwoFactor) {
+                      setPwRequire2fa(true);
+                      setPwError("Informe o código 2FA para confirmar.");
+                      return;
+                    }
+                    if (!res.ok) {
+                      setPwError(String(payload?.error || payload?.message || `Erro ao alterar senha (${res.status})`));
+                      return;
+                    }
+
+                    setChangePwOpen(false);
+                    alert("Senha alterada com sucesso.");
+                  } catch (e: any) {
+                    setPwError(String(e?.message || e));
+                  } finally {
+                    setPwSaving(false);
+                  }
+                }}
+              >
+                {pwSaving ? <Loader2 size={16} className="animate-spin" /> : null}
+                Alterar senha
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
