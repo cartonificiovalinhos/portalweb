@@ -35,13 +35,13 @@ export default function DashboardTabs({ modules, maintenanceContent }: Dashboard
 
   return (
     <div className="space-y-4">
-      <div className="border-b border-gray-200">
+      <div className="border-b border-gray-200 flex items-end justify-between gap-4">
         <ul className="flex flex-wrap -mb-px text-sm font-medium text-center text-gray-500">
           {modules.map((m) => (
             <li key={m.code} className="mr-2">
               <button
                 onClick={() => setActiveTab(m.code)}
-                className={`inline-block p-4 border-b-2 rounded-t-lg transition-colors duration-200 ${
+                className={`inline-block px-3 py-2 border-b-2 rounded-t-lg transition-colors duration-200 ${
                   activeTab === m.code
                     ? "text-blue-600 border-blue-600 active group-hover:text-blue-600"
                     : "border-transparent hover:text-gray-600 hover:border-gray-300"
@@ -53,9 +53,10 @@ export default function DashboardTabs({ modules, maintenanceContent }: Dashboard
             </li>
           ))}
         </ul>
+        <h1 className="text-2xl font-semibold text-gray-900 pb-2">Dashboard</h1>
       </div>
 
-      <div className="pt-2">
+      <div className="pt-1">
         {activeTab === 'MAINT' ? (
           <div className="animate-in fade-in duration-300">
             {maintenanceContent}
