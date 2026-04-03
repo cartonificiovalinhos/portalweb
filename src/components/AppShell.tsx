@@ -16,6 +16,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { data: session, status } = useSession();
   const isLogin = pathname === "/login";
+  const userLabel = session?.user?.name ?? (session?.user as any)?.id ?? '-';
 
   const [perms, setPerms] = useState<Permissions | null>(null);
   const [loading, setLoading] = useState(true);
@@ -102,10 +103,10 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   }
   return (
     <div className="flex">
-      <Sidebar perms={perms} mobileOpen={mobileMenuOpen} setMobileOpen={setMobileMenuOpen} pathname={pathname} />
+      <Sidebar perms={perms} mobileOpen={mobileMenuOpen} setMobileOpen={setMobileMenuOpen} pathname={pathname} userLabel={userLabel} />
       <main className="flex-1 min-h-screen">
         {/* Top bar com seletor de entidade */}
-        <div className="sticky top-0 z-10 bg-white border-b border-gray-200 p-3 flex items-center gap-3">
+        <div className="sticky top-0 z-10 bg-white border-b border-gray-200 p-3 flex flex-wrap sm:flex-nowrap items-center gap-2 sm:gap-3">
           {/* Mobile Menu Toggle */}
           <button 
             className="md:hidden p-1 mr-1 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded"
@@ -117,7 +118,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
           <div className="text-sm text-gray-700 hidden sm:block">Entidade:</div>
           <select
-            className="text-sm border rounded px-2 py-1"
+            className="text-sm border rounded px-2 py-1 max-w-[190px] sm:max-w-none"
             value={activeEntityId ?? ''}
             onChange={(e) => onChangeEntity(Number(e.target.value))}
           >
@@ -126,13 +127,13 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             ))}
           </select>
           {/* ID do usuário logado ao lado do seletor de entidade */}
-          <div className="text-xs text-gray-600">Usuário: {session?.user?.name ?? (session?.user as any)?.id ?? '-'}</div>
+          <div className="text-xs text-gray-600 hidden sm:block">Usuário: {userLabel}</div>
           
           <div className="ml-auto flex items-center gap-4">
             {loading && <div className="text-xs text-gray-500">Carregando permissões…</div>}
             {error && <div className="text-xs text-red-600">{error}</div>}
             
-            <Link href="/" className="flex items-center gap-2 px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 hover:text-blue-600 transition-all shadow-sm">
+            <Link href="/" className="hidden sm:flex items-center gap-2 px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 hover:text-blue-600 transition-all shadow-sm">
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <rect x="3" y="3" width="7" height="7"></rect>
                     <rect x="14" y="3" width="7" height="7"></rect>
