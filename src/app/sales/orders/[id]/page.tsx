@@ -632,16 +632,19 @@ export default function SalesOrderMaintenancePage() {
           <div className="border rounded bg-white p-2 text-sm overflow-x-hidden">
             <div className="flex flex-col sm:flex-row sm:items-start gap-3 min-w-0">
               <div className="order-1 sm:order-2 w-full sm:w-auto sm:ml-auto">
-                <div className="flex flex-wrap items-center gap-2 sm:justify-end">
-                  <button 
-                    className={`flex items-center gap-1 px-3 py-1 text-sm bg-white border border-gray-300 rounded shadow-sm hover:bg-gray-50 text-gray-700 ${!isEditableStatus(order?.status) ? 'opacity-50 cursor-not-allowed' : ''}`}
-                    onClick={handleSimulateTaxes}
-                    disabled={simulating || !isEditableStatus(order?.status)}
-                  >
-                    {simulating ? 'Simulando...' : 'Simular Impostos'}
-                  </button>
+                <div className="flex flex-col items-stretch sm:items-end gap-2">
+                  <div className="flex sm:justify-end">
+                    <button 
+                      className={`flex items-center gap-1 px-3 py-1 text-sm bg-white border border-gray-300 rounded shadow-sm hover:bg-gray-50 text-gray-700 ${!isEditableStatus(order?.status) ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      onClick={handleSimulateTaxes}
+                      disabled={simulating || !isEditableStatus(order?.status)}
+                    >
+                      {simulating ? 'Simulando...' : 'Simular Impostos'}
+                    </button>
+                  </div>
 
-                  <button className={`${ICON_BTN} ${integrating || !isEditableStatus(order?.status) || isHeaderEditing ? 'opacity-50 cursor-not-allowed' : ''}`} title="Enviar para ERP" aria-label="Enviar para ERP" disabled={integrating || !isEditableStatus(order?.status) || isHeaderEditing} style={{ opacity: integrating || !isEditableStatus(order?.status) || isHeaderEditing ? 0.5 : 1, pointerEvents: integrating || !isEditableStatus(order?.status) || isHeaderEditing ? 'none' : 'auto' }} onClick={async () => {
+                  <div className="flex items-center gap-2 sm:justify-end">
+                    <button className={`${ICON_BTN} ${integrating || !isEditableStatus(order?.status) || isHeaderEditing ? 'opacity-50 cursor-not-allowed' : ''}`} title="Enviar para ERP" aria-label="Enviar para ERP" disabled={integrating || !isEditableStatus(order?.status) || isHeaderEditing} style={{ opacity: integrating || !isEditableStatus(order?.status) || isHeaderEditing ? 0.5 : 1, pointerEvents: integrating || !isEditableStatus(order?.status) || isHeaderEditing ? 'none' : 'auto' }} onClick={async () => {
                   if (!order) return;
                   if (!confirm('Confirma enviar este pedido para o ERP?')) return;
                   setIntegrating(true);
@@ -679,12 +682,30 @@ export default function SalesOrderMaintenancePage() {
                       <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
                   )}
                 </button>
-                <button className={`${ICON_BTN} ${!isDeletableStatus(order?.status) || isHeaderEditing ? 'opacity-50 cursor-not-allowed' : ''}`} title="Excluir" aria-label="Excluir" disabled={!isDeletableStatus(order?.status) || isHeaderEditing} style={{ opacity: !isDeletableStatus(order?.status) || isHeaderEditing ? 0.5 : 1, pointerEvents: !isDeletableStatus(order?.status) || isHeaderEditing ? 'none' : 'auto' }} onClick={async () => { if (!order) return; if (!confirm('Confirma excluir este pedido?')) return; const r = await fetch(`/api/sales/orders/${order.id}`, { method: 'DELETE' }); if (r.ok) router.push('/sales/orders'); }}>
-                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
-                </button>
-                {isHeaderEditing ? (
-                  <>
-                    <button className="inline-flex items-center justify-center w-8 h-8 bg-white border border-gray-300 rounded shadow-sm hover:bg-gray-50 text-green-600" title="Salvar" aria-label="Salvar" onClick={() => {
+                    <button className={`${ICON_BTN} ${!isDeletableStatus(order?.status) || isHeaderEditing ? 'opacity-50 cursor-not-allowed' : ''}`} title="Excluir" aria-label="Excluir" disabled={!isDeletableStatus(order?.status) || isHeaderEditing} style={{ opacity: !isDeletableStatus(order?.status) || isHeaderEditing ? 0.5 : 1, pointerEvents: !isDeletableStatus(order?.status) || isHeaderEditing ? 'none' : 'auto' }} onClick={async () => { if (!order) return; if (!confirm('Confirma excluir este pedido?')) return; const r = await fetch(`/api/sales/orders/${order.id}`, { method: 'DELETE' }); if (r.ok) router.push('/sales/orders'); }}>
+                      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                    </button>
+
+                    <button
+                      className={`${ICON_BTN} ${isHeaderEditing ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      title="Copiar Pedido"
+                      aria-label="Copiar Pedido"
+                      disabled={isHeaderEditing}
+                      style={{ opacity: isHeaderEditing ? 0.5 : 1, pointerEvents: isHeaderEditing ? 'none' : 'auto' }}
+                      onClick={() => {
+                        if (!order) return;
+                        router.push(`/sales/orders/new?copyFrom=${order.id}`);
+                      }}
+                    >
+                      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                      </svg>
+                    </button>
+
+                    {isHeaderEditing ? (
+                      <>
+                        <button className="inline-flex items-center justify-center w-8 h-8 bg-white border border-gray-300 rounded shadow-sm hover:bg-gray-50 text-green-600" title="Salvar" aria-label="Salvar" onClick={() => {
                       const digits = deliveryDateBr.replace(/\D/g, '');
                       if (digits.length !== 0 && digits.length !== 8) {
                         alert('Entrega inválida. Use DD/MM/AAAA.');
@@ -706,14 +727,14 @@ export default function SalesOrderMaintenancePage() {
                     <button className="inline-flex items-center justify-center w-8 h-8 bg-red-50 border border-red-200 rounded shadow-sm hover:bg-red-100 text-red-600" title="Cancelar" aria-label="Cancelar" onClick={() => { setIsHeaderEditing(false); setHdrCustomerId((order as any)?.clientId != null ? Number((order as any).clientId) : hdrCustomerId); setHdrDraft({ paymentTerms: order.paymentTerms || '', deliveryDate: order.deliveryDate ? new Date(order.deliveryDate).toISOString().slice(0,10) : '', customerName: order.customerName || '', customerDoc: order.customerDoc || '', triangularCustomerName: order.triangularCustomerName || '', triangularCustomerDoc: order.triangularCustomerDoc || '' }); }}>
                       <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M18.3 5.71 12 12l6.3 6.29-1.41 1.42L10.59 13.41 4.29 19.71 2.88 18.3 9.17 12 2.88 5.71 4.29 4.29 10.59 10.59 16.89 4.29l1.41 1.42Z"/></svg>
                     </button>
-                  </>
-                ) : (
-                  <button 
-                    className={`${ICON_BTN} ${(!isEditableStatus(order?.status) && statusLabelPt(order?.status) !== 'Integrado') || checkingEdit ? 'opacity-50 cursor-not-allowed' : ''}`} 
-                    title="Editar" 
-                    aria-label="Editar" 
-                    disabled={(!isEditableStatus(order?.status) && statusLabelPt(order?.status) !== 'Integrado') || checkingEdit} 
-                    onClick={async () => {
+                      </>
+                    ) : (
+                      <button 
+                        className={`${ICON_BTN} ${(!isEditableStatus(order?.status) && statusLabelPt(order?.status) !== 'Integrado') || checkingEdit ? 'opacity-50 cursor-not-allowed' : ''}`} 
+                        title="Editar" 
+                        aria-label="Editar" 
+                        disabled={(!isEditableStatus(order?.status) && statusLabelPt(order?.status) !== 'Integrado') || checkingEdit} 
+                        onClick={async () => {
                         const status = statusLabelPt(order?.status);
                         if (status === 'Integrado') {
                             setCheckingEdit(true);
@@ -787,7 +808,8 @@ export default function SalesOrderMaintenancePage() {
                         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path></svg>
                     )}
                   </button>
-                )}
+                    )}
+                  </div>
                 </div>
                 <div className="mt-2 sm:hidden">
                   <span className={`inline-flex text-xs px-2 py-1 rounded ${statusChipStyle(statusLabelPt(order.status))}`}>

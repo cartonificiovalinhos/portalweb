@@ -10,8 +10,13 @@ export async function GET(request: Request) {
     const customerDocParam = url.searchParams.get('customerDoc');
     const customerNameParam = url.searchParams.get('customerName');
     const qParam = url.searchParams.get('q');
+    const idsParam = url.searchParams.get('ids');
 
     let filterClientId: number | null = null;
+    const filterIds: number[] = (idsParam || '')
+      .split(',')
+      .map((s) => Number(String(s).trim()))
+      .filter((n) => Number.isFinite(n) && n > 0);
 
     if (clientIdParam) {
       filterClientId = Number(clientIdParam);
@@ -36,7 +41,11 @@ export async function GET(request: Request) {
 
     if (filterClientId) {
       const links = await prisma.clientItem.findMany({
-        where: { clientId: filterClientId, allowed: true },
+        where: {
+          clientId: filterClientId,
+          allowed: true,
+          ...(filterIds.length ? { inventoryItemId: { in: Array.from(new Set(filterIds)) } } : {}),
+        },
         include: { 
           inventoryItem: {
             include: { commercialFamily: true }

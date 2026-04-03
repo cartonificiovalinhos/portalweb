@@ -170,6 +170,7 @@ function NewSalesOrderContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const customerIdParam = searchParams?.get('customerId');
+  const copyFromParam = searchParams?.get('copyFrom');
   
   // Initial empty order
   const [order, setOrder] = useState<Partial<SalesOrder>>({
@@ -203,6 +204,7 @@ function NewSalesOrderContent() {
   };
   
   useEffect(() => {
+    if (copyFromParam) return;
     if (customerIdParam) {
       fetch(`/api/base/clients?q=${customerIdParam}`)
         .then(r => r.json())
@@ -217,7 +219,105 @@ function NewSalesOrderContent() {
         })
         .catch(console.error);
     }
-  }, [customerIdParam]);
+  }, [customerIdParam, copyFromParam]);
+
+  useEffect(() => {
+    const copyId = Number(copyFromParam);
+    if (!Number.isFinite(copyId) || copyId <= 0) return;
+
+    setLoading(true);
+    (async () => {
+      try {
+        const res = await fetch(`/api/sales/orders/${copyId}`, { cache: 'no-store' });
+        if (!res.ok) throw new Error('Falha ao carregar pedido para cópia');
+        const src = await res.json();
+
+        const clientId = Number((src as any)?.clientId ?? (src as any)?.customerId ?? 0);
+        const srcItems = Array.isArray((src as any)?.items) ? (src as any).items : [];
+
+        const invIds = Array.from(
+          new Set(
+            srcItems
+              .map((it: any) => Number(it?.inventoryItemId ?? it?.inventoryItem?.id))
+              .filter((n: any) => Number.isFinite(n) && n > 0)
+          )
+        );
+
+        const invById = new Map<number, InventoryItem>();
+        if (Number.isFinite(clientId) && clientId > 0 && invIds.length > 0) {
+          const params = new URLSearchParams();
+          params.set('clientId', String(clientId));
+          params.set('ids', invIds.join(','));
+          const itemsRes = await fetch(`/api/items?${params.toString()}`, { cache: 'no-store' });
+          if (itemsRes.ok) {
+            const arr = await itemsRes.json();
+            if (Array.isArray(arr)) {
+              for (const it of arr) {
+                const id = Number(it?.id);
+                if (!Number.isFinite(id) || id <= 0) continue;
+                invById.set(id, it as InventoryItem);
+              }
+            }
+          }
+        }
+
+        const copiedItems: OrderItem[] = srcItems.map((it: any, idx: number) => {
+          const invId = Number(it?.inventoryItemId ?? it?.inventoryItem?.id);
+          const inv = Number.isFinite(invId) && invId > 0 ? invById.get(invId) : undefined;
+          const unitPrice = inv?.unitPrice != null ? Number(inv.unitPrice) : Number(it?.unitPrice ?? 0);
+
+          const fallbackInv: InventoryItem | null = it?.inventoryItem
+            ? (it.inventoryItem as InventoryItem)
+            : Number.isFinite(invId) && invId > 0
+            ? ({ id: invId, name: String(it?.name || 'Produto') } as InventoryItem)
+            : null;
+
+          return {
+            id: -Date.now() - idx,
+            name: String(it?.name || ''),
+            sku: it?.sku ?? null,
+            unit: it?.unit ?? null,
+            quantity: Number(it?.quantity ?? 1),
+            unitPrice,
+            discountPct: Number(it?.discountPct ?? 0),
+            width: it?.width ?? inv?.width ?? null,
+            length: it?.length ?? inv?.length ?? null,
+            grammage: it?.grammage ?? inv?.grammage ?? null,
+            diameter: it?.diameter ?? null,
+            tube: it?.tube ?? null,
+            inventoryItem: inv ?? fallbackInv,
+            clientOrderNumber: it?.clientOrderNumber ?? null,
+            clientOrderItemNumber: it?.clientOrderItemNumber ?? null,
+            itemDeliveryDate: it?.itemDeliveryDate ?? null,
+            internalResin: !!it?.internalResin,
+            externalResin: !!it?.externalResin,
+            creases: it?.creases ?? null,
+          };
+        });
+
+        setTotalWithTax(0);
+        setOrder({
+          status: 'OPEN',
+          orderDate: new Date().toISOString(),
+          customerName: String((src as any)?.customerName || ''),
+          customerDoc: (src as any)?.customerDoc ?? null,
+          customerId: Number.isFinite(clientId) && clientId > 0 ? clientId : undefined,
+          paymentTerms: (src as any)?.paymentTerms ?? '',
+          deliveryDate: (src as any)?.deliveryDate ? new Date((src as any).deliveryDate).toISOString().slice(0, 10) : '',
+          triangularCustomerName: (src as any)?.triangularCustomerName ?? '',
+          triangularCustomerDoc: (src as any)?.triangularCustomerDoc ?? '',
+          items: copiedItems,
+          subtotal: 0,
+          discountTotal: 0,
+          total: 0
+        });
+      } catch (e: any) {
+        alert(e?.message || String(e));
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [copyFromParam]);
   
   const [currentDate, setCurrentDate] = useState('');
   const [sessionEntity, setSessionEntity] = useState<{ id: number; name: string; cnpj: string } | null>(null);
@@ -481,31 +581,38 @@ function NewSalesOrderContent() {
         </div>
       </div>
 
-      {loading && <div className="text-sm text-gray-600">Salvando...</div>}
+      {loading && <div className="text-sm text-gray-600">Processando...</div>}
       
       <div className="space-y-3">
         {/* Header */}
         <div className="border rounded bg-white p-2 text-sm">
           <div className="flex flex-col sm:flex-row sm:items-start gap-3">
-            <div className="order-1 sm:order-2 w-full sm:w-auto sm:ml-auto flex flex-wrap items-center gap-2 sm:justify-end">
-              <button 
-                className={`flex items-center gap-1 px-3 py-1 text-sm bg-gray-100 border border-gray-300 rounded shadow-sm text-gray-700 hover:bg-gray-200 ${simulating ? 'opacity-50 cursor-wait' : ''}`} 
-                title="Simulação de impostos" 
-                onClick={handleSimulateTaxes}
-                disabled={simulating}
-              >
-                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
-                {simulating ? 'Simulando...' : 'Simular Impostos'}
-              </button>
-              <button className={`${ICON_BTN} opacity-50 cursor-not-allowed`} title="Enviar para ERP (Desabilitado)" disabled>
-                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
-              </button>
-              <button className={`${ICON_BTN} opacity-50 cursor-not-allowed`} title="Excluir (Desabilitado)" disabled>
-                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
-              </button>
-              <button className={`${ICON_BTN} text-green-600 border-green-200 bg-green-50 hover:bg-green-100`} title="Salvar Pedido" onClick={saveOrder}>
-                 <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M9 16.17 4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17Z"/></svg>
-              </button>
+            <div className="order-1 sm:order-2 w-full sm:w-auto sm:ml-auto">
+              <div className="flex flex-col items-stretch sm:items-end gap-2">
+                <div className="flex sm:justify-end">
+                  <button 
+                    className={`flex items-center gap-1 px-3 py-1 text-sm bg-white border border-gray-300 rounded shadow-sm hover:bg-gray-50 text-gray-700 ${simulating ? 'opacity-50 cursor-wait' : ''}`} 
+                    title="Simulação de impostos" 
+                    onClick={handleSimulateTaxes}
+                    disabled={simulating}
+                  >
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+                    {simulating ? 'Simulando...' : 'Simular Impostos'}
+                  </button>
+                </div>
+
+                <div className="flex items-center gap-2 sm:justify-end">
+                  <button className={`${ICON_BTN} opacity-50 cursor-not-allowed`} title="Enviar para ERP (Desabilitado)" disabled>
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+                  </button>
+                  <button className={`${ICON_BTN} opacity-50 cursor-not-allowed`} title="Excluir (Desabilitado)" disabled>
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                  </button>
+                  <button className={`${ICON_BTN} text-green-600 border-green-200 bg-green-50 hover:bg-green-100`} title="Salvar Pedido" onClick={saveOrder}>
+                     <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M9 16.17 4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17Z"/></svg>
+                  </button>
+                </div>
+              </div>
             </div>
 
             <div className="order-2 sm:order-1 grid grid-cols-1 md:grid-cols-12 gap-3 flex-1">
