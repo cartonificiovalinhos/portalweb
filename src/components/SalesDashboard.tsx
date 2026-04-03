@@ -178,9 +178,9 @@ export default function SalesDashboard() {
   };
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500">
-      <div className="bg-white p-4 rounded shadow-sm border border-gray-200">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 items-end">
+    <div className="space-y-3 animate-in fade-in duration-500">
+      <div className="bg-white p-2 rounded shadow-sm border border-gray-200">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-2 items-end">
           <div className="min-w-0">
             <label className="block text-xs font-medium text-gray-700 mb-1">Ano</label>
             <select
@@ -236,76 +236,76 @@ export default function SalesDashboard() {
         </div>
       </div>
 
-      <div className="bg-white p-4 rounded shadow-sm border border-gray-200">
+      <div className="bg-white p-2 rounded shadow-sm border border-gray-200">
         <div className="overflow-x-auto">
           <table className="min-w-full text-sm">
             <thead>
               <tr className="bg-gray-50 text-left">
-                <th className="p-2 border-b font-medium">Tipo Agrupa</th>
-                <th className="p-2 border-b font-medium text-right">Meta Prevista</th>
-                <th className="p-2 border-b font-medium text-right">Carregado</th>
-                <th className="p-2 border-b font-medium text-right">Devolução</th>
-                <th className="p-2 border-b font-medium text-right">Realizado Líq</th>
-                <th className="p-2 border-b font-medium text-right">(%)Atingimento</th>
-                <th className="p-2 border-b font-medium text-right">Em Carteira</th>
+                <th className="p-1 border-b font-medium">Tipo Agrupa</th>
+                <th className="p-1 border-b font-medium text-right">Meta Prevista</th>
+                <th className="p-1 border-b font-medium text-right">Carregado</th>
+                <th className="p-1 border-b font-medium text-right">Devolução</th>
+                <th className="p-1 border-b font-medium text-right">Realizado Líq</th>
+                <th className="p-1 border-b font-medium text-right">(%)Atingimento</th>
+                <th className="p-1 border-b font-medium text-right">Em Carteira</th>
               </tr>
             </thead>
             <tbody>
               <tr>
-                <td className="p-2 border-b">Peso (KG)</td>
-                <td className="p-2 border-b text-right">{fmtInt(summary.peso.metaPrevista)}</td>
-                <td className="p-2 border-b text-right">{fmtInt(summary.peso.carregado)}</td>
-                <td className="p-2 border-b text-right">{fmtInt(summary.peso.devolucao)}</td>
-                <td className="p-2 border-b text-right">{fmtInt(summary.peso.realizadoLiq)}</td>
-                <td className="p-2 border-b text-right">{fmtDec(summary.peso.atingimento)}</td>
-                <td className="p-2 border-b text-right">{fmtInt(summary.peso.emCarteira)}</td>
+                <td className="p-1 border-b">Peso (KG)</td>
+                <td className="p-1 border-b text-right">{fmtInt(summary.peso.metaPrevista)}</td>
+                <td className="p-1 border-b text-right">{fmtInt(summary.peso.carregado)}</td>
+                <td className="p-1 border-b text-right">{fmtInt(summary.peso.devolucao)}</td>
+                <td className="p-1 border-b text-right">{fmtInt(summary.peso.realizadoLiq)}</td>
+                <td className="p-1 border-b text-right">{fmtDec(summary.peso.atingimento)}</td>
+                <td className="p-1 border-b text-right">{fmtInt(summary.peso.emCarteira)}</td>
               </tr>
               <tr>
-                <td className="p-2">Valor</td>
-                <td className="p-2 text-right">{fmtInt(summary.valor.metaPrevista)}</td>
-                <td className="p-2 text-right">{fmtInt(summary.valor.carregado)}</td>
-                <td className="p-2 text-right">{fmtInt(summary.valor.devolucao)}</td>
-                <td className="p-2 text-right">{fmtInt(summary.valor.realizadoLiq)}</td>
-                <td className="p-2 text-right">{fmtDec(summary.valor.atingimento)}</td>
-                <td className="p-2 text-right">{fmtInt(summary.valor.emCarteira)}</td>
+                <td className="p-1">Valor</td>
+                <td className="p-1 text-right">{fmtInt(summary.valor.metaPrevista)}</td>
+                <td className="p-1 text-right">{fmtInt(summary.valor.carregado)}</td>
+                <td className="p-1 text-right">{fmtInt(summary.valor.devolucao)}</td>
+                <td className="p-1 text-right">{fmtInt(summary.valor.realizadoLiq)}</td>
+                <td className="p-1 text-right">{fmtDec(summary.valor.atingimento)}</td>
+                <td className="p-1 text-right">{fmtInt(summary.valor.emCarteira)}</td>
               </tr>
             </tbody>
           </table>
         </div>
 
-        <div className="mt-4">
-          <div className="flex flex-wrap gap-6 border-b">
+        <div className="mt-2">
+          <div className="flex flex-wrap gap-3 border-b">
             <button
               type="button"
               onClick={() => setActiveGroupTab('FAMILY')}
-              className={`px-1 pb-2 text-sm ${activeGroupTab === 'FAMILY' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-600 hover:text-gray-900'}`}
+              className={`px-1 pb-1 text-sm ${activeGroupTab === 'FAMILY' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-600 hover:text-gray-900'}`}
             >
               Por Família
             </button>
             <button
               type="button"
               onClick={() => setActiveGroupTab('CUSTOMER')}
-              className={`px-1 pb-2 text-sm ${activeGroupTab === 'CUSTOMER' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-600 hover:text-gray-900'}`}
+              className={`px-1 pb-1 text-sm ${activeGroupTab === 'CUSTOMER' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-600 hover:text-gray-900'}`}
             >
               Por Cliente
             </button>
             <button
               type="button"
               onClick={() => setActiveGroupTab('REP')}
-              className={`px-1 pb-2 text-sm ${activeGroupTab === 'REP' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-600 hover:text-gray-900'}`}
+              className={`px-1 pb-1 text-sm ${activeGroupTab === 'REP' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-600 hover:text-gray-900'}`}
             >
               Por Representante
             </button>
             <button
               type="button"
               onClick={() => setActiveGroupTab('REGION')}
-              className={`px-1 pb-2 text-sm ${activeGroupTab === 'REGION' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-600 hover:text-gray-900'}`}
+              className={`px-1 pb-1 text-sm ${activeGroupTab === 'REGION' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-600 hover:text-gray-900'}`}
             >
               Por Região
             </button>
           </div>
 
-          <div className="mt-4 border rounded bg-gray-50 p-4 text-sm text-gray-600 min-h-24">
+          <div className="mt-2 border rounded bg-gray-50 p-2 text-sm text-gray-600 min-h-24">
             {activeGroupTab === 'FAMILY' && <div>Conteúdo por família (em desenvolvimento).</div>}
             {activeGroupTab === 'CUSTOMER' && <div>Conteúdo por cliente (em desenvolvimento).</div>}
             {activeGroupTab === 'REP' && <div>Conteúdo por representante (em desenvolvimento).</div>}
