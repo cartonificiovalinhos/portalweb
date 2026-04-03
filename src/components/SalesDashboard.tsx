@@ -16,12 +16,12 @@ function GroupGrid({ firstColLabel }: { firstColLabel: string }) {
       <table className="min-w-full text-sm border border-gray-200 bg-white">
         <thead>
           <tr className="bg-gray-100 text-left">
-            <th className="p-1 border-b border-r font-medium">{firstColLabel}</th>
-            <th className="p-1 border-b border-r font-medium text-right">Meta Prevista</th>
-            <th className="p-1 border-b border-r font-medium text-right">Carregado</th>
-            <th className="p-1 border-b border-r font-medium text-right">Devolução</th>
-            <th className="p-1 border-b border-r font-medium text-right">Realizado Líq</th>
-            <th className="p-1 border-b border-r font-medium text-right">(%)Atingimento</th>
+            <th className="p-1 border-b border-b-gray-200 border-r border-r-gray-100 font-medium">{firstColLabel}</th>
+            <th className="p-1 border-b border-b-gray-200 border-r border-r-gray-100 font-medium text-right">Meta Prevista</th>
+            <th className="p-1 border-b border-b-gray-200 border-r border-r-gray-100 font-medium text-right">Carregado</th>
+            <th className="p-1 border-b border-b-gray-200 border-r border-r-gray-100 font-medium text-right">Devolução</th>
+            <th className="p-1 border-b border-b-gray-200 border-r border-r-gray-100 font-medium text-right">Realizado Líq</th>
+            <th className="p-1 border-b border-b-gray-200 border-r border-r-gray-100 font-medium text-right">(%)Atingimento</th>
             <th className="p-1 border-b font-medium text-right">Em Carteira</th>
           </tr>
         </thead>
