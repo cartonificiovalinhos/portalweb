@@ -463,7 +463,7 @@ function NewSalesOrderContent() {
   }, [order.items]);
 
   return (
-    <div className="p-3 space-y-4">
+    <div className="p-3 space-y-2">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <h1 className="text-xl font-semibold">Novo Pedido</h1>
@@ -483,9 +483,9 @@ function NewSalesOrderContent() {
 
       {loading && <div className="text-sm text-gray-600">Salvando...</div>}
       
-      <div className="space-y-6">
+      <div className="space-y-3">
         {/* Header */}
-        <div className="border rounded bg-white p-4 text-sm">
+        <div className="border rounded bg-white p-2 text-sm">
           <div className="flex items-start gap-3">
             <div className="grid grid-cols-1 md:grid-cols-12 gap-3 flex-1">
               <div className="md:col-span-12 flex gap-8">

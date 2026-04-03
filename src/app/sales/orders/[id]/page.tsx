@@ -565,7 +565,7 @@ export default function SalesOrderMaintenancePage() {
 
 
   return (
-    <div className="p-3 space-y-4">
+    <div className="p-3 space-y-2">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <h1 className="text-xl font-semibold">Manutenção de Pedidos</h1>
@@ -595,9 +595,9 @@ export default function SalesOrderMaintenancePage() {
       {error && <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded px-3 py-2">{error}</div>}
 
       {order && (
-        <div className="space-y-6">
+        <div className="space-y-3">
           {/* Header do pedido com ícones à direita */}
-          <div className="border rounded bg-white p-4 text-sm">
+          <div className="border rounded bg-white p-2 text-sm">
             <div className="flex items-start gap-3">
               <div className="flex flex-col gap-3 flex-1">
                 {/* Linha Superior: Número, Data, Entidade, Última Simulação */}
