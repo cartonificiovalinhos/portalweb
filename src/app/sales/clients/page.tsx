@@ -64,38 +64,67 @@ export default function SalesClientsPage() {
       </div>
 
       <div className="border rounded bg-white shadow-sm overflow-hidden">
-        <table className="min-w-full text-sm">
-          <thead className="bg-gray-50 border-b">
-            <tr>
-              <th className="text-left p-3 font-medium text-gray-600">Doc</th>
-              <th className="text-left p-3 font-medium text-gray-600">Nome</th>
-              <th className="text-left p-3 font-medium text-gray-600">Cidade</th>
-              <th className="text-left p-3 font-medium text-gray-600">Estado</th>
-              <th className="text-center p-3 font-medium text-gray-600 w-20">Ações</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-100">
-            {items.map((c) => (
-              <tr key={c.id} className="hover:bg-blue-50 transition-colors">
-                <td className="p-3 text-gray-700 font-mono text-xs">{maskDoc(c.doc)}</td>
-                <td className="p-3 text-gray-900 font-medium">{c.name}</td>
-                <td className="p-3 text-gray-600">{c.cidade || "-"}</td>
-                <td className="p-3 text-gray-600">{c.estado || "-"}</td>
-                <td className="p-3 text-center">
-                  <button
-                    onClick={() => router.push(`/sales/clients/${c.id}`)}
-                    className="inline-flex items-center justify-center w-8 h-8 text-blue-600 hover:bg-blue-100 rounded-full transition-colors"
-                    title="Abrir detalhes"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
-                    </svg>
-                  </button>
-                </td>
+        <div className="sm:hidden divide-y">
+          {items.map((c) => (
+            <div key={c.id} className="p-3">
+              <div className="flex items-start gap-3">
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-semibold text-gray-900 break-words">{c.name}</div>
+                  <div className="mt-1 text-xs text-gray-600 font-mono">{maskDoc(c.doc) || '-'}</div>
+                  <div className="mt-1 text-xs text-gray-600">
+                    {(c.cidade || '-')}{c.estado ? ` • ${c.estado}` : ''}
+                  </div>
+                </div>
+                <button
+                  onClick={() => router.push(`/sales/clients/${c.id}`)}
+                  className="inline-flex items-center justify-center w-10 h-10 text-blue-600 border border-blue-200 bg-white hover:bg-blue-50 rounded"
+                  title="Abrir detalhes"
+                  aria-label="Abrir detalhes"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="hidden sm:block overflow-x-auto">
+          <table className="min-w-full text-sm">
+            <thead className="bg-gray-50 border-b">
+              <tr>
+                <th className="text-left p-3 font-medium text-gray-600">Doc</th>
+                <th className="text-left p-3 font-medium text-gray-600">Nome</th>
+                <th className="text-left p-3 font-medium text-gray-600">Cidade</th>
+                <th className="text-left p-3 font-medium text-gray-600">Estado</th>
+                <th className="text-center p-3 font-medium text-gray-600 w-20">Ações</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {items.map((c) => (
+                <tr key={c.id} className="hover:bg-blue-50 transition-colors">
+                  <td className="p-3 text-gray-700 font-mono text-xs">{maskDoc(c.doc)}</td>
+                  <td className="p-3 text-gray-900 font-medium">{c.name}</td>
+                  <td className="p-3 text-gray-600">{c.cidade || "-"}</td>
+                  <td className="p-3 text-gray-600">{c.estado || "-"}</td>
+                  <td className="p-3 text-center">
+                    <button
+                      onClick={() => router.push(`/sales/clients/${c.id}`)}
+                      className="inline-flex items-center justify-center w-8 h-8 text-blue-600 hover:bg-blue-100 rounded-full transition-colors"
+                      title="Abrir detalhes"
+                      aria-label="Abrir detalhes"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+                      </svg>
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
         {loading && <div className="p-4 text-center text-gray-500 text-sm">Carregando...</div>}
         {error && <div className="p-4 text-center text-red-600 text-sm">{error}</div>}
         {!loading && !error && items.length === 0 && (

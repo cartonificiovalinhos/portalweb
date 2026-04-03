@@ -253,6 +253,31 @@ function translateHistoryMessageLabel(m: string): string {
   return raw.slice(0, startIdx) + translated + rest;
 }
 
+function isoToBrDate(iso: string): string {
+  const s = String(iso || '').trim();
+  const m = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return s;
+  return `${m[3]}/${m[2]}/${m[1]}`;
+}
+
+function brToIsoDate(br: string): string | null {
+  const s = String(br || '').trim();
+  const m = s.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if (!m) return null;
+  const dd = Number(m[1]);
+  const mm = Number(m[2]);
+  const yyyy = Number(m[3]);
+  if (!Number.isFinite(dd) || !Number.isFinite(mm) || !Number.isFinite(yyyy)) return null;
+  if (yyyy < 1900 || yyyy > 2200) return null;
+  if (mm < 1 || mm > 12) return null;
+  if (dd < 1 || dd > 31) return null;
+  const dt = new Date(yyyy, mm - 1, dd);
+  if (dt.getFullYear() !== yyyy || dt.getMonth() !== mm - 1 || dt.getDate() !== dd) return null;
+  const isoMm = String(mm).padStart(2, '0');
+  const isoDd = String(dd).padStart(2, '0');
+  return `${String(yyyy).padStart(4, '0')}-${isoMm}-${isoDd}`;
+}
+
 export default function SalesOrderMaintenancePage() {
   const params = useParams() as any;
   const id = Number(params.id);
@@ -262,6 +287,7 @@ export default function SalesOrderMaintenancePage() {
   const [error, setError] = useState<string | null>(null);
   const [showFeaturesFor, setShowFeaturesFor] = useState<number | null>(null);
   const [hdrDraft, setHdrDraft] = useState<{ paymentTerms?: string; deliveryDate?: string; customerName?: string; customerDoc?: string; triangularCustomerName?: string; triangularCustomerDoc?: string }>({});
+  const [deliveryDateBr, setDeliveryDateBr] = useState('');
   const [hdrCustomerId, setHdrCustomerId] = useState<number | null>(null);
   const [isHeaderEditing, setIsHeaderEditing] = useState(false);
   const [addingItems, setAddingItems] = useState(false);
@@ -280,6 +306,10 @@ export default function SalesOrderMaintenancePage() {
   const [showBilling, setShowBilling] = useState(false);
   const [invoices, setInvoices] = useState<SalesOrderInvoice[]>([]);
   const [loadingInvoices, setLoadingInvoices] = useState(false);
+
+  useEffect(() => {
+    setDeliveryDateBr(isoToBrDate(hdrDraft.deliveryDate ?? ''));
+  }, [hdrDraft.deliveryDate]);
 
   const loadInvoices = async () => {
     setLoadingInvoices(true);
@@ -654,7 +684,23 @@ export default function SalesOrderMaintenancePage() {
                 </button>
                 {isHeaderEditing ? (
                   <>
-                    <button className="inline-flex items-center justify-center w-8 h-8 bg-white border border-gray-300 rounded shadow-sm hover:bg-gray-50 text-green-600" title="Salvar" aria-label="Salvar" onClick={() => saveHeader({ paymentTerms: hdrDraft.paymentTerms, deliveryDate: hdrDraft.deliveryDate, customerName: hdrDraft.customerName, customerDoc: hdrDraft.customerDoc, triangularCustomerName: hdrDraft.triangularCustomerName, triangularCustomerDoc: hdrDraft.triangularCustomerDoc, clientId: hdrCustomerId })}>
+                    <button className="inline-flex items-center justify-center w-8 h-8 bg-white border border-gray-300 rounded shadow-sm hover:bg-gray-50 text-green-600" title="Salvar" aria-label="Salvar" onClick={() => {
+                      const digits = deliveryDateBr.replace(/\D/g, '');
+                      if (digits.length !== 0 && digits.length !== 8) {
+                        alert('Entrega inválida. Use DD/MM/AAAA.');
+                        return;
+                      }
+                      if (digits.length === 8) {
+                        const iso = brToIsoDate(deliveryDateBr);
+                        if (!iso) {
+                          alert('Entrega inválida. Use DD/MM/AAAA.');
+                          return;
+                        }
+                        saveHeader({ paymentTerms: hdrDraft.paymentTerms, deliveryDate: iso, customerName: hdrDraft.customerName, customerDoc: hdrDraft.customerDoc, triangularCustomerName: hdrDraft.triangularCustomerName, triangularCustomerDoc: hdrDraft.triangularCustomerDoc, clientId: hdrCustomerId });
+                        return;
+                      }
+                      saveHeader({ paymentTerms: hdrDraft.paymentTerms, deliveryDate: '', customerName: hdrDraft.customerName, customerDoc: hdrDraft.customerDoc, triangularCustomerName: hdrDraft.triangularCustomerName, triangularCustomerDoc: hdrDraft.triangularCustomerDoc, clientId: hdrCustomerId });
+                    }}>
                       <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M9 16.17 4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17Z"/></svg>
                     </button>
                     <button className="inline-flex items-center justify-center w-8 h-8 bg-red-50 border border-red-200 rounded shadow-sm hover:bg-red-100 text-red-600" title="Cancelar" aria-label="Cancelar" onClick={() => { setIsHeaderEditing(false); setHdrCustomerId((order as any)?.clientId != null ? Number((order as any).clientId) : hdrCustomerId); setHdrDraft({ paymentTerms: order.paymentTerms || '', deliveryDate: order.deliveryDate ? new Date(order.deliveryDate).toISOString().slice(0,10) : '', customerName: order.customerName || '', customerDoc: order.customerDoc || '', triangularCustomerName: order.triangularCustomerName || '', triangularCustomerDoc: order.triangularCustomerDoc || '' }); }}>
@@ -837,7 +883,23 @@ export default function SalesOrderMaintenancePage() {
                   </div>
                   <div className="md:col-span-3 min-w-0">
                     <span className="text-gray-600">Entrega</span>
-                    <input type="text" inputMode="numeric" placeholder="AAAA-MM-DD" className="mt-1 block w-full min-w-0 max-w-full px-2 py-1 border rounded sm:hidden" value={hdrDraft.deliveryDate ?? ''} onChange={(e) => setHdrDraft((d) => ({ ...d, deliveryDate: e.target.value }))} disabled={!isHeaderEditing} />
+                    <input type="text" inputMode="numeric" placeholder="DD/MM/AAAA" className="mt-1 block w-full min-w-0 max-w-full px-2 py-1 border rounded sm:hidden" value={deliveryDateBr} onChange={(e) => {
+                      const digits = e.target.value.replace(/\D/g, '').slice(0, 8);
+                      let next = digits;
+                      if (digits.length > 2) next = `${digits.slice(0, 2)}/${digits.slice(2)}`;
+                      if (digits.length > 4) next = `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
+                      setDeliveryDateBr(next);
+                      if (digits.length === 0) {
+                        setHdrDraft((d) => ({ ...d, deliveryDate: '' }));
+                        return;
+                      }
+                      if (digits.length !== 8) {
+                        setHdrDraft((d) => ({ ...d, deliveryDate: '' }));
+                        return;
+                      }
+                      const iso = brToIsoDate(next);
+                      setHdrDraft((d) => ({ ...d, deliveryDate: iso ?? '' }));
+                    }} disabled={!isHeaderEditing} />
                     <input type="date" className="mt-1 hidden sm:block w-full min-w-0 max-w-full px-2 py-1 border rounded" value={hdrDraft.deliveryDate ?? ''} onChange={(e) => setHdrDraft((d) => ({ ...d, deliveryDate: e.target.value }))} disabled={!isHeaderEditing} />
                   </div>
                   <div className={`md:col-span-6 ${!isHeaderEditing ? "opacity-75 pointer-events-none" : ""}`}>
