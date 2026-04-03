@@ -191,12 +191,12 @@ export default function Sidebar({ perms, mobileOpen, setMobileOpen, pathname }: 
             <div key={m.code}>
               <button
                 onClick={() => toggleModule(m.code)}
-                className={`w-full flex items-center ${collapsed ? "justify-center" : "gap-2"} px-3 py-2 rounded text-sm transition-colors ${
+                className={`w-full flex items-center ${collapsed && !mobileOpen ? "justify-center" : "gap-2"} px-3 py-2 rounded text-sm transition-colors ${
                   anyActive ? "bg-gray-800 text-white" : "text-gray-200 hover:bg-gray-700"
                 }`}
                 aria-expanded={isExpanded}
               >
-                {!collapsed && (
+                {(!collapsed || mobileOpen) && (
                   <span className="text-white">
                     {isExpanded ? Icon.caretDown : Icon.caretRight}
                   </span>
@@ -204,7 +204,7 @@ export default function Sidebar({ perms, mobileOpen, setMobileOpen, pathname }: 
                 <span className="text-white">
                   {m.code === 'ADMIN' ? Icon.adminModule : m.code === 'MAINT' ? Icon.maintModule : m.code === 'SALES' ? Icon.salesModule : Icon.module}
                 </span>
-                {!collapsed && <span className="font-medium">{m.name}</span>}
+                {(!collapsed || mobileOpen) && <span className="font-medium">{m.name}</span>}
               </button>
               {isExpanded && (
                 <div className="mt-1 space-y-1">
@@ -248,12 +248,12 @@ export default function Sidebar({ perms, mobileOpen, setMobileOpen, pathname }: 
                       <Link
                         key={p.code}
                         href={href}
-                        className={`ml-6 flex items-center ${collapsed ? "justify-center" : "gap-2"} px-3 py-2 rounded text-sm transition-colors ${
+                        className={`ml-6 flex items-center ${collapsed && !mobileOpen ? "justify-center" : "gap-2"} px-3 py-2 rounded text-sm transition-colors ${
                           active ? "bg-gray-800 text-white" : "text-gray-200 hover:bg-gray-700"
                         }`}
                       >
                         {icon && <span className="text-white">{icon}</span>}
-                        {!collapsed && <span>{p.name}</span>}
+                        {(!collapsed || mobileOpen) && <span>{p.name}</span>}
                       </Link>
                     );
                   })}
