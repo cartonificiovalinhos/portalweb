@@ -16,14 +16,12 @@ function MultiSelectDropdown({
   options,
   value,
   onChange,
-  widthClassName,
 }: {
   label: string;
   placeholder: string;
   options: MultiOpt[];
   value: string[];
   onChange: (next: string[]) => void;
-  widthClassName: string;
 }) {
   const [open, setOpen] = useState(false);
   const wrapperRef = useRef<HTMLDivElement>(null);
@@ -50,7 +48,7 @@ function MultiSelectDropdown({
       <label className="block text-xs font-medium text-gray-700 mb-1">{label}</label>
       <button
         type="button"
-        className={`border rounded px-3 py-1.5 text-sm ${widthClassName} text-left focus:ring-2 focus:ring-blue-500 outline-none bg-white`}
+        className="border rounded px-3 py-1.5 text-sm w-full text-left focus:ring-2 focus:ring-blue-500 outline-none bg-white"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
       >
@@ -182,36 +180,36 @@ export default function SalesDashboard() {
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
       <div className="bg-white p-4 rounded shadow-sm border border-gray-200">
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
-          <div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 items-end">
+          <div className="min-w-0">
             <label className="block text-xs font-medium text-gray-700 mb-1">Ano</label>
             <select
               value={year}
               onChange={(e) => setYear(Number(e.target.value))}
-              className="border rounded px-3 py-1.5 text-sm w-32 focus:ring-2 focus:ring-blue-500 outline-none"
+              className="border rounded px-3 py-1.5 text-sm w-full focus:ring-2 focus:ring-blue-500 outline-none"
             >
               {years.map((y) => <option key={y} value={y}>{y}</option>)}
             </select>
           </div>
 
-          <div>
+          <div className="min-w-0">
             <label className="block text-xs font-medium text-gray-700 mb-1">Mês</label>
             <select
               value={month}
               onChange={(e) => setMonth(e.target.value)}
-              className="border rounded px-3 py-1.5 text-sm w-40 focus:ring-2 focus:ring-blue-500 outline-none"
+              className="border rounded px-3 py-1.5 text-sm w-full focus:ring-2 focus:ring-blue-500 outline-none"
             >
               <option value="">Todos</option>
               {months.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
             </select>
           </div>
 
-          <div>
+          <div className="min-w-0">
             <label className="block text-xs font-medium text-gray-700 mb-1">Entidade</label>
             <select
               value={entityId}
               onChange={(e) => setEntityId(e.target.value)}
-              className="border rounded px-3 py-1.5 text-sm w-64 focus:ring-2 focus:ring-blue-500 outline-none"
+              className="border rounded px-3 py-1.5 text-sm w-full focus:ring-2 focus:ring-blue-500 outline-none"
             >
               <option value="">Todas</option>
               {entities.map((e) => (
@@ -226,7 +224,6 @@ export default function SalesDashboard() {
             options={repOptions}
             value={selectedReps}
             onChange={setSelectedReps}
-            widthClassName="w-64"
           />
 
           <MultiSelectDropdown
@@ -235,7 +232,6 @@ export default function SalesDashboard() {
             options={regionOptions}
             value={selectedRegions}
             onChange={setSelectedRegions}
-            widthClassName="w-56"
           />
         </div>
       </div>
@@ -277,39 +273,39 @@ export default function SalesDashboard() {
           </table>
         </div>
 
-        <div className="mt-3 border-t pt-3">
-          <div className="flex flex-wrap gap-2">
+        <div className="mt-4">
+          <div className="flex flex-wrap gap-6 border-b">
             <button
               type="button"
               onClick={() => setActiveGroupTab('FAMILY')}
-              className={`px-3 py-1.5 text-sm border rounded ${activeGroupTab === 'FAMILY' ? 'bg-blue-50 border-blue-200 text-blue-700' : 'bg-white hover:bg-gray-50'}`}
+              className={`px-1 pb-2 text-sm ${activeGroupTab === 'FAMILY' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-600 hover:text-gray-900'}`}
             >
               Por Família
             </button>
             <button
               type="button"
               onClick={() => setActiveGroupTab('CUSTOMER')}
-              className={`px-3 py-1.5 text-sm border rounded ${activeGroupTab === 'CUSTOMER' ? 'bg-blue-50 border-blue-200 text-blue-700' : 'bg-white hover:bg-gray-50'}`}
+              className={`px-1 pb-2 text-sm ${activeGroupTab === 'CUSTOMER' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-600 hover:text-gray-900'}`}
             >
               Por Cliente
             </button>
             <button
               type="button"
               onClick={() => setActiveGroupTab('REP')}
-              className={`px-3 py-1.5 text-sm border rounded ${activeGroupTab === 'REP' ? 'bg-blue-50 border-blue-200 text-blue-700' : 'bg-white hover:bg-gray-50'}`}
+              className={`px-1 pb-2 text-sm ${activeGroupTab === 'REP' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-600 hover:text-gray-900'}`}
             >
               Por Representante
             </button>
             <button
               type="button"
               onClick={() => setActiveGroupTab('REGION')}
-              className={`px-3 py-1.5 text-sm border rounded ${activeGroupTab === 'REGION' ? 'bg-blue-50 border-blue-200 text-blue-700' : 'bg-white hover:bg-gray-50'}`}
+              className={`px-1 pb-2 text-sm ${activeGroupTab === 'REGION' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-600 hover:text-gray-900'}`}
             >
               Por Região
             </button>
           </div>
 
-          <div className="mt-3 border rounded bg-gray-50 p-4 text-sm text-gray-600 min-h-24">
+          <div className="mt-4 border rounded bg-gray-50 p-4 text-sm text-gray-600 min-h-24">
             {activeGroupTab === 'FAMILY' && <div>Conteúdo por família (em desenvolvimento).</div>}
             {activeGroupTab === 'CUSTOMER' && <div>Conteúdo por cliente (em desenvolvimento).</div>}
             {activeGroupTab === 'REP' && <div>Conteúdo por representante (em desenvolvimento).</div>}
