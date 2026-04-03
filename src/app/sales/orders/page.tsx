@@ -104,6 +104,14 @@ export default function SalesOrdersPage() {
       });
   }, [orders, q, status, dateStart, dateEnd]);
 
+  const calcTotal = (o: SalesOrder) => {
+    return (o.items || []).reduce((acc, item) => {
+      const total = item.quantity * item.unitPrice;
+      const discount = total * (item.discountPct / 100);
+      return acc + (total - discount);
+    }, 0);
+  };
+
   const IconBtn = ({ title, onClick, children, disabled = false }: any) => (
     <button
       title={title}
@@ -186,7 +194,93 @@ export default function SalesOrdersPage() {
             <a href="/sales/orders/new" className="px-3 py-1.5 text-xs border rounded bg-white hover:bg-gray-100">Novo Pedido</a>
           </div>
         </div>
-        <div className="overflow-x-auto">
+        <div className="sm:hidden divide-y">
+          {loading && (
+            <div className="px-3 py-4 text-center text-gray-500 text-sm">Carregando...</div>
+          )}
+          {!loading && filtered.length === 0 && (
+            <div className="px-3 py-4 text-center text-gray-500 text-sm">Nenhum pedido encontrado.</div>
+          )}
+          {!loading && filtered.map((o) => (
+            <div key={o.id} className="px-3 py-3">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="font-mono text-xs text-gray-700">{o.code || o.id}</div>
+                  <div className="text-sm font-medium text-gray-900 truncate">{o.customerName || '-'}</div>
+                  <div className="text-xs text-gray-600 truncate">{o.entity?.name || '-'}</div>
+                </div>
+                <span className={`shrink-0 px-2 py-0.5 rounded text-xs ${statusColor(statusLabelPt(o.status))}`}>{statusLabelPt(o.status)}</span>
+              </div>
+
+              <div className="mt-2 flex items-center justify-between gap-3 text-xs text-gray-600">
+                <div>{o.orderDate ? new Date(o.orderDate).toLocaleDateString('pt-BR') : '-'}</div>
+                <div className="font-medium text-gray-900">{calcTotal(o).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</div>
+              </div>
+
+              <div className="mt-2 flex items-center justify-end">
+                <div className="inline-flex">
+                  <IconBtn title="Visualizar" onClick={() => setSelected(o)}><EyeIcon /></IconBtn>
+                  <IconBtn title="Detalhes" onClick={() => { window.location.href = `/sales/orders/${o.id}`; }}> <FileIcon /> </IconBtn>
+                  <IconBtn
+                    title="Enviar para ERP"
+                    disabled={integratingId === o.id || !['Orçamento', 'Erro na integração'].includes(statusLabelPt(o.status))}
+                    onClick={async () => {
+                      if (!confirm('Confirma enviar este pedido para o ERP?')) return;
+                      setIntegratingId(o.id);
+                      try {
+                        const res = await fetch(`/api/sales/orders/${o.id}/integrate`, {
+                            method: 'POST', headers: { 'Content-Type': 'application/json' }
+                        });
+                        if (!res.ok) {
+                            const err = await res.json();
+                            throw new Error(err.error || 'Falha ao enviar para ERP');
+                        }
+                        const data = await res.json();
+                        
+                        if (data.newStatus === 'Erro na integração') {
+                            alert('Houve erros na integração. Verifique o histórico de situação.');
+                        } else if (data.newStatus === 'Integrado') {
+                            alert('Pedido integrado com sucesso!');
+                        } else {
+                            alert('Envio realizado. Verifique o status atual.');
+                        }
+
+                        const r = await fetch('/api/sales/orders');
+                        if (r.ok) {
+                            const list = await r.json();
+                            setOrders(Array.isArray(list) ? list : []);
+                        }
+                      } catch (e: any) { 
+                          alert(e?.message || String(e)); 
+                      } finally {
+                          setIntegratingId(null);
+                      }
+                    }}
+                  >
+                    {integratingId === o.id ? (
+                        <svg className="animate-spin h-3 w-3 text-gray-700" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                    ) : <SendIcon />}
+                  </IconBtn>
+                  <IconBtn title="Excluir" disabled={!['Orçamento', 'Erro na integração'].includes(statusLabelPt(o.status))} onClick={async () => {
+                    if (!confirm('Confirma excluir este pedido?')) return;
+                    try {
+                      const r = await fetch(`/api/sales/orders/${o.id}`, { method: 'DELETE' });
+                      if (!r.ok) throw new Error('Falha ao excluir pedido');
+                      setOrders((prev) => prev.filter((so) => so.id !== o.id));
+                    } catch (e: any) { alert(e?.message || String(e)); }
+                  }}>
+                    <TrashIcon />
+                  </IconBtn>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="hidden sm:block overflow-x-auto">
           <table className="min-w-full text-sm">
             <thead className="bg-gray-100 text-gray-700">
               <tr>
@@ -213,11 +307,7 @@ export default function SalesOrdersPage() {
                   <td className="px-3 py-2">{o.customerName || '-'}</td>
                   <td className="px-3 py-2">{o.orderDate ? new Date(o.orderDate).toLocaleDateString('pt-BR') : '-'}</td>
                   <td className="px-3 py-2 text-right">
-                    {((o.items || []).reduce((acc, item) => {
-                      const total = item.quantity * item.unitPrice;
-                      const discount = total * (item.discountPct / 100);
-                      return acc + (total - discount);
-                    }, 0)).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                    {calcTotal(o).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                   </td>
                   <td className="px-3 py-2"><span className={`px-2 py-0.5 rounded text-xs ${statusColor(statusLabelPt(o.status))}`}>{statusLabelPt(o.status)}</span></td>
                   <td className="px-3 py-2 text-center">
