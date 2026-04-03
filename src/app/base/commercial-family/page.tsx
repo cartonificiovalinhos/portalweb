@@ -74,7 +74,7 @@ export default function CommercialFamilyPage() {
   };
 
   return (
-    <div className="p-6 space-y-4">
+    <div className="p-3 space-y-4">
       <h1 className="text-xl font-semibold">Base • Família Comercial</h1>
 
       <div className="flex gap-2 items-center">

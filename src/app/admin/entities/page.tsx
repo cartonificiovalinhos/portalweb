@@ -232,7 +232,7 @@ export default function AdminEntitiesPage() {
   };
 
   return (
-    <div className="p-6 space-y-4">
+    <div className="p-3 space-y-4">
       <h1 className="text-xl font-semibold">Administração • Entidades</h1>
       {err && <div className="text-red-600 text-sm">{err}</div>}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

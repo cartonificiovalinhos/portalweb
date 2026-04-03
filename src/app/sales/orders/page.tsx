@@ -142,9 +142,8 @@ export default function SalesOrdersPage() {
   );
 
   return (
-    <div className="p-6 space-y-4">
+    <div className="p-3 space-y-4">
       <h1 className="text-xl font-semibold">Venda • Consulta de Pedidos</h1>
-      <div className="text-sm text-gray-600">Listagem de pedidos gerenciados pela rotina de Manutenção de Pedidos.</div>
       {error && <div className="text-sm text-red-600">{error}</div>}
 
       {/* Filtros */}

@@ -25,7 +25,7 @@ export default async function BudgetPage({
   }));
 
   return (
-    <div className="space-y-6 p-6">
+    <div className="space-y-6 p-3">
       <div>
         <h1 className="text-3xl font-bold tracking-tight text-slate-900">
           Orçamento Planejado

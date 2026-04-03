@@ -18,12 +18,12 @@ export default function AssetQuickView() {
       .finally(() => setLoading(false));
   }, [id]);
 
-  if (!id) return <div className="p-6">ID inválido</div>;
-  if (loading) return <div className="p-6">Carregando...</div>;
-  if (!asset) return <div className="p-6">Componente não encontrado</div>;
+  if (!id) return <div className="p-3">ID inválido</div>;
+  if (loading) return <div className="p-3">Carregando...</div>;
+  if (!asset) return <div className="p-3">Componente não encontrado</div>;
 
   return (
-    <div className="max-w-2xl mx-auto p-6 space-y-4">
+    <div className="max-w-2xl mx-auto p-3 space-y-4">
       <div className="flex items-start gap-4">
         <img src={asset.thumbnail || '/icons/logo cartonificio.png'} alt={asset.name} className="w-24 h-24 object-cover rounded border" />
         <div className="flex-1">

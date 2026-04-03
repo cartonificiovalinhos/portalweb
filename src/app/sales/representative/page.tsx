@@ -101,7 +101,7 @@ export default function RepresentativePage() {
   
 
   return (
-    <div className="p-6">
+    <div className="p-3">
       <h1 className="text-2xl font-semibold mb-2">Vendas • Representante</h1>
       <p className="text-sm text-gray-600 mb-4">Vincule clientes ao representante selecionado.</p>
 

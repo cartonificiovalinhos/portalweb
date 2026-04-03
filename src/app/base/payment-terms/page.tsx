@@ -78,7 +78,7 @@ export default function PaymentTermsPage() {
   };
 
   return (
-    <div className="p-6 space-y-4">
+    <div className="p-3 space-y-4">
       <h1 className="text-xl font-semibold">Base • Condição de Pagamento</h1>
 
       <div className="flex gap-2 items-center">

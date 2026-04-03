@@ -186,7 +186,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             </button>
           </div>
         </div>
-        <div className="p-6">
+        <div className="p-3">
           <ProgramGuard perms={perms} pathname={pathname}>
             {children}
           </ProgramGuard>

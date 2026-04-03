@@ -13,7 +13,7 @@ export default async function NewExpensePage() {
   ]);
 
   return (
-    <div className="space-y-6 p-6 max-w-5xl mx-auto">
+    <div className="space-y-6 p-3 max-w-5xl mx-auto">
       <div className="flex items-center gap-4">
         <Link
             href="/admin/modules/gestao-finti/despesas"

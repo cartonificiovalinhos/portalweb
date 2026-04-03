@@ -51,7 +51,7 @@ export default function SalesClientsPage() {
   }, [q]);
 
   return (
-    <div className="p-6 space-y-4">
+    <div className="p-3 space-y-4">
       <h1 className="text-xl font-semibold">Força de Vendas • Clientes</h1>
 
       <div className="flex gap-2 items-center">

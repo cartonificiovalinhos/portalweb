@@ -40,7 +40,7 @@ export default async function HomePage() {
   }
 
   return (
-    <div className="space-y-4 -mt-4">
+    <div className="space-y-4 -mt-2">
       <DashboardTabs 
         modules={modules} 
         maintenanceContent={

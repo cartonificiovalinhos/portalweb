@@ -11,7 +11,7 @@ export default async function SettingsPage() {
   ]);
 
   return (
-    <div className="space-y-6 p-6">
+    <div className="space-y-6 p-3">
       <div>
         <h1 className="text-3xl font-bold tracking-tight">
           Configurações
