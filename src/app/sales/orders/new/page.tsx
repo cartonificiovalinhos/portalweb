@@ -55,7 +55,7 @@ type SalesOrder = {
   items?: OrderItem[];
 };
 
-import { SalesOrderItemRow, supportsSheetDims, supportsCoreDims } from "../components/SalesOrderItemRow";
+import { SalesOrderItemCard, SalesOrderItemRow, supportsSheetDims, supportsCoreDims } from "../components/SalesOrderItemRow";
 
 const ICON_BTN = "inline-flex items-center justify-center w-8 h-8 bg-white border border-gray-300 rounded shadow-sm hover:bg-gray-50 text-gray-700";
 
@@ -486,9 +486,30 @@ function NewSalesOrderContent() {
       <div className="space-y-3">
         {/* Header */}
         <div className="border rounded bg-white p-2 text-sm">
-          <div className="flex items-start gap-3">
-            <div className="grid grid-cols-1 md:grid-cols-12 gap-3 flex-1">
-              <div className="md:col-span-12 flex gap-8">
+          <div className="flex flex-col sm:flex-row sm:items-start gap-3">
+            <div className="order-1 sm:order-2 w-full sm:w-auto sm:ml-auto flex flex-wrap items-center gap-2 sm:justify-end">
+              <button 
+                className={`flex items-center gap-1 px-3 py-1 text-sm bg-gray-100 border border-gray-300 rounded shadow-sm text-gray-700 hover:bg-gray-200 ${simulating ? 'opacity-50 cursor-wait' : ''}`} 
+                title="Simulação de impostos" 
+                onClick={handleSimulateTaxes}
+                disabled={simulating}
+              >
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+                {simulating ? 'Simulando...' : 'Simular Impostos'}
+              </button>
+              <button className={`${ICON_BTN} opacity-50 cursor-not-allowed`} title="Enviar para ERP (Desabilitado)" disabled>
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+              </button>
+              <button className={`${ICON_BTN} opacity-50 cursor-not-allowed`} title="Excluir (Desabilitado)" disabled>
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+              </button>
+              <button className={`${ICON_BTN} text-green-600 border-green-200 bg-green-50 hover:bg-green-100`} title="Salvar Pedido" onClick={saveOrder}>
+                 <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M9 16.17 4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17Z"/></svg>
+              </button>
+            </div>
+
+            <div className="order-2 sm:order-1 grid grid-cols-1 md:grid-cols-12 gap-3 flex-1">
+              <div className="md:col-span-12 flex flex-wrap items-center gap-8">
                 <div>
                   <span className="text-gray-600">Número</span>
                   <div className="font-mono mt-1 text-gray-400">(Automático)</div>
@@ -584,29 +605,6 @@ function NewSalesOrderContent() {
                 </div>
               </div>
             </div>
-            <div className="ml-auto flex gap-2">
-              <button 
-                className={`flex items-center gap-1 px-3 py-1 text-sm bg-gray-100 border border-gray-300 rounded shadow-sm text-gray-700 hover:bg-gray-200 ${simulating ? 'opacity-50 cursor-wait' : ''}`} 
-                title="Simulação de impostos" 
-                onClick={handleSimulateTaxes}
-                disabled={simulating}
-              >
-                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
-                {simulating ? 'Simulando...' : 'Simular Impostos'}
-              </button>
-              {/* Send to ERP - Disabled */}
-              <button className={`${ICON_BTN} opacity-50 cursor-not-allowed`} title="Enviar para ERP (Desabilitado)" disabled>
-                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
-              </button>
-              {/* Delete - Disabled */}
-              <button className={`${ICON_BTN} opacity-50 cursor-not-allowed`} title="Excluir (Desabilitado)" disabled>
-                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
-              </button>
-              {/* Save Order instead of Edit */}
-              <button className={`${ICON_BTN} text-green-600 border-green-200 bg-green-50 hover:bg-green-100`} title="Salvar Pedido" onClick={saveOrder}>
-                 <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M9 16.17 4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17Z"/></svg>
-              </button>
-            </div>
           </div>
         </div>
 
@@ -664,7 +662,25 @@ function NewSalesOrderContent() {
         {groups.map(([fam, list]) => (
           <div key={fam} className="border rounded bg-white">
             <div className="p-2 text-xs text-gray-600">{fam}</div>
-            <div className="overflow-x-auto">
+            <div className="sm:hidden divide-y">
+              {list.map((it) => (
+                <SalesOrderItemCard
+                  key={it.id}
+                  item={it}
+                  isOrderEditable={true}
+                  canDelete={true}
+                  onPreviewUpdate={(updated) => updateItem(it.id, updated)}
+                  onDelete={() => removeItem(it.id)}
+                  showFeatures={showFeaturesFor === it.id}
+                  toggleFeatures={() => setShowFeaturesFor(showFeaturesFor === it.id ? null : it.id)}
+                  computeWeightKg={computeWeightKg}
+                  fmtInt={fmtInt}
+                  hasSheetCol={list.some(supportsSheetDims)}
+                  hasCoreCol={list.some(supportsCoreDims)}
+                />
+              ))}
+            </div>
+            <div className="hidden sm:block overflow-x-auto">
               <table className="min-w-full text-sm">
                 <thead>
                   <tr className="bg-gray-50">
@@ -713,7 +729,7 @@ function NewSalesOrderContent() {
               const total = subtotal - discountTotal;
               const totalWeight = list.reduce((s, it) => s + Math.round(computeWeightKg(it)), 0);
               return (
-                <div className="px-3 py-2 text-xs text-gray-700 flex gap-6 justify-end border-t">
+                <div className="px-3 py-2 text-xs text-gray-700 flex flex-wrap gap-4 justify-end border-t">
                   <span>Subtotal: {fmtCurrency(subtotal)}</span>
                   <span>Descontos: {fmtCurrency(discountTotal)}</span>
                   <span>Total Sem Imp R$: {fmtCurrency(total)}</span>

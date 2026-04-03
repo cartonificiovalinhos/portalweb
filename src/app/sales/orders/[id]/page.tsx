@@ -1,7 +1,7 @@
 "use client";
 import React, { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { SalesOrderItemRow, supportsSheetDims, supportsCoreDims } from "../components/SalesOrderItemRow";
+import { SalesOrderItemCard, SalesOrderItemRow, supportsSheetDims, supportsCoreDims } from "../components/SalesOrderItemRow";
 
 type InventoryItem = {
   id: number;
@@ -1032,7 +1032,53 @@ export default function SalesOrderMaintenancePage() {
           {groups.map(([fam, list]) => (
             <div key={fam} className="border rounded bg-white">
               <div className="p-2 text-xs text-gray-600">{fam}</div>
-              <div className="overflow-x-auto">
+              <div className="sm:hidden divide-y">
+                {list.map((it) => {
+                  const hasSheet = list.some(supportsSheetDims);
+                  const hasCore = list.some(supportsCoreDims);
+                  const isFeatures = showFeaturesFor === it.id;
+
+                  return (
+                    <SalesOrderItemCard
+                      key={it.id}
+                      item={it}
+                      isOrderEditable={isEditableStatus(order?.status)}
+                      canDelete={isDeletableStatus(order?.status)}
+                      onPreviewUpdate={(updated) => {
+                        setOrderItems((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
+                      }}
+                      onAutoSave={async (updated) => {
+                        if (!order) return;
+                        try {
+                          const res = await fetch(`/api/sales/orders/${order.id}/items/${updated.id}`, {
+                            method: "PATCH",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify(updated)
+                          });
+                          if (!res.ok) {
+                            const err = await res.json().catch(() => ({}));
+                            throw new Error(err.error || "Falha ao salvar item");
+                          }
+                        } catch (e: any) { alert(e?.message || String(e)); }
+                      }}
+                      onDelete={async () => {
+                        if (!order) return;
+                        if (!confirm("Confirma excluir este item?")) return;
+                        const r = await fetch(`/api/sales/orders/${order.id}/items/${it.id}`, { method: "DELETE" });
+                        if (r.ok) await refreshOrder();
+                      }}
+                      showFeatures={isFeatures}
+                      toggleFeatures={() => setShowFeaturesFor(isFeatures ? null : it.id)}
+                      computeWeightKg={computeWeightKg}
+                      fmtInt={fmtInt}
+                      hasSheetCol={hasSheet}
+                      hasCoreCol={hasCore}
+                      onSaveSuccess={refreshOrder}
+                    />
+                  );
+                })}
+              </div>
+              <div className="hidden sm:block overflow-x-auto">
                 <table className="min-w-full text-sm">
                   <thead>
                     <tr className="bg-gray-50">
