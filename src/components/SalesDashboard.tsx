@@ -10,6 +10,31 @@ type UserEntry = { id: number; name: string; salesRepAdmin?: boolean };
 
 type MultiOpt = { value: string; label: string };
 
+function GroupGrid({ firstColLabel }: { firstColLabel: string }) {
+  return (
+    <div className="overflow-x-auto">
+      <table className="min-w-full text-sm border border-gray-200 bg-white">
+        <thead>
+          <tr className="bg-gray-100 text-left">
+            <th className="p-1 border-b border-r font-medium">{firstColLabel}</th>
+            <th className="p-1 border-b border-r font-medium text-right">Meta Prevista</th>
+            <th className="p-1 border-b border-r font-medium text-right">Carregado</th>
+            <th className="p-1 border-b border-r font-medium text-right">Devolução</th>
+            <th className="p-1 border-b border-r font-medium text-right">Realizado Líq</th>
+            <th className="p-1 border-b border-r font-medium text-right">(%)Atingimento</th>
+            <th className="p-1 border-b font-medium text-right">Em Carteira</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td className="p-2 text-center text-gray-500" colSpan={7}>Sem dados</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 function MultiSelectDropdown({
   label,
   placeholder,
@@ -306,10 +331,10 @@ export default function SalesDashboard() {
           </div>
 
           <div className="mt-2 border rounded bg-gray-50 p-2 text-sm text-gray-600 min-h-24">
-            {activeGroupTab === 'FAMILY' && <div>Conteúdo por família (em desenvolvimento).</div>}
-            {activeGroupTab === 'CUSTOMER' && <div>Conteúdo por cliente (em desenvolvimento).</div>}
-            {activeGroupTab === 'REP' && <div>Conteúdo por representante (em desenvolvimento).</div>}
-            {activeGroupTab === 'REGION' && <div>Conteúdo por região (em desenvolvimento).</div>}
+            {activeGroupTab === 'FAMILY' && <GroupGrid firstColLabel="Descrição Família" />}
+            {activeGroupTab === 'CUSTOMER' && <GroupGrid firstColLabel="Descrição Cliente" />}
+            {activeGroupTab === 'REP' && <GroupGrid firstColLabel="Descrição Representante" />}
+            {activeGroupTab === 'REGION' && <GroupGrid firstColLabel="Descrição Região" />}
           </div>
         </div>
       </div>
