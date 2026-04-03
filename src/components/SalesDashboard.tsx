@@ -1,56 +1,110 @@
 "use client";
-import React, { useEffect, useState } from 'react';
-import {
-  Chart as ChartJS,
-  CategoryScale,
-  LinearScale,
-  BarElement,
-  Title,
-  Tooltip,
-  Legend,
-  ChartOptions
-} from 'chart.js';
-import { Bar } from 'react-chartjs-2';
-
-ChartJS.register(
-  CategoryScale,
-  LinearScale,
-  BarElement,
-  Title,
-  Tooltip,
-  Legend
-);
-
-type ChartDataEntry = {
-  name: string;
-  value: number;
-};
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 
 type EntityEntry = {
   id: number;
   name: string;
 };
 
-type TrendEntry = {
-  name: string;
-  sales: number;
-  invoiced: number;
-};
+type UserEntry = { id: number; name: string; salesRepAdmin?: boolean };
 
-type DashboardData = {
-  salesByCustomer: ChartDataEntry[];
-  salesByStatus: ChartDataEntry[];
-  salesByFamily: ChartDataEntry[];
-  trend: TrendEntry[];
-  availableEntities: EntityEntry[];
-};
+type MultiOpt = { value: string; label: string };
+
+function MultiSelectDropdown({
+  label,
+  placeholder,
+  options,
+  value,
+  onChange,
+  widthClassName,
+}: {
+  label: string;
+  placeholder: string;
+  options: MultiOpt[];
+  value: string[];
+  onChange: (next: string[]) => void;
+  widthClassName: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (wrapperRef.current && !wrapperRef.current.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const selectedLabels = useMemo(() => {
+    const map = new Map(options.map((o) => [o.value, o.label]));
+    return value.map((v) => map.get(v)).filter(Boolean) as string[];
+  }, [options, value]);
+
+  const allChecked = options.length > 0 && value.length === options.length;
+
+  return (
+    <div className="relative" ref={wrapperRef}>
+      <label className="block text-xs font-medium text-gray-700 mb-1">{label}</label>
+      <button
+        type="button"
+        className={`border rounded px-3 py-1.5 text-sm ${widthClassName} text-left focus:ring-2 focus:ring-blue-500 outline-none bg-white`}
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+      >
+        {selectedLabels.length ? `${selectedLabels.length} selecionado(s)` : placeholder}
+      </button>
+      {open && (
+        <div className="absolute z-20 mt-1 w-full max-h-64 overflow-auto border rounded bg-white shadow">
+          <label className="flex items-center gap-2 px-3 py-2 text-sm border-b cursor-pointer">
+            <input
+              type="checkbox"
+              checked={allChecked}
+              onChange={(e) => onChange(e.target.checked ? options.map((o) => o.value) : [])}
+            />
+            <span>Selecionar todas as opções</span>
+          </label>
+          {options.map((o) => (
+            <label key={o.value} className="flex items-center gap-2 px-3 py-2 text-sm hover:bg-gray-50 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={value.includes(o.value)}
+                onChange={(e) => {
+                  onChange(
+                    e.target.checked
+                      ? (value.includes(o.value) ? value : [...value, o.value])
+                      : value.filter((v) => v !== o.value)
+                  );
+                }}
+              />
+              <span>{o.label}</span>
+            </label>
+          ))}
+          {options.length === 0 && (
+            <div className="px-3 py-2 text-sm text-gray-500">Nenhuma opção disponível</div>
+          )}
+          <div className="flex items-center justify-between px-3 py-2 border-t text-xs">
+            <button type="button" className="text-blue-600 hover:underline" onClick={() => onChange([])}>Limpar</button>
+            <button type="button" className="text-gray-700 hover:underline" onClick={() => setOpen(false)}>Fechar</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function SalesDashboard() {
-  const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [year, setYear] = useState(new Date().getFullYear());
   const [month, setMonth] = useState<string>('');
   const [entityId, setEntityId] = useState<string>('');
+  const [entities, setEntities] = useState<EntityEntry[]>([]);
+  const [repOptions, setRepOptions] = useState<MultiOpt[]>([]);
+  const [selectedReps, setSelectedReps] = useState<string[]>([]);
+  const [selectedRegions, setSelectedRegions] = useState<string[]>([]);
+  const [activeGroupTab, setActiveGroupTab] = useState<'FAMILY' | 'CUSTOMER' | 'REP' | 'REGION'>('FAMILY');
 
   const months = [
     { value: '1', label: 'Janeiro' },
@@ -70,198 +124,197 @@ export default function SalesDashboard() {
   const years = Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i);
 
   useEffect(() => {
-    const fetchData = async () => {
+    const loadFilters = async () => {
       setLoading(true);
       try {
-        const params = new URLSearchParams();
-        params.set('year', String(year));
-        if (month) params.set('month', month);
-        if (entityId) params.set('entityId', entityId);
+        const [permsRes, usersRes] = await Promise.all([
+          fetch('/api/permissions', { cache: 'no-store' }).catch(() => null as any),
+          fetch('/api/users', { cache: 'no-store' }).catch(() => null as any),
+        ]);
 
-        const res = await fetch(`/api/sales/dashboard?${params.toString()}`);
-        if (res.ok) {
-          const json = await res.json();
-          setData(json);
+        if (permsRes?.ok) {
+          const j = await permsRes.json().catch(() => ({} as any));
+          const list = Array.isArray(j?.entities) ? j.entities : [];
+          setEntities(
+            list
+              .map((e: any) => ({ id: Number(e?.id), name: String(e?.name || '') }))
+              .filter((e: any) => Number.isFinite(e.id) && e.id > 0 && e.name)
+          );
         }
-      } catch (error) {
-        console.error("Failed to fetch dashboard data", error);
+
+        if (usersRes?.ok) {
+          const arr = await usersRes.json().catch(() => []);
+          const list = Array.isArray(arr) ? (arr as UserEntry[]) : [];
+          const reps = list.filter((u: any) => Boolean(u?.salesRepAdmin));
+          const finalList = reps.length ? reps : list;
+          setRepOptions(
+            finalList
+              .map((u: any) => ({ value: String(u.id), label: String(u.name || '') }))
+              .filter((o: any) => o.value && o.label)
+          );
+        }
       } finally {
         setLoading(false);
       }
     };
 
-    fetchData();
-  }, [year, month, entityId]);
+    loadFilters();
+  }, []);
 
-  const fmtMoney = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 });
+  const regionOptions: MultiOpt[] = useMemo(() => {
+    return [
+      { value: 'NORTE', label: 'Norte' },
+      { value: 'NORDESTE', label: 'Nordeste' },
+      { value: 'CENTRO_OESTE', label: 'Centro-Oeste' },
+      { value: 'SUDESTE', label: 'Sudeste' },
+      { value: 'SUL', label: 'Sul' },
+    ];
+  }, []);
 
-  // Common options for charts
-  const commonOptions: ChartOptions<'bar'> = {
-    responsive: true,
-    maintainAspectRatio: false,
-    plugins: {
-      legend: { display: false },
-      tooltip: {
-        callbacks: {
-          label: (context) => fmtMoney(context.raw as number)
-        }
-      }
-    },
+  const fmtInt = (v: number) => v.toLocaleString('pt-BR');
+  const fmtDec = (v: number) => v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+  const summary = {
+    peso: { metaPrevista: 0, carregado: 0, devolucao: 0, realizadoLiq: 0, atingimento: 0, emCarteira: 0 },
+    valor: { metaPrevista: 0, carregado: 0, devolucao: 0, realizadoLiq: 0, atingimento: 0, emCarteira: 0 },
   };
-
-  // 1. Vendas por Cliente (Top 10) - Hide names on X axis, show in tooltip
-  const customerChartOptions: ChartOptions<'bar'> = {
-    ...commonOptions,
-    plugins: {
-      ...commonOptions.plugins,
-      tooltip: {
-        callbacks: {
-            title: (items) => items[0].label, // Show name in tooltip title
-            label: (context) => fmtMoney(context.raw as number)
-        }
-      }
-    },
-    scales: {
-      x: {
-        ticks: { display: false } // Hide labels on X axis
-      }
-    }
-  };
-
-  const customerChartData = {
-    labels: data?.salesByCustomer?.map(d => d.name) || [],
-    datasets: [{
-      label: 'Vendas',
-      data: data?.salesByCustomer?.map(d => d.value) || [],
-      backgroundColor: 'rgba(54, 162, 235, 0.8)',
-      borderRadius: 4,
-    }]
-  };
-
-  // 2. Total Vendas Por Situação - Horizontal Bar
-  const statusChartOptions: ChartOptions<'bar'> = {
-    ...commonOptions,
-    indexAxis: 'y',
-    scales: {
-        x: { beginAtZero: true }
-    }
-  };
-
-  const statusChartData = {
-    labels: data?.salesByStatus?.map(d => d.name) || [],
-    datasets: [{
-      label: 'Total',
-      data: data?.salesByStatus?.map(d => d.value) || [],
-      backgroundColor: 'rgba(14, 165, 233, 0.8)', // sky-500
-      borderRadius: 4,
-    }]
-  };
-
-  // 3. Total Vendas Por Fam. Comercial
-  const familyChartData = {
-    labels: data?.salesByFamily?.map(d => d.name) || [],
-    datasets: [{
-      label: 'Total',
-      data: data?.salesByFamily?.map(d => d.value) || [],
-      backgroundColor: 'rgba(6, 182, 212, 0.8)', // cyan-500
-      borderRadius: 4,
-    }]
-  };
-
-  // 4. Tendência de Vendas
-  const trendChartData = {
-    labels: data?.trend?.map(d => d.name) || [],
-    datasets: [
-      {
-        label: 'Vendas (Integrado+)',
-        data: data?.trend?.map(d => d.sales) || [],
-        backgroundColor: 'rgba(74, 222, 128, 0.8)', // green-400
-        borderRadius: 4,
-      },
-      {
-        label: 'Faturado',
-        data: data?.trend?.map(d => d.invoiced) || [],
-        backgroundColor: 'rgba(59, 130, 246, 0.8)', // blue-500
-        borderRadius: 4,
-      }
-    ]
-  };
-
-
-  if (loading && !data) return <div className="p-8 text-center text-gray-500">Carregando dashboard...</div>;
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
-      {/* Filters */}
-      <div className="flex flex-wrap gap-4 bg-white p-4 rounded shadow-sm border border-gray-200 items-end">
-        <div>
-          <label className="block text-xs font-medium text-gray-700 mb-1">Ano</label>
-          <select 
-            value={year} 
-            onChange={(e) => setYear(Number(e.target.value))}
-            className="border rounded px-3 py-1.5 text-sm w-32 focus:ring-2 focus:ring-blue-500 outline-none"
-          >
-            {years.map(y => <option key={y} value={y}>{y}</option>)}
-          </select>
-        </div>
-        <div>
-          <label className="block text-xs font-medium text-gray-700 mb-1">Mês</label>
-          <select 
-            value={month} 
-            onChange={(e) => setMonth(e.target.value)}
-            className="border rounded px-3 py-1.5 text-sm w-40 focus:ring-2 focus:ring-blue-500 outline-none"
-          >
-            <option value="">Todos</option>
-            {months.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
-          </select>
-        </div>
-        <div>
-          <label className="block text-xs font-medium text-gray-700 mb-1">Entidade</label>
-          <select 
-            value={entityId} 
-            onChange={(e) => setEntityId(e.target.value)}
-            className="border rounded px-3 py-1.5 text-sm w-64 focus:ring-2 focus:ring-blue-500 outline-none"
-          >
-            <option value="">Todas</option>
-            {data?.availableEntities?.map(e => (
-                <option key={e.id} value={e.id}>{e.name}</option>
-            ))}
-          </select>
+      <div className="bg-white p-4 rounded shadow-sm border border-gray-200">
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1">Ano</label>
+            <select
+              value={year}
+              onChange={(e) => setYear(Number(e.target.value))}
+              className="border rounded px-3 py-1.5 text-sm w-32 focus:ring-2 focus:ring-blue-500 outline-none"
+            >
+              {years.map((y) => <option key={y} value={y}>{y}</option>)}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1">Mês</label>
+            <select
+              value={month}
+              onChange={(e) => setMonth(e.target.value)}
+              className="border rounded px-3 py-1.5 text-sm w-40 focus:ring-2 focus:ring-blue-500 outline-none"
+            >
+              <option value="">Todos</option>
+              {months.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1">Entidade</label>
+            <select
+              value={entityId}
+              onChange={(e) => setEntityId(e.target.value)}
+              className="border rounded px-3 py-1.5 text-sm w-64 focus:ring-2 focus:ring-blue-500 outline-none"
+            >
+              <option value="">Todas</option>
+              {entities.map((e) => (
+                <option key={e.id} value={String(e.id)}>{e.name}</option>
+              ))}
+            </select>
+          </div>
+
+          <MultiSelectDropdown
+            label="Representante"
+            placeholder={loading ? "Carregando..." : "Selecione..."}
+            options={repOptions}
+            value={selectedReps}
+            onChange={setSelectedReps}
+            widthClassName="w-64"
+          />
+
+          <MultiSelectDropdown
+            label="Região"
+            placeholder="Selecione..."
+            options={regionOptions}
+            value={selectedRegions}
+            onChange={setSelectedRegions}
+            widthClassName="w-56"
+          />
         </div>
       </div>
 
-      {/* Grid Layout */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        
-        {/* Row 1 */}
-        <div className="bg-white p-4 rounded shadow border border-gray-200 h-80 flex flex-col">
-            <h3 className="text-sm font-semibold mb-2 text-gray-700">Vendas por Cliente (Top 10)</h3>
-            <div className="flex-1 min-h-0">
-                <Bar data={customerChartData} options={customerChartOptions} />
-            </div>
+      <div className="bg-white p-4 rounded shadow-sm border border-gray-200">
+        <div className="overflow-x-auto">
+          <table className="min-w-full text-sm">
+            <thead>
+              <tr className="bg-gray-50 text-left">
+                <th className="p-2 border-b font-medium">Tipo Agrupa</th>
+                <th className="p-2 border-b font-medium text-right">Meta Prevista</th>
+                <th className="p-2 border-b font-medium text-right">Carregado</th>
+                <th className="p-2 border-b font-medium text-right">Devolução</th>
+                <th className="p-2 border-b font-medium text-right">Realizado Líq</th>
+                <th className="p-2 border-b font-medium text-right">(%)Atingimento</th>
+                <th className="p-2 border-b font-medium text-right">Em Carteira</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td className="p-2 border-b">Peso (KG)</td>
+                <td className="p-2 border-b text-right">{fmtInt(summary.peso.metaPrevista)}</td>
+                <td className="p-2 border-b text-right">{fmtInt(summary.peso.carregado)}</td>
+                <td className="p-2 border-b text-right">{fmtInt(summary.peso.devolucao)}</td>
+                <td className="p-2 border-b text-right">{fmtInt(summary.peso.realizadoLiq)}</td>
+                <td className="p-2 border-b text-right">{fmtDec(summary.peso.atingimento)}</td>
+                <td className="p-2 border-b text-right">{fmtInt(summary.peso.emCarteira)}</td>
+              </tr>
+              <tr>
+                <td className="p-2">Valor</td>
+                <td className="p-2 text-right">{fmtInt(summary.valor.metaPrevista)}</td>
+                <td className="p-2 text-right">{fmtInt(summary.valor.carregado)}</td>
+                <td className="p-2 text-right">{fmtInt(summary.valor.devolucao)}</td>
+                <td className="p-2 text-right">{fmtInt(summary.valor.realizadoLiq)}</td>
+                <td className="p-2 text-right">{fmtDec(summary.valor.atingimento)}</td>
+                <td className="p-2 text-right">{fmtInt(summary.valor.emCarteira)}</td>
+              </tr>
+            </tbody>
+          </table>
         </div>
 
-        <div className="bg-white p-4 rounded shadow border border-gray-200 h-80 flex flex-col">
-            <h3 className="text-sm font-semibold mb-2 text-gray-700">Total Vendas Por Situação</h3>
-            <div className="flex-1 min-h-0">
-                <Bar data={statusChartData} options={statusChartOptions} />
-            </div>
-        </div>
-        
-        {/* Row 2 */}
-        <div className="bg-white p-4 rounded shadow border border-gray-200 h-80 flex flex-col">
-            <h3 className="text-sm font-semibold mb-2 text-gray-700">Total Vendas Por Fam. Comercial R$</h3>
-            <div className="flex-1 min-h-0">
-                <Bar data={familyChartData} options={commonOptions} />
-            </div>
-        </div>
-        
-        {/* Trend spans 2 cols or full width depending on layout */}
-        <div className="md:col-span-2 lg:col-span-3 bg-white p-4 rounded shadow border border-gray-200 h-80 flex flex-col">
-             <h3 className="text-sm font-semibold mb-2 text-gray-700">{`Total Vendas x Faturado - ${year}`}</h3>
-             <div className="flex-1 min-h-0">
-                <Bar data={trendChartData} options={commonOptions} />
-             </div>
+        <div className="mt-3 border-t pt-3">
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => setActiveGroupTab('FAMILY')}
+              className={`px-3 py-1.5 text-sm border rounded ${activeGroupTab === 'FAMILY' ? 'bg-blue-50 border-blue-200 text-blue-700' : 'bg-white hover:bg-gray-50'}`}
+            >
+              Por Família
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveGroupTab('CUSTOMER')}
+              className={`px-3 py-1.5 text-sm border rounded ${activeGroupTab === 'CUSTOMER' ? 'bg-blue-50 border-blue-200 text-blue-700' : 'bg-white hover:bg-gray-50'}`}
+            >
+              Por Cliente
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveGroupTab('REP')}
+              className={`px-3 py-1.5 text-sm border rounded ${activeGroupTab === 'REP' ? 'bg-blue-50 border-blue-200 text-blue-700' : 'bg-white hover:bg-gray-50'}`}
+            >
+              Por Representante
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveGroupTab('REGION')}
+              className={`px-3 py-1.5 text-sm border rounded ${activeGroupTab === 'REGION' ? 'bg-blue-50 border-blue-200 text-blue-700' : 'bg-white hover:bg-gray-50'}`}
+            >
+              Por Região
+            </button>
+          </div>
+
+          <div className="mt-3 border rounded bg-gray-50 p-4 text-sm text-gray-600 min-h-24">
+            {activeGroupTab === 'FAMILY' && <div>Conteúdo por família (em desenvolvimento).</div>}
+            {activeGroupTab === 'CUSTOMER' && <div>Conteúdo por cliente (em desenvolvimento).</div>}
+            {activeGroupTab === 'REP' && <div>Conteúdo por representante (em desenvolvimento).</div>}
+            {activeGroupTab === 'REGION' && <div>Conteúdo por região (em desenvolvimento).</div>}
+          </div>
         </div>
       </div>
     </div>
