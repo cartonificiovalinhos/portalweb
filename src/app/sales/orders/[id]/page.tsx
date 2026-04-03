@@ -775,7 +775,7 @@ export default function SalesOrderMaintenancePage() {
                 </div>
 
                 {/* Linha de Inputs: Cliente, Pagamento, Entrega */}
-                <div className="grid grid-cols-1 md:grid-cols-12 gap-3 mt-2">
+                <div className="grid grid-cols-1 md:grid-cols-12 gap-3 mt-2 min-w-0">
                   <div className={`md:col-span-6 ${!isHeaderEditing || (order.items && order.items.length > 0) || !['OPEN', 'Orçamento'].includes(order.status || '') ? "opacity-75 pointer-events-none" : ""}`}>
                      <AsyncSelect
                         label="Cliente"
@@ -828,9 +828,9 @@ export default function SalesOrderMaintenancePage() {
                       )}
                     />
                   </div>
-                  <div className="md:col-span-3">
+                  <div className="md:col-span-3 min-w-0">
                     <span className="text-gray-600">Entrega</span>
-                    <input type="date" className="mt-1 w-full px-2 py-1 border rounded" value={hdrDraft.deliveryDate ?? ''} onChange={(e) => setHdrDraft((d) => ({ ...d, deliveryDate: e.target.value }))} disabled={!isHeaderEditing} />
+                    <input type="date" className="mt-1 block w-full min-w-0 max-w-full px-2 py-1 border rounded" value={hdrDraft.deliveryDate ?? ''} onChange={(e) => setHdrDraft((d) => ({ ...d, deliveryDate: e.target.value }))} disabled={!isHeaderEditing} />
                   </div>
                   <div className={`md:col-span-6 ${!isHeaderEditing ? "opacity-75 pointer-events-none" : ""}`}>
                      <AsyncSelect
