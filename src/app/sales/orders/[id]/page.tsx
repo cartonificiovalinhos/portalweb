@@ -938,53 +938,93 @@ export default function SalesOrderMaintenancePage() {
               </button>
             </div>
             {showBilling && (
-              <div className="overflow-x-auto">
-                <table className="min-w-full text-sm">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-3 py-2 text-left">Nr Nota Fiscal</th>
-                      <th className="px-3 py-2 text-left">Data Emissão</th>
-                      <th className="px-3 py-2 text-right">Vlr Tot Nota R$</th>
-                      <th className="px-3 py-2 text-right">Peso Tot Nota Kg</th>
-                      <th className="px-3 py-2 text-center">Opções</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {loadingInvoices && <tr><td colSpan={5} className="px-3 py-4 text-center text-gray-500">Carregando...</td></tr>}
-                    {!loadingInvoices && invoices.length === 0 && <tr><td colSpan={5} className="px-3 py-4 text-center text-gray-500">Nenhum faturamento registrado.</td></tr>}
-                    {!loadingInvoices && invoices.map((inv) => (
-                      <tr key={inv.id} className="border-t hover:bg-gray-50">
-                        <td className="px-3 py-2">{inv.invoiceNumber}</td>
-                        <td className="px-3 py-2">{new Date(inv.issueDate).toLocaleDateString('pt-BR')}</td>
-                        <td className="px-3 py-2 text-right">{fmtCurrency(inv.totalValue)}</td>
-                        <td className="px-3 py-2 text-right">{fmtNumber(inv.totalWeight)}</td>
-                        <td className="px-3 py-2 text-center">
-                           <div className="flex justify-center gap-2">
-                             {inv.danfeFileName && (
-                               <a 
-                                 href={`/api/sales/orders/${id}/invoices/${inv.id}/download?type=danfe`} 
-                                 target="_blank" 
-                                 className="px-2 py-1 text-xs border rounded bg-white hover:bg-gray-100 text-blue-600"
-                               >
-                                 Baixar DANFE
-                               </a>
-                             )}
-                             {inv.xmlFileName && (
-                               <a 
-                                 href={`/api/sales/orders/${id}/invoices/${inv.id}/download?type=xml`} 
-                                 target="_blank" 
-                                 className="px-2 py-1 text-xs border rounded bg-white hover:bg-gray-100 text-green-600"
-                               >
-                                 Baixar XML
-                               </a>
-                             )}
-                           </div>
-                        </td>
+              <>
+                <div className="sm:hidden divide-y">
+                  {loadingInvoices && <div className="px-3 py-4 text-center text-gray-500 text-sm">Carregando...</div>}
+                  {!loadingInvoices && invoices.length === 0 && <div className="px-3 py-4 text-center text-gray-500 text-sm">Nenhum faturamento registrado.</div>}
+                  {!loadingInvoices && invoices.map((inv) => (
+                    <div key={inv.id} className="p-3">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="text-sm font-medium text-gray-900 truncate">{inv.invoiceNumber}</div>
+                          <div className="text-xs text-gray-600">{new Date(inv.issueDate).toLocaleDateString('pt-BR')}</div>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <div className="text-xs text-gray-600">{fmtNumber(inv.totalWeight)} Kg</div>
+                          <div className="text-sm font-medium text-gray-900">{fmtCurrency(inv.totalValue)}</div>
+                        </div>
+                      </div>
+                      <div className="mt-2 flex items-center gap-2">
+                        {inv.danfeFileName && (
+                          <a 
+                            href={`/api/sales/orders/${id}/invoices/${inv.id}/download?type=danfe`} 
+                            target="_blank" 
+                            className="px-2 py-1 text-xs border rounded bg-white hover:bg-gray-100 text-blue-600"
+                          >
+                            Baixar DANFE
+                          </a>
+                        )}
+                        {inv.xmlFileName && (
+                          <a 
+                            href={`/api/sales/orders/${id}/invoices/${inv.id}/download?type=xml`} 
+                            target="_blank" 
+                            className="px-2 py-1 text-xs border rounded bg-white hover:bg-gray-100 text-green-600"
+                          >
+                            Baixar XML
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div className="hidden sm:block overflow-x-auto">
+                  <table className="min-w-full text-sm">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-3 py-2 text-left">Nr Nota Fiscal</th>
+                        <th className="px-3 py-2 text-left">Data Emissão</th>
+                        <th className="px-3 py-2 text-right">Vlr Tot Nota R$</th>
+                        <th className="px-3 py-2 text-right">Peso Tot Nota Kg</th>
+                        <th className="px-3 py-2 text-center">Opções</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                    </thead>
+                    <tbody>
+                      {loadingInvoices && <tr><td colSpan={5} className="px-3 py-4 text-center text-gray-500">Carregando...</td></tr>}
+                      {!loadingInvoices && invoices.length === 0 && <tr><td colSpan={5} className="px-3 py-4 text-center text-gray-500">Nenhum faturamento registrado.</td></tr>}
+                      {!loadingInvoices && invoices.map((inv) => (
+                        <tr key={inv.id} className="border-t hover:bg-gray-50">
+                          <td className="px-3 py-2">{inv.invoiceNumber}</td>
+                          <td className="px-3 py-2">{new Date(inv.issueDate).toLocaleDateString('pt-BR')}</td>
+                          <td className="px-3 py-2 text-right">{fmtCurrency(inv.totalValue)}</td>
+                          <td className="px-3 py-2 text-right">{fmtNumber(inv.totalWeight)}</td>
+                          <td className="px-3 py-2 text-center">
+                            <div className="flex justify-center gap-2">
+                              {inv.danfeFileName && (
+                                <a 
+                                  href={`/api/sales/orders/${id}/invoices/${inv.id}/download?type=danfe`} 
+                                  target="_blank" 
+                                  className="px-2 py-1 text-xs border rounded bg-white hover:bg-gray-100 text-blue-600"
+                                >
+                                  Baixar DANFE
+                                </a>
+                              )}
+                              {inv.xmlFileName && (
+                                <a 
+                                  href={`/api/sales/orders/${id}/invoices/${inv.id}/download?type=xml`} 
+                                  target="_blank" 
+                                  className="px-2 py-1 text-xs border rounded bg-white hover:bg-gray-100 text-green-600"
+                                >
+                                  Baixar XML
+                                </a>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </>
             )}
           </div>
 
