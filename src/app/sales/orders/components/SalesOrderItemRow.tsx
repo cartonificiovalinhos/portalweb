@@ -78,7 +78,7 @@ const FormattedIntInput = ({
             setStr(value.toLocaleString('pt-BR'));
         }
     }
-  }, [value]);
+  }, [value, str]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const raw = e.target.value;

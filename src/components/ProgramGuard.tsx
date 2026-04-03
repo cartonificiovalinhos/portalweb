@@ -1,4 +1,5 @@
 "use client";
+import Link from "next/link";
 import React from "react";
 
 type Program = { code: string; name: string };
@@ -40,7 +41,7 @@ export default function ProgramGuard({ perms, children, pathname }: { perms: Per
     <div className="max-w-xl">
       <h2 className="text-xl font-semibold mb-2">Acesso restrito</h2>
       <p className="text-gray-600 mb-3">Você não tem permissão para acessar este programa na entidade selecionada.</p>
-      <a href="/" className="px-3 py-2 bg-blue-600 text-white rounded">Voltar ao Dashboard</a>
+      <Link href="/" className="px-3 py-2 bg-blue-600 text-white rounded">Voltar ao Dashboard</Link>
     </div>
   );
 }

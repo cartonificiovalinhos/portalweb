@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
+import Image from 'next/image';
 
 export default function AssetQuickView() {
   const params = useParams() as any;
@@ -25,7 +26,7 @@ export default function AssetQuickView() {
   return (
     <div className="max-w-2xl mx-auto space-y-4">
       <div className="flex items-start gap-4">
-        <img src={asset.thumbnail || '/icons/logo cartonificio.png'} alt={asset.name} className="w-24 h-24 object-cover rounded border" />
+        <Image src={asset.thumbnail || '/icons/logo cartonificio.png'} alt={asset.name} width={96} height={96} className="w-24 h-24 object-cover rounded border" unoptimized loader={({ src }) => src} />
         <div className="flex-1">
           <div className="text-2xl font-semibold">{asset.name}</div>
           <div className="text-sm text-gray-600">Código: {asset.code || '-'}</div>

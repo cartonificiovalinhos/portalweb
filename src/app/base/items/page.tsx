@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 
 type Item = {
   id: number;
@@ -34,7 +34,7 @@ export default function BaseItemMaintenancePage() {
   const [activeEntityId, setActiveEntityId] = useState<number | null>(null);
   const [availability, setAvailability] = useState<Array<{ id: number; name: string; modules: Array<{ entityModuleId: number; moduleId: number; moduleCode: string; moduleName: string; allowed: boolean }> }>>([]);
 
-  const load = async (mods?: number[]) => {
+  const load = useCallback(async (mods?: number[]) => {
     setLoading(true); setError(null);
     try {
       const moduleIds = (mods ?? selectedModuleIds).filter((n) => Number.isFinite(n) && n > 0);
@@ -45,9 +45,9 @@ export default function BaseItemMaintenancePage() {
       setItems(Array.isArray(data) ? data : []);
     } catch (e: any) { setError(e?.message || String(e)); }
     finally { setLoading(false); }
-  };
+  }, [selectedModuleIds]);
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { void load(); }, [load]);
   // Buscar módulos permitidos para a entidade ativa
   useEffect(() => {
     fetch('/api/permissions')
@@ -59,7 +59,7 @@ export default function BaseItemMaintenancePage() {
       .catch(() => setModules([]));
   }, []);
   // Recarregar itens ao alterar seleção de módulos
-  useEffect(() => { load(selectedModuleIds); }, [selectedModuleIds]);
+  useEffect(() => { void load(selectedModuleIds); }, [load, selectedModuleIds]);
 
   const filtered = useMemo(() => {
     const q = (query || "").trim().toLowerCase();

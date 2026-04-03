@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 
 type ModuleItem = { id: number; code: string; name: string; description?: string | null; showDashboardTab?: boolean };
 type ProgramItem = { id: number; code: string; name: string; description?: string | null; showInMenu?: boolean };
@@ -23,18 +23,19 @@ export default function AdminModulesPage() {
 
   const selectedModule = useMemo(() => modules.find(m => m.id === selectedModuleId) || null, [modules, selectedModuleId]);
 
-  const loadModules = async () => {
+  const loadModules = useCallback(async () => {
     setLoading(true); setErr(null);
     try {
       const res = await fetch('/api/admin/modules');
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || `Erro ${res.status}`);
       setModules(data.modules || []);
-      if (!selectedModuleId && data.modules?.length) setSelectedModuleId(data.modules[0].id);
+      const firstId = data.modules?.[0]?.id ?? null;
+      setSelectedModuleId((prev) => prev ?? firstId);
     } catch (e: any) { setErr(e?.message || String(e)); } finally { setLoading(false); }
-  };
+  }, []);
 
-  const loadPrograms = async (mid: number) => {
+  const loadPrograms = useCallback(async (mid: number) => {
     if (!mid) return;
     setLoading(true); setErr(null);
     try {
@@ -44,12 +45,12 @@ export default function AdminModulesPage() {
       setPrograms(data.programs || []);
       setSelectedProgramId(null);
     } catch (e: any) { setErr(e?.message || String(e)); } finally { setLoading(false); }
-  };
+  }, []);
 
-  useEffect(() => { loadModules(); }, []);
+  useEffect(() => { void loadModules(); }, [loadModules]);
   useEffect(() => {
     if (selectedModuleId) {
-      loadPrograms(selectedModuleId);
+      void loadPrograms(selectedModuleId);
       const m = modules.find(x => x.id === selectedModuleId);
       if (m) {
         setModCode(m.code); setModName(m.name); setModDesc(m.description || ''); setEditingModule(true);
@@ -58,7 +59,7 @@ export default function AdminModulesPage() {
     } else {
       setModCode(''); setModName(''); setModDesc(''); setEditingModule(false); setModShowDashboard(false);
     }
-  }, [selectedModuleId, modules]);
+  }, [selectedModuleId, modules, loadPrograms]);
 
   const generateCode = (text: string) => {
     return text

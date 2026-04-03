@@ -1,6 +1,6 @@
 "use client";
 // Rebuild trigger: Fix webpack runtime error
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 
 type Client = { 
@@ -144,7 +144,7 @@ export default function ClientDetailsPage() {
 
   const PAGE_SIZE = 20;
 
-  const refreshCart = async () => {
+  const refreshCart = useCallback(async () => {
     if (!client) return;
     const r = await fetch(`/api/clients/${client.id}/cart`, { cache: 'no-store' });
     if (r.ok) {
@@ -153,7 +153,7 @@ export default function ClientDetailsPage() {
     } else {
       setCartItems([]);
     }
-  };
+  }, [client]);
 
   useEffect(() => {
     const load = async () => {
@@ -205,7 +205,7 @@ export default function ClientDetailsPage() {
     if (client) {
         refreshCart();
     }
-  }, [client]);
+  }, [client, refreshCart]);
 
   useEffect(() => {
     const last = Math.max(0, Math.ceil(orders.length / PAGE_SIZE) - 1);

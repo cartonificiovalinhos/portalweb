@@ -43,8 +43,8 @@ export default function ComplaintMaintenancePage() {
       .then((arr) => {
         const list = Array.isArray(arr) ? arr : [];
         setFamilies(list);
-        if (!form.division && list.length > 0) {
-          setForm((f: any) => ({ ...f, division: list[0].description }));
+        if (list.length > 0) {
+          setForm((f: any) => (f.division ? f : { ...f, division: list[0].description }));
         }
       })
       .catch(() => {})
@@ -55,9 +55,7 @@ export default function ComplaintMaintenancePage() {
   // Preencher atendente com usuário logado
   useEffect(() => {
     const name = (session?.user as any)?.name || (session?.user as any)?.email || '';
-    if (name && !form.attendant) {
-      setForm((f: any) => ({ ...f, attendant: name }));
-    }
+    if (name) setForm((f: any) => (f.attendant ? f : { ...f, attendant: name }));
   }, [session?.user]);
 
   function updateField(key: string, value: any) {

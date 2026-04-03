@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { safeParseJson } from '../../../lib/safeJson';
 import { useParams } from 'next/navigation';
 import { SignaturePad } from '../../../components/SignaturePad';
+import Image from 'next/image';
 
 export default function WorkOrderDetail() {
   const params = useParams() as any;
@@ -235,7 +236,9 @@ export default function WorkOrderDetail() {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           {attachments.map((a) => (
             <div key={a.id} className="border rounded overflow-hidden">
-              <img src={a.url} alt={a.fileName} className="w-full h-32 object-cover" />
+              <div className="relative w-full h-32">
+                <Image src={a.url} alt={a.fileName} fill sizes="(min-width: 768px) 25vw, 50vw" className="object-cover" unoptimized loader={({ src }) => src} />
+              </div>
               <div className="px-2 py-1 text-xs text-gray-600 truncate">{a.fileName}</div>
             </div>
           ))}

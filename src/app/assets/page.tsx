@@ -1,7 +1,8 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { safeParseJson } from "../../lib/safeJson";
 import Link from "next/link";
+import Image from "next/image";
 
 export default function AssetsPage() {
   const [items, setItems] = useState<any[]>([]);
@@ -10,17 +11,17 @@ export default function AssetsPage() {
   const [rootPhotos, setRootPhotos] = useState<Record<number, string>>({});
   const [showNewRoot, setShowNewRoot] = useState(false);
 
-  const load = () => {
+  const load = useCallback(() => {
     setLoading(true);
     fetch("/api/assets")
       .then((r) => safeParseJson(r, []))
       .then((data) => setItems(Array.isArray(data) ? data : []))
       .finally(() => setLoading(false));
-  };
+  }, []);
 
   useEffect(() => {
     load();
-  }, []);
+  }, [load]);
 
   // Navegação: lista de máquinas-mãe -> detalhe com árvore
 
@@ -289,7 +290,7 @@ function PhotosPanel({ assetId }: { assetId: number }) {
   const [uploading, setUploading] = useState(false);
   const [removingId, setRemovingId] = useState<number | null>(null);
 
-  const loadPhotos = () => {
+  const loadPhotos = useCallback(() => {
     setLoading(true);
     fetch(`/api/assets/${assetId}/photos`)
       .then((r) => safeParseJson(r, []))
@@ -304,11 +305,11 @@ function PhotosPanel({ assetId }: { assetId: number }) {
         setPhotos(onlyImages);
       })
       .finally(() => setLoading(false));
-  };
+  }, [assetId]);
 
   useEffect(() => {
     loadPhotos();
-  }, []);
+  }, [loadPhotos]);
 
   const onUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -343,7 +344,9 @@ function PhotosPanel({ assetId }: { assetId: number }) {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
         {photos.map((p) => (
           <div key={p.id} className="border rounded overflow-hidden relative group">
-            <img src={p.url} alt={`Foto ${p.id}`} className="w-full h-24 object-cover" />
+            <div className="relative w-full h-24">
+              <Image src={p.url} alt={`Foto ${p.id}`} fill sizes="(min-width: 768px) 25vw, 50vw" className="object-cover" unoptimized loader={({ src }) => src} />
+            </div>
             <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition">
               <button
                 onClick={() => onRemove(p.id)}
@@ -403,7 +406,7 @@ function AssetDetailsPanel({ asset }: { asset?: any }) {
   return (
     <div className="border rounded p-3">
       <div className="flex items-start gap-3">
-        <img src={thumb || '/icons/logo cartonificio.png'} alt={asset.name} className="w-20 h-20 object-cover rounded border" />
+        <Image src={thumb || '/icons/logo cartonificio.png'} alt={asset.name} width={80} height={80} className="w-20 h-20 object-cover rounded border" unoptimized loader={({ src }) => src} />
         <div className="flex-1">
           <div className="text-lg font-semibold">{asset.name}</div>
           <div className="text-xs text-gray-600">{asset.code || '-'} • {asset.location || '-'}</div>
@@ -419,10 +422,14 @@ function AssetDetailsPanel({ asset }: { asset?: any }) {
           title="Ver QR Code"
           onClick={() => setShowQR(true)}
         >
-          <img
+          <Image
             src={`https://api.qrserver.com/v1/create-qr-code/?size=80x80&data=${encodeURIComponent(`${typeof window !== 'undefined' ? window.location.origin : ''}/assets/view/${asset.id}`)}`}
             alt="QR Code"
+            width={64}
+            height={64}
             className="w-16 h-16"
+            unoptimized
+            loader={({ src }) => src}
           />
         </button>
       </div>
@@ -446,10 +453,14 @@ function AssetDetailsPanel({ asset }: { asset?: any }) {
               <button className="text-gray-600 hover:text-gray-800" onClick={() => setShowQR(false)}>✕</button>
             </div>
             <div className="flex flex-col items-center gap-3">
-              <img
+              <Image
                 src={`https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(`${typeof window !== 'undefined' ? window.location.origin : ''}/assets/view/${asset.id}`)}`}
                 alt="QR Code"
+                width={256}
+                height={256}
                 className="w-64 h-64"
+                unoptimized
+                loader={({ src }) => src}
               />
               <div className="text-xs text-gray-600 break-all text-center">{typeof window !== 'undefined' ? `${window.location.origin}/assets/view/${asset.id}` : `/assets/view/${asset.id}`}</div>
               <div className="flex gap-2">
@@ -484,7 +495,9 @@ function RootMachinesGrid({ items, loading, onSelect, rootPhotos, setRootPhotos 
       {roots.map((r) => (
         <div key={r.id} className="border rounded overflow-hidden cursor-pointer hover:shadow relative" onMouseEnter={() => ensurePhoto(r.id)} onClick={() => onSelect(r.id)}>
           <div className="h-36 bg-gray-100">
-            <img src={rootPhotos[r.id] || '/icons/logo cartonificio.png'} alt={r.name} className="w-full h-36 object-cover" />
+            <div className="relative w-full h-36">
+              <Image src={rootPhotos[r.id] || '/icons/logo cartonificio.png'} alt={r.name} fill sizes="(min-width: 768px) 33vw, 100vw" className="object-cover" unoptimized loader={({ src }) => src} />
+            </div>
             {r.criticality && (
               <span className={`absolute top-2 right-2 text-[11px] px-2 py-0.5 rounded bg-white/80 border ${r.criticality === 'HIGH' ? 'border-red-600 text-red-700' : r.criticality === 'MEDIUM' ? 'border-yellow-600 text-yellow-700' : 'border-green-600 text-green-700'}`}>
                 {r.criticality === 'HIGH' ? 'Criticidade: Alta' : r.criticality === 'MEDIUM' ? 'Criticidade: Média' : 'Criticidade: Baixa'}
@@ -534,8 +547,8 @@ function MachineDetail({ rootId, items, loading, onBack, onRefresh }: { rootId: 
   });
   const [rerrors, setRerrors] = useState<{ name?: string; year?: string }>({});
 
-  useEffect(() => {
-    setRdata({
+  const rootSnapshot = useMemo(() => {
+    return {
       name: root?.name || "",
       code: root?.code || "",
       location: root?.location || "",
@@ -543,20 +556,24 @@ function MachineDetail({ rootId, items, loading, onBack, onRefresh }: { rootId: 
       model: root?.model || "",
       year: root?.year ? String(root?.year) : "",
       criticality: root?.criticality || "",
-    });
+    };
+  }, [root?.code, root?.criticality, root?.location, root?.manufacturer, root?.model, root?.name, root?.year]);
+
+  useEffect(() => {
+    setRdata(rootSnapshot);
     setSelectedId(rootId);
     setCheckedIds([]);
-  }, [rootId]);
+  }, [rootId, rootSnapshot]);
 
-  const loadHistory = async () => {
+  const loadHistory = useCallback(async () => {
     setLoadingHistory(true);
     const assetForHistory = selectedId || rootId;
     const list = await fetch(`/api/work-orders?assetId=${assetForHistory}`).then((r) => safeParseJson(r, []));
     setHistory(Array.isArray(list) ? list : []);
     setLoadingHistory(false);
-  };
+  }, [rootId, selectedId]);
 
-  useEffect(() => { loadHistory(); }, [rootId, selectedId]);
+  useEffect(() => { void loadHistory(); }, [loadHistory]);
 
   const exportCsv = () => {
     const cols = ['id','title','status','startedAt','completedAt','closedAt','mttr'];

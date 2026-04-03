@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useMemo, useState, Suspense } from "react";
+import { useCallback, useEffect, useMemo, useState, Suspense } from "react";
 import { safeParseJson } from "../../lib/safeJson";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
@@ -35,7 +35,7 @@ function WorkOrdersInner() {
   const typeOptions = ["Preventiva", "Corretiva", "Inspeção", "Melhoria", "Segurança"];
   const searchParams = useSearchParams();
 
-  const load = () => {
+  const load = useCallback(() => {
     setLoading(true);
     const qs = new URLSearchParams();
     if (filters.sector) qs.set('sector', filters.sector);
@@ -48,10 +48,9 @@ function WorkOrdersInner() {
       .then((r) => safeParseJson(r, []))
       .then((wo) => setData(Array.isArray(wo) ? wo : []))
       .finally(() => setLoading(false));
-  };
+  }, [filters.from, filters.maintenanceType, filters.sector, filters.status, filters.to]);
 
   useEffect(() => {
-    load();
     // Carregar ativos e lista de técnicos
     fetch("/api/assets").then((r) => r.json()).then((list) => {
       setAssets(list);
@@ -78,14 +77,11 @@ function WorkOrdersInner() {
       const list = Array.isArray(users) ? users : [];
       setTechnicians(list);
     }).catch(() => setTechnicians([]));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [searchParams]);
 
   useEffect(() => {
-    // Recarrega lista ao alterar filtros
     load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filters.sector, filters.maintenanceType, filters.from, filters.to, filters.status]);
+  }, [load]);
 
   const monthMatrix = useMemo(() => {
     if (calMode !== "month") return [] as Date[][];

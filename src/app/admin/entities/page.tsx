@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 
 type Entity = { id: number; name: string; cnpj: string };
 type ModuleItem = { id: number; code: string; name: string; linked: number | boolean };
@@ -22,20 +22,21 @@ export default function AdminEntitiesPage() {
   const selectedEntity = useMemo(() => entities.find(e => e.id === selectedEntityId) || null, [entities, selectedEntityId]);
   const selectedModule = useMemo(() => modules.find(m => m.id === selectedModuleId) || null, [modules, selectedModuleId]);
 
-  const loadEntities = async () => {
+  const loadEntities = useCallback(async () => {
     setLoading(true); setErr(null);
     try {
       const res = await fetch('/api/admin/entities');
       if (!res.ok) throw new Error((await res.json()).error || `Erro ${res.status}`);
       const data = await res.json();
       setEntities(data.entities || []);
-      if (!selectedEntityId && data.entities?.length) setSelectedEntityId(data.entities[0].id);
+      const firstId = data.entities?.[0]?.id ?? null;
+      setSelectedEntityId((prev) => prev ?? firstId);
     } catch (e: any) {
       setErr(e?.message || String(e));
     } finally { setLoading(false); }
-  };
+  }, []);
 
-  const loadModules = async (eid: number) => {
+  const loadModules = useCallback(async (eid: number) => {
     if (!eid) return;
     setLoading(true); setErr(null);
     try {
@@ -48,9 +49,9 @@ export default function AdminEntitiesPage() {
     } catch (e: any) {
       setErr(e?.message || String(e));
     } finally { setLoading(false); }
-  };
+  }, []);
 
-  const loadPrograms = async (eid: number, mid: number) => {
+  const loadPrograms = useCallback(async (eid: number, mid: number) => {
     if (!eid || !mid) return;
     setLoading(true); setErr(null);
     try {
@@ -61,11 +62,11 @@ export default function AdminEntitiesPage() {
     } catch (e: any) {
       setErr(e?.message || String(e));
     } finally { setLoading(false); }
-  };
+  }, []);
 
-  useEffect(() => { loadEntities(); }, []);
-  useEffect(() => { if (selectedEntityId) loadModules(selectedEntityId); }, [selectedEntityId]);
-  useEffect(() => { if (selectedEntityId && selectedModuleId) loadPrograms(selectedEntityId, selectedModuleId); }, [selectedEntityId, selectedModuleId]);
+  useEffect(() => { void loadEntities(); }, [loadEntities]);
+  useEffect(() => { if (selectedEntityId) void loadModules(selectedEntityId); }, [selectedEntityId, loadModules]);
+  useEffect(() => { if (selectedEntityId && selectedModuleId) void loadPrograms(selectedEntityId, selectedModuleId); }, [selectedEntityId, selectedModuleId, loadPrograms]);
 
   const toggleModuleLink = async (mid: number, linked: boolean) => {
     if (!selectedEntityId) return;

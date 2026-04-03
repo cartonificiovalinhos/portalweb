@@ -2,6 +2,7 @@
 import { useRef, useState, Suspense, useEffect } from "react";
 import { signIn } from "next-auth/react";
 import { useSearchParams } from "next/navigation";
+import Image from "next/image";
 import QRCode from 'qrcode';
 
 function LoginForm() {
@@ -169,7 +170,7 @@ function LoginForm() {
     <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
       <div className="w-full max-w-sm bg-white shadow rounded p-6">
         <div className="flex flex-col items-center mb-4">
-          <img src="/icons/logo cartonificio.png" alt="Cartonifício Valinhos" className="w-24 max-h-20 object-contain mb-2" />
+          <Image src="/icons/logo cartonificio.png" alt="Cartonifício Valinhos" width={96} height={80} className="w-24 max-h-20 object-contain mb-2" priority />
           <h1 className="text-xl font-semibold">
             {step === 'credentials' && "Seja bem vindo"}
             {step === '2fa' && "Verificação em Duas Etapas"}
@@ -226,7 +227,7 @@ function LoginForm() {
                       Escaneie o QR Code abaixo com o Google Authenticator ou outro app compatível.
                   </p>
                   {qrCodeUrl ? (
-                      <img src={qrCodeUrl} alt="QR Code 2FA" className="w-48 h-48 mb-4 border rounded" />
+                      <Image src={qrCodeUrl} alt="QR Code 2FA" width={192} height={192} className="w-48 h-48 mb-4 border rounded" unoptimized loader={({ src }) => src} />
                   ) : (
                       <div className="w-48 h-48 mb-4 border rounded flex items-center justify-center bg-gray-100 text-gray-400">
                           Carregando...

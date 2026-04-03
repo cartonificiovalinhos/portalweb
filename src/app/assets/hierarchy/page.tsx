@@ -1,7 +1,8 @@
 "use client";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { safeParseJson } from "../../../lib/safeJson";
 import Link from "next/link";
+import Image from "next/image";
 
 type Asset = { id: number; name: string; code: string; parentId?: number | null };
 type AssetPhoto = { id: number; fileName: string; url: string; mimeType?: string | null };
@@ -44,7 +45,9 @@ function AssetBranch({
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           {list.map((p) => (
             <div key={p.id} className="border rounded overflow-hidden">
-              <img src={p.url} alt={p.fileName} className="w-full h-24 object-cover" />
+              <div className="relative w-full h-24">
+                <Image src={p.url} alt={p.fileName} fill sizes="(min-width: 768px) 25vw, 50vw" className="object-cover" unoptimized loader={({ src }) => src} />
+              </div>
               <div className="px-2 py-1 text-xs text-gray-600 truncate">{p.fileName}</div>
             </div>
           ))}
@@ -97,28 +100,28 @@ export default function HierarchyPage() {
     return m;
   }, [assets]);
 
-  const matches = (a: Asset) => {
+  const matches = useCallback((a: Asset) => {
     const q = query.trim().toLowerCase();
     if (!q) return true;
     return (
       (a.name ?? "").toLowerCase().includes(q) ||
       (a.code ?? "").toLowerCase().includes(q)
     );
-  };
+  }, [query]);
 
-  const hasDescendantMatch = (a: Asset): boolean => {
+  const hasDescendantMatch = useCallback((a: Asset): boolean => {
     const children = childrenByParent.get(a.id) ?? [];
     for (const c of children) {
       if (matches(c) || hasDescendantMatch(c)) return true;
     }
     return false;
-  };
+  }, [childrenByParent, matches]);
 
   const roots = useMemo(() => {
     const allRoots = assets.filter((a) => !a.parentId);
     if (!query.trim()) return allRoots;
     return allRoots.filter((r) => matches(r) || hasDescendantMatch(r));
-  }, [assets, query, childrenByParent]);
+  }, [assets, hasDescendantMatch, matches, query]);
 
   const ensurePhotosLoaded = async (assetId: number) => {
     if (photos[assetId]) return;

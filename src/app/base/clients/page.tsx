@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 
 type Client = {
   id: number;
@@ -48,7 +48,7 @@ export default function ClientsPage() {
   const ptWrapperRef = React.useRef<HTMLDivElement>(null);
   const [linkedPaymentTerms, setLinkedPaymentTerms] = useState<PaymentTerm[]>([]);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
@@ -61,9 +61,9 @@ export default function ClientsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [q]);
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { void load(); }, [load]);
 
   useEffect(() => {
     (async () => {
@@ -107,15 +107,17 @@ export default function ClientsPage() {
         } catch {}
       }
 
-      const fallback = add.paymentTermId ? paymentTermById.get(add.paymentTermId) : null;
-      const list = fallback ? [fallback] : [];
-      setLinkedPaymentTerms(list);
-      setAdd((prev) => ({
-        ...prev,
-        paymentTermId: list[0]?.id ?? null,
-        paymentTermCode: list[0]?.code ?? null,
-        paymentTermDescription: list[0]?.description ?? null,
-      }));
+      setAdd((prev) => {
+        const fallback = prev.paymentTermId ? paymentTermById.get(prev.paymentTermId) : null;
+        const list = fallback ? [fallback] : [];
+        setLinkedPaymentTerms(list);
+        return {
+          ...prev,
+          paymentTermId: list[0]?.id ?? null,
+          paymentTermCode: list[0]?.code ?? null,
+          paymentTermDescription: list[0]?.description ?? null,
+        };
+      });
     })();
   }, [showAdd, editingId, paymentTermById]);
 

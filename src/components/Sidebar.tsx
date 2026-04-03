@@ -1,5 +1,6 @@
 "use client";
 import Link from "next/link";
+import Image from "next/image";
 import { signOut } from "next-auth/react";
 import React, { useEffect, useState } from "react";
 
@@ -163,7 +164,7 @@ export default function Sidebar({ perms, mobileOpen, setMobileOpen, pathname, us
         `}
       >
         <div className={`px-3 py-4 border-b border-gray-800 flex items-center ${collapsed ? "justify-center md:justify-center" : "gap-2"}`}>
-          <img src="/icons/logo cartonificio.png" alt="Cartonifício Valinhos" className="w-8 h-8 object-contain" />
+          <Image src="/icons/logo cartonificio.png" alt="Cartonifício Valinhos" width={32} height={32} className="w-8 h-8 object-contain" priority />
           {(!collapsed || mobileOpen) && (
             <div className={`md:${collapsed ? "hidden" : "block"}`}>
               <div className="text-sm font-semibold">Cartonifício Valinhos</div>
