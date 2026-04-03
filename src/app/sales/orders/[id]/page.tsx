@@ -639,6 +639,7 @@ export default function SalesOrderMaintenancePage() {
                       onClick={handleSimulateTaxes}
                       disabled={simulating || !isEditableStatus(order?.status)}
                     >
+                      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
                       {simulating ? 'Simulando...' : 'Simular Impostos'}
                     </button>
                   </div>
