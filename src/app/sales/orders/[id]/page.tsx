@@ -572,7 +572,7 @@ export default function SalesOrderMaintenancePage() {
         <div className="flex items-center gap-3">
           <h1 className="text-xl font-semibold">Manutenção de Pedidos</h1>
           {order && (
-            <span className={`text-xs px-2 py-1 rounded ${statusChipStyle(statusLabelPt(order.status))}`}>
+            <span className={`hidden sm:inline-flex text-xs px-2 py-1 rounded ${statusChipStyle(statusLabelPt(order.status))}`}>
               {statusLabelPt(order.status)}
             </span>
           )}
@@ -599,18 +599,19 @@ export default function SalesOrderMaintenancePage() {
       {order && (
         <div className="space-y-3">
           {/* Header do pedido com ícones à direita */}
-          <div className="border rounded bg-white p-2 text-sm">
+          <div className="border rounded bg-white p-2 text-sm overflow-x-hidden">
             <div className="flex flex-col sm:flex-row sm:items-start gap-3 min-w-0">
-              <div className="order-1 sm:order-2 w-full sm:w-auto sm:ml-auto flex flex-wrap items-center gap-2 sm:justify-end">
-                <button 
-                  className={`flex items-center gap-1 px-3 py-1 text-sm bg-white border border-gray-300 rounded shadow-sm hover:bg-gray-50 text-gray-700 ${!isEditableStatus(order?.status) ? 'opacity-50 cursor-not-allowed' : ''}`}
-                  onClick={handleSimulateTaxes}
-                  disabled={simulating || !isEditableStatus(order?.status)}
-                >
-                  {simulating ? 'Simulando...' : 'Simular Impostos'}
-                </button>
+              <div className="order-1 sm:order-2 w-full sm:w-auto sm:ml-auto">
+                <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+                  <button 
+                    className={`flex items-center gap-1 px-3 py-1 text-sm bg-white border border-gray-300 rounded shadow-sm hover:bg-gray-50 text-gray-700 ${!isEditableStatus(order?.status) ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    onClick={handleSimulateTaxes}
+                    disabled={simulating || !isEditableStatus(order?.status)}
+                  >
+                    {simulating ? 'Simulando...' : 'Simular Impostos'}
+                  </button>
 
-                <button className={`${ICON_BTN} ${integrating || !isEditableStatus(order?.status) || isHeaderEditing ? 'opacity-50 cursor-not-allowed' : ''}`} title="Enviar para ERP" aria-label="Enviar para ERP" disabled={integrating || !isEditableStatus(order?.status) || isHeaderEditing} style={{ opacity: integrating || !isEditableStatus(order?.status) || isHeaderEditing ? 0.5 : 1, pointerEvents: integrating || !isEditableStatus(order?.status) || isHeaderEditing ? 'none' : 'auto' }} onClick={async () => {
+                  <button className={`${ICON_BTN} ${integrating || !isEditableStatus(order?.status) || isHeaderEditing ? 'opacity-50 cursor-not-allowed' : ''}`} title="Enviar para ERP" aria-label="Enviar para ERP" disabled={integrating || !isEditableStatus(order?.status) || isHeaderEditing} style={{ opacity: integrating || !isEditableStatus(order?.status) || isHeaderEditing ? 0.5 : 1, pointerEvents: integrating || !isEditableStatus(order?.status) || isHeaderEditing ? 'none' : 'auto' }} onClick={async () => {
                   if (!order) return;
                   if (!confirm('Confirma enviar este pedido para o ERP?')) return;
                   setIntegrating(true);
@@ -741,6 +742,12 @@ export default function SalesOrderMaintenancePage() {
                     )}
                   </button>
                 )}
+                </div>
+                <div className="mt-2 sm:hidden">
+                  <span className={`inline-flex text-xs px-2 py-1 rounded ${statusChipStyle(statusLabelPt(order.status))}`}>
+                    {statusLabelPt(order.status)}
+                  </span>
+                </div>
               </div>
 
               <div className="order-2 sm:order-1 flex flex-col gap-3 flex-1 min-w-0">
@@ -830,7 +837,8 @@ export default function SalesOrderMaintenancePage() {
                   </div>
                   <div className="md:col-span-3 min-w-0">
                     <span className="text-gray-600">Entrega</span>
-                    <input type="date" className="mt-1 block w-full min-w-0 max-w-full px-2 py-1 border rounded" value={hdrDraft.deliveryDate ?? ''} onChange={(e) => setHdrDraft((d) => ({ ...d, deliveryDate: e.target.value }))} disabled={!isHeaderEditing} />
+                    <input type="text" inputMode="numeric" placeholder="AAAA-MM-DD" className="mt-1 block w-full min-w-0 max-w-full px-2 py-1 border rounded sm:hidden" value={hdrDraft.deliveryDate ?? ''} onChange={(e) => setHdrDraft((d) => ({ ...d, deliveryDate: e.target.value }))} disabled={!isHeaderEditing} />
+                    <input type="date" className="mt-1 hidden sm:block w-full min-w-0 max-w-full px-2 py-1 border rounded" value={hdrDraft.deliveryDate ?? ''} onChange={(e) => setHdrDraft((d) => ({ ...d, deliveryDate: e.target.value }))} disabled={!isHeaderEditing} />
                   </div>
                   <div className={`md:col-span-6 ${!isHeaderEditing ? "opacity-75 pointer-events-none" : ""}`}>
                      <AsyncSelect
