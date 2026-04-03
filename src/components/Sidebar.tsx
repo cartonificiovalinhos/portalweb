@@ -121,10 +121,8 @@ export default function Sidebar({ perms, mobileOpen, setMobileOpen, pathname }: 
 
   // Close mobile menu when route changes
   useEffect(() => {
-    if (mobileOpen && setMobileOpen) {
-      setMobileOpen(false);
-    }
-  }, [pathname, mobileOpen, setMobileOpen]);
+    if (setMobileOpen) setMobileOpen(false);
+  }, [pathname, setMobileOpen]);
 
   // Expand automatically based on route
   useEffect(() => {
