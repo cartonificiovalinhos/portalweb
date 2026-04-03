@@ -274,6 +274,8 @@ export default function SalesOrderMaintenancePage() {
   const [checkingEdit, setCheckingEdit] = useState(false);
   const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
 
+  const canEditOrder = isEditableStatus(order?.status);
+
   // Billing History
   const [showBilling, setShowBilling] = useState(false);
   const [invoices, setInvoices] = useState<SalesOrderInvoice[]>([]);
@@ -598,138 +600,8 @@ export default function SalesOrderMaintenancePage() {
         <div className="space-y-3">
           {/* Header do pedido com ícones à direita */}
           <div className="border rounded bg-white p-2 text-sm">
-            <div className="flex items-start gap-3">
-              <div className="flex flex-col gap-3 flex-1">
-                {/* Linha Superior: Número, Data, Entidade, Última Simulação */}
-                <div className="flex flex-wrap items-center gap-8">
-                  <div>
-                    <span className="text-gray-600">Número</span>
-                    <div className="font-mono mt-1">{order.code}</div>
-                  </div>
-                  <div>
-                    <span className="text-gray-600">Pedido ERP</span>
-                    <div className="font-mono mt-1 text-blue-600">{order.erpOrderNumber || '-'}</div>
-                  </div>
-                  <div>
-                    <span className="text-gray-600">Data</span>
-                    <div className="mt-1">{new Date(order.orderDate).toLocaleDateString('pt-BR')}</div>
-                  </div>
-                  {order.entity && (
-                    <div>
-                      <span className="text-gray-600">Entidade</span>
-                      <div className="mt-1 font-medium">{order.entity.name}</div>
-                    </div>
-                  )}
-                  {order.lastTaxSimulation && (
-                     <div className="ml-auto">
-                       <span className="text-gray-600">Última simulação</span>
-                       <div className="mt-1">
-                         {new Date(order.lastTaxSimulation).toLocaleDateString('pt-BR')} - {new Date(order.lastTaxSimulation).toLocaleTimeString('pt-BR')}
-                       </div>
-                     </div>
-                  )}
-                </div>
-
-                {/* Linha de Inputs: Cliente, Pagamento, Entrega */}
-                <div className="grid grid-cols-1 md:grid-cols-12 gap-3 mt-2">
-                  <div className={`md:col-span-6 ${!isHeaderEditing || (order.items && order.items.length > 0) || !['OPEN', 'Orçamento'].includes(order.status || '') ? "opacity-75 pointer-events-none" : ""}`}>
-                     <AsyncSelect
-                        label="Cliente"
-                        value={hdrDraft.customerName ?? ''}
-                        onChange={(val) => setHdrDraft((d) => ({ ...d, customerName: val }))}
-                        onSelectObj={(item) => {
-                           setHdrDraft((d) => ({ ...d, customerName: item.name, customerDoc: item.doc }));
-                           setHdrCustomerId(Number(item.id));
-                           (async () => {
-                             try {
-                               const ptRes = await fetch(`/api/base/payment-terms?clientId=${Number(item.id)}`);
-                               const ptData = await ptRes.json();
-                               const list = Array.isArray(ptData) ? ptData : [];
-                               const first = list[0];
-                               if (first?.description) {
-                                 const newVal = first.code != null ? `[${first.code}] ${first.description}` : String(first.description);
-                                 setHdrDraft((d) => ({ ...d, paymentTerms: newVal }));
-                               }
-                             } catch {}
-                           })();
-                        }}
-                        fetchUrl={(q) => `/api/base/clients?q=${q}`}
-                        placeholder="Pesquise por nome ou documento"
-                        getLabel={(item) => item.name}
-                        renderOption={(item) => (
-                          <div>
-                            <div className="font-medium">{item.name}</div>
-                            <div className="text-xs text-gray-500">{item.doc}</div>
-                          </div>
-                        )}
-                      />
-                  </div>
-                  <div className={`md:col-span-3 ${!isHeaderEditing ? "opacity-75 pointer-events-none" : ""}`}>
-                    <AsyncSelect
-                      label="Condição de pagamento"
-                      value={hdrDraft.paymentTerms ?? ''}
-                      onChange={(val) => setHdrDraft((d) => ({ ...d, paymentTerms: val }))}
-                      onSelectObj={(item) => {
-                         const newVal = `[${item.code}] ${item.description}`;
-                         setHdrDraft((d) => ({ ...d, paymentTerms: newVal }));
-                      }}
-                      fetchUrl={(q) => `/api/base/payment-terms?clientId=${hdrCustomerId ? String(hdrCustomerId) : '0'}&q=${q}`}
-                      placeholder="Digite código ou descrição"
-                      getLabel={(item) => `[${item.code}] ${item.description}`}
-                      renderOption={(item) => (
-                        <div>
-                          <div className="font-medium">{item.description}</div>
-                          <div className="text-xs text-gray-500">Código: {item.code} | Parcelas: {item.installments}</div>
-                        </div>
-                      )}
-                    />
-                  </div>
-                  <div className="md:col-span-3">
-                    <span className="text-gray-600">Entrega</span>
-                    <input type="date" className="mt-1 w-full px-2 py-1 border rounded" value={hdrDraft.deliveryDate ?? ''} onChange={(e) => setHdrDraft((d) => ({ ...d, deliveryDate: e.target.value }))} disabled={!isHeaderEditing} />
-                  </div>
-                  <div className={`md:col-span-6 ${!isHeaderEditing ? "opacity-75 pointer-events-none" : ""}`}>
-                     <AsyncSelect
-                        label="Cliente Remessa Triangular"
-                        value={hdrDraft.triangularCustomerName ?? ''}
-                        onChange={(val) => setHdrDraft((d) => ({ ...d, triangularCustomerName: val }))}
-                        onSelectObj={(item) => {
-                           setHdrDraft((d) => ({ ...d, triangularCustomerName: item.name, triangularCustomerDoc: item.doc }));
-                        }}
-                        fetchUrl={(q) => `/api/base/clients?q=${q}`}
-                        placeholder="Pesquise por nome ou documento"
-                        getLabel={(item) => item.name}
-                        renderOption={(item) => (
-                          <div>
-                            <div className="font-medium">{item.name}</div>
-                            <div className="text-xs text-gray-500">{item.doc}</div>
-                          </div>
-                        )}
-                      />
-                  </div>
-                </div>
-
-                {/* Totais */}
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mt-2">
-                  <div>
-                    <span className="text-gray-600">Total Sem Imp R$</span>
-                    <div className="mt-1 w-full px-2 py-1 border rounded bg-gray-50 text-gray-800">{fmtCurrency(globalTotalNoTax)}</div>
-                  </div>
-                  <div>
-                    <span className="text-gray-600">Total Com Imp R$</span>
-                    <div className="mt-1 w-full px-2 py-1 border rounded bg-yellow-100 text-gray-800 font-bold">{fmtCurrency(order.totalWithTax ?? 0)}</div>
-                  </div>
-                  <div>
-                    <span className="text-gray-600">Total Peso (KG)</span>
-                    <div className="mt-1 w-full px-2 py-1 border rounded bg-gray-50 text-gray-800">{fmtInt(globalWeight)}</div>
-                  </div>
-                  <div>
-                    <span className="text-gray-600">Total Fat. R$</span>
-                    <div className="mt-1 w-full px-2 py-1 border rounded bg-blue-50 text-gray-800 font-medium" title="Atualizado via ERP">{fmtCurrency(order.totalInvoiced ?? 0)}</div>
-                  </div>
-                </div>
-              </div>
-              <div className="ml-auto flex gap-2">
+            <div className="flex flex-col sm:flex-row sm:items-start gap-3">
+              <div className="order-1 sm:order-2 w-full sm:w-auto sm:ml-auto flex flex-wrap items-center gap-2 sm:justify-end">
                 <button 
                   className={`flex items-center gap-1 px-3 py-1 text-sm bg-white border border-gray-300 rounded shadow-sm hover:bg-gray-50 text-gray-700 ${!isEditableStatus(order?.status) ? 'opacity-50 cursor-not-allowed' : ''}`}
                   onClick={handleSimulateTaxes}
@@ -870,6 +742,137 @@ export default function SalesOrderMaintenancePage() {
                   </button>
                 )}
               </div>
+
+              <div className="order-2 sm:order-1 flex flex-col gap-3 flex-1">
+                {/* Linha Superior: Número, Data, Entidade, Última Simulação */}
+                <div className="flex flex-wrap items-center gap-8">
+                  <div>
+                    <span className="text-gray-600">Número</span>
+                    <div className="font-mono mt-1">{order.code}</div>
+                  </div>
+                  <div>
+                    <span className="text-gray-600">Pedido ERP</span>
+                    <div className="font-mono mt-1 text-blue-600">{order.erpOrderNumber || '-'}</div>
+                  </div>
+                  <div>
+                    <span className="text-gray-600">Data</span>
+                    <div className="mt-1">{new Date(order.orderDate).toLocaleDateString('pt-BR')}</div>
+                  </div>
+                  {order.entity && (
+                    <div>
+                      <span className="text-gray-600">Entidade</span>
+                      <div className="mt-1 font-medium">{order.entity.name}</div>
+                    </div>
+                  )}
+                  {order.lastTaxSimulation && (
+                     <div className="ml-auto">
+                       <span className="text-gray-600">Última simulação</span>
+                       <div className="mt-1">
+                         {new Date(order.lastTaxSimulation).toLocaleDateString('pt-BR')} - {new Date(order.lastTaxSimulation).toLocaleTimeString('pt-BR')}
+                       </div>
+                     </div>
+                  )}
+                </div>
+
+                {/* Linha de Inputs: Cliente, Pagamento, Entrega */}
+                <div className="grid grid-cols-1 md:grid-cols-12 gap-3 mt-2">
+                  <div className={`md:col-span-6 ${!isHeaderEditing || (order.items && order.items.length > 0) || !['OPEN', 'Orçamento'].includes(order.status || '') ? "opacity-75 pointer-events-none" : ""}`}>
+                     <AsyncSelect
+                        label="Cliente"
+                        value={hdrDraft.customerName ?? ''}
+                        onChange={(val) => setHdrDraft((d) => ({ ...d, customerName: val }))}
+                        onSelectObj={(item) => {
+                           setHdrDraft((d) => ({ ...d, customerName: item.name, customerDoc: item.doc }));
+                           setHdrCustomerId(Number(item.id));
+                           (async () => {
+                             try {
+                               const ptRes = await fetch(`/api/base/payment-terms?clientId=${Number(item.id)}`);
+                               const ptData = await ptRes.json();
+                               const list = Array.isArray(ptData) ? ptData : [];
+                               const first = list[0];
+                               if (first?.description) {
+                                 const newVal = first.code != null ? `[${first.code}] ${first.description}` : String(first.description);
+                                 setHdrDraft((d) => ({ ...d, paymentTerms: newVal }));
+                               }
+                             } catch {}
+                           })();
+                        }}
+                        fetchUrl={(q) => `/api/base/clients?q=${q}`}
+                        placeholder="Pesquise por nome ou documento"
+                        getLabel={(item) => item.name}
+                        renderOption={(item) => (
+                          <div>
+                            <div className="font-medium">{item.name}</div>
+                            <div className="text-xs text-gray-500">{item.doc}</div>
+                          </div>
+                        )}
+                      />
+                  </div>
+                  <div className={`md:col-span-3 ${!isHeaderEditing ? "opacity-75 pointer-events-none" : ""}`}>
+                    <AsyncSelect
+                      label="Condição de pagamento"
+                      value={hdrDraft.paymentTerms ?? ''}
+                      onChange={(val) => setHdrDraft((d) => ({ ...d, paymentTerms: val }))}
+                      onSelectObj={(item) => {
+                         const newVal = `[${item.code}] ${item.description}`;
+                         setHdrDraft((d) => ({ ...d, paymentTerms: newVal }));
+                      }}
+                      fetchUrl={(q) => `/api/base/payment-terms?clientId=${hdrCustomerId ? String(hdrCustomerId) : '0'}&q=${q}`}
+                      placeholder="Digite código ou descrição"
+                      getLabel={(item) => `[${item.code}] ${item.description}`}
+                      renderOption={(item) => (
+                        <div>
+                          <div className="font-medium">{item.description}</div>
+                          <div className="text-xs text-gray-500">Código: {item.code} | Parcelas: {item.installments}</div>
+                        </div>
+                      )}
+                    />
+                  </div>
+                  <div className="md:col-span-3">
+                    <span className="text-gray-600">Entrega</span>
+                    <input type="date" className="mt-1 w-full px-2 py-1 border rounded" value={hdrDraft.deliveryDate ?? ''} onChange={(e) => setHdrDraft((d) => ({ ...d, deliveryDate: e.target.value }))} disabled={!isHeaderEditing} />
+                  </div>
+                  <div className={`md:col-span-6 ${!isHeaderEditing ? "opacity-75 pointer-events-none" : ""}`}>
+                     <AsyncSelect
+                        label="Cliente Remessa Triangular"
+                        value={hdrDraft.triangularCustomerName ?? ''}
+                        onChange={(val) => setHdrDraft((d) => ({ ...d, triangularCustomerName: val }))}
+                        onSelectObj={(item) => {
+                           setHdrDraft((d) => ({ ...d, triangularCustomerName: item.name, triangularCustomerDoc: item.doc }));
+                        }}
+                        fetchUrl={(q) => `/api/base/clients?q=${q}`}
+                        placeholder="Pesquise por nome ou documento"
+                        getLabel={(item) => item.name}
+                        renderOption={(item) => (
+                          <div>
+                            <div className="font-medium">{item.name}</div>
+                            <div className="text-xs text-gray-500">{item.doc}</div>
+                          </div>
+                        )}
+                      />
+                  </div>
+                </div>
+
+                {/* Totais */}
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mt-2">
+                  <div>
+                    <span className="text-gray-600">Total Sem Imp R$</span>
+                    <div className="mt-1 w-full px-2 py-1 border rounded bg-gray-50 text-gray-800">{fmtCurrency(globalTotalNoTax)}</div>
+                  </div>
+                  <div>
+                    <span className="text-gray-600">Total Com Imp R$</span>
+                    <div className="mt-1 w-full px-2 py-1 border rounded bg-yellow-100 text-gray-800 font-bold">{fmtCurrency(order.totalWithTax ?? 0)}</div>
+                  </div>
+                  <div>
+                    <span className="text-gray-600">Total Peso (KG)</span>
+                    <div className="mt-1 w-full px-2 py-1 border rounded bg-gray-50 text-gray-800">{fmtInt(globalWeight)}</div>
+                  </div>
+                  <div>
+                    <span className="text-gray-600">Total Fat. R$</span>
+                    <div className="mt-1 w-full px-2 py-1 border rounded bg-blue-50 text-gray-800 font-medium" title="Atualizado via ERP">{fmtCurrency(order.totalInvoiced ?? 0)}</div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -990,9 +993,14 @@ export default function SalesOrderMaintenancePage() {
             <div className="px-3 py-2 border-b flex items-center gap-2">
               <span className="text-sm text-gray-700">Itens</span>
               <button 
-                className={`ml-auto px-2 py-1 text-xs border rounded bg-white hover:bg-gray-100 ${!isHeaderEditing ? 'opacity-50 cursor-not-allowed' : ''}`} 
-                disabled={!isHeaderEditing} 
-                onClick={() => { setAddingItems(true); searchClientItems(''); }}
+                className={`ml-auto px-2 py-1 text-xs border rounded bg-white hover:bg-gray-100 ${!isHeaderEditing && !canEditOrder ? 'opacity-50 cursor-not-allowed' : ''}`} 
+                disabled={!isHeaderEditing && !canEditOrder} 
+                onClick={() => { 
+                  if (!isHeaderEditing) setIsHeaderEditing(true);
+                  setAddingItems(true);
+                  setSearchTerm('');
+                  searchClientItems('');
+                }}
               >
                 Adicionar itens
               </button>
@@ -1000,7 +1008,7 @@ export default function SalesOrderMaintenancePage() {
             {addingItems && (
               <div className="p-3 border-b">
                 <div className="flex items-center gap-2">
-                  <input className="flex-1 px-2 py-1 border rounded" placeholder="Pesquisar itens do cliente" value={searchTerm} onChange={(e) => { const v = e.target.value; setSearchTerm(v); searchClientItems(v); }} />
+                  <input className="flex-1 px-2 py-1 border rounded" placeholder="Pesquisar itens do cliente" value={searchTerm} onChange={(e) => { const v = e.target.value; setSearchTerm(v); searchClientItems(v); }} autoFocus />
                   <button className="px-2 py-1 text-xs border rounded" onClick={() => setAddingItems(false)}>Fechar</button>
                 </div>
                 <div className="mt-2">
