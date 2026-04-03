@@ -242,7 +242,7 @@ export default function ClientsPage() {
   };
 
   return (
-    <div className="p-4 space-y-4">
+    <div className="space-y-4">
       <h1 className="text-xl font-semibold">Clientes</h1>
 
       <div className="flex gap-2 items-center">

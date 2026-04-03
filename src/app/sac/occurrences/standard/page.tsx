@@ -127,7 +127,7 @@ export default function StandardOccurrencePage() {
   }
 
   return (
-    <div className="p-4 space-y-4">
+    <div className="space-y-4">
       <h1 className="text-xl font-semibold">SAC • Ocorrência Padrão</h1>
 
       <div className="grid grid-cols-12 gap-2 border p-2 bg-gray-50">

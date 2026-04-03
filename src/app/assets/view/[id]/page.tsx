@@ -23,7 +23,7 @@ export default function AssetQuickView() {
   if (!asset) return <div className="p-3">Componente não encontrado</div>;
 
   return (
-    <div className="max-w-2xl mx-auto p-3 space-y-4">
+    <div className="max-w-2xl mx-auto space-y-4">
       <div className="flex items-start gap-4">
         <img src={asset.thumbnail || '/icons/logo cartonificio.png'} alt={asset.name} className="w-24 h-24 object-cover rounded border" />
         <div className="flex-1">

@@ -129,7 +129,7 @@ export default function ComplaintMaintenancePage() {
   }
 
   return (
-    <div className="p-4 space-y-4">
+    <div className="space-y-4">
       <h1 className="text-xl font-semibold">Manutenção de Reclamação</h1>
 
       {/* Linha superior */}

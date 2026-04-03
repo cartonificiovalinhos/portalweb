@@ -357,7 +357,7 @@ export default function UsersPage() {
   };
 
   return (
-    <div className="p-3 space-y-4">
+    <div className="space-y-4">
       <h1 className="text-xl font-semibold">Administração • Usuários</h1>
       {err && <div className="text-red-600 text-sm">{err}</div>}
 

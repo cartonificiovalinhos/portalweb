@@ -12,7 +12,7 @@ export default async function AnalysisPage() {
   const variablePercentage = totalMonth > 0 ? (100 - Number(fixedPercentage)).toFixed(1) : "0.0";
 
   return (
-    <div className="space-y-8 p-3">
+    <div className="space-y-8">
       <h1 className="text-3xl font-bold text-slate-900">Análise Estratégica</h1>
 
       {/* Strategic Metrics */}

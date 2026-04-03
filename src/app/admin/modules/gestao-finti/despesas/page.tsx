@@ -16,7 +16,7 @@ export default async function ExpensesPage() {
   });
 
   return (
-    <div className="space-y-6 p-3">
+    <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold text-slate-900">Despesas</h1>
         <div className="flex gap-2">

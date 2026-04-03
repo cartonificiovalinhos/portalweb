@@ -150,7 +150,7 @@ export default function SalesOrdersPage() {
   );
 
   return (
-    <div className="p-3 space-y-4">
+    <div className="space-y-4">
       <h1 className="text-xl font-semibold">Venda • Consulta de Pedidos</h1>
       {error && <div className="text-sm text-red-600">{error}</div>}
 

@@ -597,7 +597,7 @@ export default function SalesOrderMaintenancePage() {
 
 
   return (
-    <div className="p-3 space-y-2">
+    <div className="space-y-2">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <h1 className="text-xl font-semibold">Manutenção de Pedidos</h1>

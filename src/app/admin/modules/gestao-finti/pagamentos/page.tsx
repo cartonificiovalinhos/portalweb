@@ -17,7 +17,7 @@ export default async function PaymentsPage() {
   });
 
   return (
-    <div className="space-y-6 p-3">
+    <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold text-slate-900">
           Pagamentos
