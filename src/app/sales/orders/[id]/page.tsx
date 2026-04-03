@@ -1104,8 +1104,14 @@ export default function SalesOrderMaintenancePage() {
                       onDelete={async () => {
                         if (!order) return;
                         if (!confirm("Confirma excluir este item?")) return;
-                        const r = await fetch(`/api/sales/orders/items/${it.id}`, { method: "DELETE" });
-                        if (r.ok) await refreshOrder();
+                        try {
+                          const r = await fetch(`/api/sales/orders/items/${it.id}`, { method: "DELETE" });
+                          if (!r.ok) {
+                            const err = await r.json().catch(() => ({}));
+                            throw new Error(err.error || "Falha ao excluir item");
+                          }
+                          await refreshOrder();
+                        } catch (e: any) { alert(e?.message || String(e)); }
                       }}
                       showFeatures={isFeatures}
                       toggleFeatures={() => setShowFeaturesFor(isFeatures ? null : it.id)}
@@ -1162,7 +1168,10 @@ export default function SalesOrderMaintenancePage() {
                                if (!confirm('Confirma excluir este item?')) return;
                                try {
                                  const res = await fetch(`/api/sales/orders/items/${it.id}`, { method: 'DELETE' });
-                                 if (!res.ok) throw new Error('Falha ao excluir item');
+                                 if (!res.ok) {
+                                   const err = await res.json().catch(() => ({}));
+                                   throw new Error(err.error || 'Falha ao excluir item');
+                                 }
                                  await refreshOrder();
                                } catch (e: any) { alert(e?.message || String(e)); }
                            }}
