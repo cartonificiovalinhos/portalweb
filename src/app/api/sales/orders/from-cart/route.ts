@@ -3,6 +3,40 @@ import { prisma } from '../../../../../lib/prisma';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '../../../../../lib/auth';
 
+const SALES_ORDER_CODE_PREFIX = 'PV';
+const SALES_ORDER_CODE_WIDTH = 6;
+
+function formatSalesOrderCode(seq: number): string {
+  if (!Number.isFinite(seq) || seq <= 0) throw new Error('Sequência inválida para número do pedido');
+  if (seq > 10 ** SALES_ORDER_CODE_WIDTH - 1) throw new Error('Limite de numeração de pedido atingido');
+  return `${SALES_ORDER_CODE_PREFIX}${String(seq).padStart(SALES_ORDER_CODE_WIDTH, '0')}`;
+}
+
+async function generateNextSalesOrderCode(db: any): Promise<string> {
+  const last = await db.salesOrder.findFirst({
+    where: { code: { startsWith: SALES_ORDER_CODE_PREFIX } },
+    orderBy: { code: 'desc' },
+    select: { code: true },
+  });
+
+  const lastCode = typeof last?.code === 'string' ? last.code : '';
+  const suffix = lastCode.startsWith(SALES_ORDER_CODE_PREFIX) ? lastCode.slice(SALES_ORDER_CODE_PREFIX.length) : '';
+  const lastSeq = /^\d+$/.test(suffix) ? Number.parseInt(suffix, 10) : 0;
+  return formatSalesOrderCode(lastSeq + 1);
+}
+
+function isUniqueSalesOrderCodeError(err: any): boolean {
+  const code = err?.code;
+  if (code === 'P2002') {
+    const target = err?.meta?.target;
+    if (Array.isArray(target)) return target.includes('code');
+    if (typeof target === 'string') return target.includes('code');
+    return true;
+  }
+  const msg = String(err?.message || err || '');
+  return msg.toLowerCase().includes('duplicate') && msg.toLowerCase().includes('code');
+}
+
 export async function POST(request: Request) {
   try {
     const session = await getServerSession(authOptions);
@@ -62,37 +96,43 @@ export async function POST(request: Request) {
     const discountTotal = 0;
     const total = subtotal;
 
-    // Use a numeric timestamp + random suffix for uniqueness, or just timestamp if sufficient. 
-    // Format: ORD-timestamp
-    const code = `ORD-${Date.now()}`;
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const code = await generateNextSalesOrderCode(prisma);
 
-    // Transaction: Create Order, Delete Cart Items
-    const result = await prisma.$transaction(async (tx) => {
-        const order = await tx.salesOrder.create({
+      try {
+        const result = await prisma.$transaction(async (tx) => {
+          const order = await tx.salesOrder.create({
             data: {
-                code,
-                status: 'Orçamento',
-                customerName: client.name,
-                customerDoc: client.doc,
-                clientId: client.id,
-                entityId,
-                paymentTerms: lastOrder?.paymentTerms,
-                createdById,
-                subtotal,
-                discountTotal,
-                total,
-                items: { create: normalizedItems }
+              code,
+              status: 'Orçamento',
+              customerName: client.name,
+              customerDoc: client.doc,
+              clientId: client.id,
+              entityId,
+              paymentTerms: lastOrder?.paymentTerms,
+              createdById,
+              subtotal,
+              discountTotal,
+              total,
+              items: { create: normalizedItems }
             }
-        });
+          });
 
-        await tx.clientCartItem.deleteMany({
+          await tx.clientCartItem.deleteMany({
             where: { clientId }
+          });
+
+          return order;
         });
 
-        return order;
-    });
+        return NextResponse.json(result, { status: 201 });
+      } catch (e: any) {
+        if (isUniqueSalesOrderCodeError(e)) continue;
+        throw e;
+      }
+    }
 
-    return NextResponse.json(result, { status: 201 });
+    return NextResponse.json({ error: 'Falha ao gerar número do pedido' }, { status: 500 });
   } catch (e: any) {
       console.error(e);
       return NextResponse.json({ error: e.message || String(e) }, { status: 500 });

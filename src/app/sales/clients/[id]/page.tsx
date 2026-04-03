@@ -109,6 +109,12 @@ const SendIcon = () => (
     <path d="M22 2 15 22l-4-9-9-4Z" strokeWidth="1.5" />
   </svg>
 );
+const CopyIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" className="w-4 h-4">
+    <path d="M8 7h11v13H8z" strokeWidth="1.5" />
+    <path d="M5 17H4a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1h11a1 1 0 0 1 1 1v1" strokeWidth="1.5" />
+  </svg>
+);
 const TrashIcon = () => (
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" className="w-4 h-4">
     <path d="M3 6h18" strokeWidth="1.5" />
@@ -509,6 +515,7 @@ export default function ClientDetailsPage() {
                       <div className="mt-3 flex flex-wrap gap-2">
                         <button className="px-3 py-2 text-xs border rounded" onClick={() => setSelected(o)}>Itens</button>
                         <button className="px-3 py-2 text-xs border rounded" onClick={() => { window.location.href = `/sales/orders/${o.id}`; }}>Detalhes</button>
+                        <button className="px-3 py-2 text-xs border rounded" onClick={() => router.push(`/sales/orders/new?copyFrom=${o.id}`)}>Copiar</button>
                         <button
                           className="px-3 py-2 text-xs border rounded disabled:opacity-50"
                           disabled={integratingId === o.id || !['Orçamento', 'Erro na integração'].includes(statusLabelPt(o.status))}
@@ -603,6 +610,7 @@ export default function ClientDetailsPage() {
                         <div className="inline-flex">
                           <IconBtn title="Visualizar" onClick={() => setSelected(o)}><EyeIcon /></IconBtn>
                           <IconBtn title="Detalhes" onClick={() => { window.location.href = `/sales/orders/${o.id}`; }}> <FileIcon /> </IconBtn>
+                          <IconBtn title="Copiar Pedido" onClick={() => router.push(`/sales/orders/new?copyFrom=${o.id}`)}><CopyIcon /></IconBtn>
                           <IconBtn 
                             title="Enviar para ERP" 
                             disabled={integratingId === o.id || !['Orçamento', 'Erro na integração'].includes(statusLabelPt(o.status))}

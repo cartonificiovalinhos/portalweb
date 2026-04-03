@@ -7,6 +7,40 @@ function normalizeDoc(doc: string): string {
   return (doc || '').replace(/\D+/g, '');
 }
 
+const SALES_ORDER_CODE_PREFIX = 'PV';
+const SALES_ORDER_CODE_WIDTH = 6;
+
+function formatSalesOrderCode(seq: number): string {
+  if (!Number.isFinite(seq) || seq <= 0) throw new Error('Sequência inválida para número do pedido');
+  if (seq > 10 ** SALES_ORDER_CODE_WIDTH - 1) throw new Error('Limite de numeração de pedido atingido');
+  return `${SALES_ORDER_CODE_PREFIX}${String(seq).padStart(SALES_ORDER_CODE_WIDTH, '0')}`;
+}
+
+async function generateNextSalesOrderCode(db: any): Promise<string> {
+  const last = await db.salesOrder.findFirst({
+    where: { code: { startsWith: SALES_ORDER_CODE_PREFIX } },
+    orderBy: { code: 'desc' },
+    select: { code: true },
+  });
+
+  const lastCode = typeof last?.code === 'string' ? last.code : '';
+  const suffix = lastCode.startsWith(SALES_ORDER_CODE_PREFIX) ? lastCode.slice(SALES_ORDER_CODE_PREFIX.length) : '';
+  const lastSeq = /^\d+$/.test(suffix) ? Number.parseInt(suffix, 10) : 0;
+  return formatSalesOrderCode(lastSeq + 1);
+}
+
+function isUniqueSalesOrderCodeError(err: any): boolean {
+  const code = err?.code;
+  if (code === 'P2002') {
+    const target = err?.meta?.target;
+    if (Array.isArray(target)) return target.includes('code');
+    if (typeof target === 'string') return target.includes('code');
+    return true;
+  }
+  const msg = String(err?.message || err || '');
+  return msg.toLowerCase().includes('duplicate') && msg.toLowerCase().includes('code');
+}
+
 async function resolveEntityIdFromDoc(raw: unknown): Promise<number | undefined> {
   const doc = typeof raw === 'string' ? normalizeDoc(raw) : '';
   if (!doc) return undefined;
@@ -300,9 +334,7 @@ export async function POST(request: Request) {
       }
     }
 
-    const code = `ORD-${Date.now()}`;
-    const orderCreateData = {
-      code,
+    const baseOrderCreateData = {
       entityId,
       customerName,
       customerDoc: customerDocNorm || undefined,
@@ -320,90 +352,104 @@ export async function POST(request: Request) {
       items: { create: normalizedItems },
     } as const;
 
-    try {
-      const created = await prisma.salesOrder.create({
-        data: orderCreateData,
-        include: { items: true },
-      });
-      return NextResponse.json(created, { status: 201 });
-    } catch (e: any) {
-      const msg = String(e?.message || e);
-      if (!msg.includes('Could not figure out an ID in create')) throw e;
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const code = await generateNextSalesOrderCode(prisma);
+      const orderCreateData = { ...baseOrderCreateData, code } as const;
 
-      const createdId = await prisma.$transaction(async (tx) => {
-        const nextOrderIdRows = await tx.$queryRawUnsafe<any[]>('SELECT COALESCE(MAX(id), 0) + 1 as id FROM salesorder');
-        const nextOrderId = nextOrderIdRows?.[0]?.id ? Number(nextOrderIdRows[0].id) : null;
-        if (!nextOrderId || !Number.isFinite(nextOrderId) || nextOrderId <= 0) return null;
+      try {
+        const created = await prisma.salesOrder.create({
+          data: orderCreateData,
+          include: { items: true },
+        });
+        return NextResponse.json(created, { status: 201 });
+      } catch (e: any) {
+        if (isUniqueSalesOrderCodeError(e)) continue;
 
-        await tx.$executeRawUnsafe(
-          `INSERT INTO salesorder
-            (id, code, entityId, customerName, customerDoc, clientId, triangularCustomerName, triangularCustomerDoc, paymentTerms, carrier, deliveryDate, notes, createdById, subtotal, discountTotal, total, createdAt, updatedAt)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
-          Math.trunc(nextOrderId),
-          code,
-          entityId ?? null,
-          customerName,
-          customerDocNorm || null,
-          clientId ?? null,
-          triangularCustomerName || null,
-          triangularCustomerDocNorm || null,
-          paymentTerms !== undefined && paymentTerms !== null ? String(paymentTerms) : null,
-          carrier || null,
-          parseDate(deliveryDate) ?? null,
-          notes || null,
-          createdById ?? null,
-          subtotal,
-          discountTotal,
-          total,
-        );
+        const msg = String(e?.message || e);
+        if (!msg.includes('Could not figure out an ID in create')) throw e;
 
-        const id = Math.trunc(nextOrderId);
+        try {
+          const createdId = await prisma.$transaction(async (tx) => {
+            const nextOrderIdRows = await tx.$queryRawUnsafe<any[]>('SELECT COALESCE(MAX(id), 0) + 1 as id FROM salesorder');
+            const nextOrderId = nextOrderIdRows?.[0]?.id ? Number(nextOrderIdRows[0].id) : null;
+            if (!nextOrderId || !Number.isFinite(nextOrderId) || nextOrderId <= 0) return null;
 
-        const nextItemIdRows = await tx.$queryRawUnsafe<any[]>('SELECT COALESCE(MAX(id), 0) + 1 as id FROM salesorderitem');
-        let nextItemId = nextItemIdRows?.[0]?.id ? Number(nextItemIdRows[0].id) : null;
-        if (!nextItemId || !Number.isFinite(nextItemId) || nextItemId <= 0) return null;
+            await tx.$executeRawUnsafe(
+              `INSERT INTO salesorder
+                (id, code, entityId, customerName, customerDoc, clientId, triangularCustomerName, triangularCustomerDoc, paymentTerms, carrier, deliveryDate, notes, createdById, subtotal, discountTotal, total, createdAt, updatedAt)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
+              Math.trunc(nextOrderId),
+              code,
+              entityId ?? null,
+              customerName,
+              customerDocNorm || null,
+              clientId ?? null,
+              triangularCustomerName || null,
+              triangularCustomerDocNorm || null,
+              paymentTerms !== undefined && paymentTerms !== null ? String(paymentTerms) : null,
+              carrier || null,
+              parseDate(deliveryDate) ?? null,
+              notes || null,
+              createdById ?? null,
+              subtotal,
+              discountTotal,
+              total,
+            );
 
-        for (const it of normalizedItems as any[]) {
-          const creasesJson = it.creases !== undefined ? JSON.stringify(it.creases) : null;
-          await tx.$executeRawUnsafe(
-            `INSERT INTO salesorderitem
-              (id, orderId, inventoryItemId, sku, name, quantity, unit, unitPrice, discountPct, lineTotal, width, length, grammage, diameter, tube, weightKg, creases, clientOrderNumber, clientOrderItemNumber, itemDeliveryDate, internalResin, externalResin)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-            Math.trunc(nextItemId),
-            Math.trunc(id),
-            it.inventoryItemId ?? null,
-            it.sku ?? null,
-            it.name,
-            Math.trunc(Number(it.quantity ?? 1)),
-            it.unit ?? null,
-            Number(it.unitPrice ?? 0),
-            Number(it.discountPct ?? 0),
-            Number(it.lineTotal ?? 0),
-            it.width ?? null,
-            it.length ?? null,
-            it.grammage ?? null,
-            it.diameter ?? null,
-            it.tube ?? null,
-            it.weightKg ?? null,
-            creasesJson,
-            it.clientOrderNumber ?? null,
-            it.clientOrderItemNumber ?? null,
-            it.itemDeliveryDate instanceof Date ? it.itemDeliveryDate : (it.itemDeliveryDate ? new Date(it.itemDeliveryDate) : null),
-            it.internalResin ? 1 : 0,
-            it.externalResin ? 1 : 0,
-          );
-          nextItemId += 1;
+            const id = Math.trunc(nextOrderId);
+
+            const nextItemIdRows = await tx.$queryRawUnsafe<any[]>('SELECT COALESCE(MAX(id), 0) + 1 as id FROM salesorderitem');
+            let nextItemId = nextItemIdRows?.[0]?.id ? Number(nextItemIdRows[0].id) : null;
+            if (!nextItemId || !Number.isFinite(nextItemId) || nextItemId <= 0) return null;
+
+            for (const it of normalizedItems as any[]) {
+              const creasesJson = it.creases !== undefined ? JSON.stringify(it.creases) : null;
+              await tx.$executeRawUnsafe(
+                `INSERT INTO salesorderitem
+                  (id, orderId, inventoryItemId, sku, name, quantity, unit, unitPrice, discountPct, lineTotal, width, length, grammage, diameter, tube, weightKg, creases, clientOrderNumber, clientOrderItemNumber, itemDeliveryDate, internalResin, externalResin)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                Math.trunc(nextItemId),
+                Math.trunc(id),
+                it.inventoryItemId ?? null,
+                it.sku ?? null,
+                it.name,
+                Math.trunc(Number(it.quantity ?? 1)),
+                it.unit ?? null,
+                Number(it.unitPrice ?? 0),
+                Number(it.discountPct ?? 0),
+                Number(it.lineTotal ?? 0),
+                it.width ?? null,
+                it.length ?? null,
+                it.grammage ?? null,
+                it.diameter ?? null,
+                it.tube ?? null,
+                it.weightKg ?? null,
+                creasesJson,
+                it.clientOrderNumber ?? null,
+                it.clientOrderItemNumber ?? null,
+                it.itemDeliveryDate instanceof Date ? it.itemDeliveryDate : (it.itemDeliveryDate ? new Date(it.itemDeliveryDate) : null),
+                it.internalResin ? 1 : 0,
+                it.externalResin ? 1 : 0,
+              );
+              nextItemId += 1;
+            }
+
+            return Math.trunc(id);
+          });
+
+          if (!createdId || !Number.isFinite(createdId)) {
+            return NextResponse.json({ error: 'Falha ao obter ID do pedido após criação (fallback)' }, { status: 500 });
+          }
+
+          return NextResponse.json({ id: createdId }, { status: 201 });
+        } catch (fallbackErr: any) {
+          if (isUniqueSalesOrderCodeError(fallbackErr)) continue;
+          throw fallbackErr;
         }
-
-        return Math.trunc(id);
-      });
-
-      if (!createdId || !Number.isFinite(createdId)) {
-        return NextResponse.json({ error: 'Falha ao obter ID do pedido após criação (fallback)' }, { status: 500 });
       }
-
-      return NextResponse.json({ id: createdId }, { status: 201 });
     }
+
+    return NextResponse.json({ error: 'Falha ao gerar número do pedido' }, { status: 500 });
   } catch (err: any) {
     console.error('Create order error:', err);
     return NextResponse.json({ error: String(err?.message || err) }, { status: 500 });
