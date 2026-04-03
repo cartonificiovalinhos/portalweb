@@ -600,7 +600,7 @@ export default function SalesOrderMaintenancePage() {
         <div className="space-y-3">
           {/* Header do pedido com ícones à direita */}
           <div className="border rounded bg-white p-2 text-sm">
-            <div className="flex flex-col sm:flex-row sm:items-start gap-3">
+            <div className="flex flex-col sm:flex-row sm:items-start gap-3 min-w-0">
               <div className="order-1 sm:order-2 w-full sm:w-auto sm:ml-auto flex flex-wrap items-center gap-2 sm:justify-end">
                 <button 
                   className={`flex items-center gap-1 px-3 py-1 text-sm bg-white border border-gray-300 rounded shadow-sm hover:bg-gray-50 text-gray-700 ${!isEditableStatus(order?.status) ? 'opacity-50 cursor-not-allowed' : ''}`}
@@ -743,7 +743,7 @@ export default function SalesOrderMaintenancePage() {
                 )}
               </div>
 
-              <div className="order-2 sm:order-1 flex flex-col gap-3 flex-1">
+              <div className="order-2 sm:order-1 flex flex-col gap-3 flex-1 min-w-0">
                 {/* Linha Superior: Número, Data, Entidade, Última Simulação */}
                 <div className="flex flex-wrap items-center gap-8">
                   <div>
@@ -1090,7 +1090,7 @@ export default function SalesOrderMaintenancePage() {
                       onAutoSave={async (updated) => {
                         if (!order) return;
                         try {
-                          const res = await fetch(`/api/sales/orders/${order.id}/items/${updated.id}`, {
+                          const res = await fetch(`/api/sales/orders/items/${updated.id}`, {
                             method: "PATCH",
                             headers: { "Content-Type": "application/json" },
                             body: JSON.stringify(updated)
@@ -1104,7 +1104,7 @@ export default function SalesOrderMaintenancePage() {
                       onDelete={async () => {
                         if (!order) return;
                         if (!confirm("Confirma excluir este item?")) return;
-                        const r = await fetch(`/api/sales/orders/${order.id}/items/${it.id}`, { method: "DELETE" });
+                        const r = await fetch(`/api/sales/orders/items/${it.id}`, { method: "DELETE" });
                         if (r.ok) await refreshOrder();
                       }}
                       showFeatures={isFeatures}
