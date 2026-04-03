@@ -67,16 +67,15 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       let priceBy: string | null = null;
       let commercialFamilyId: number | null = null;
       if (invId) {
-        const rows: any[] = await tx.$queryRawUnsafe(`
-          SELECT inv."commercialFamilyId" AS "commercialFamilyId", cf."priceBy" AS "priceBy"
-          FROM "InventoryItem" inv
-          LEFT JOIN "CommercialFamily" cf ON cf."id" = inv."commercialFamilyId"
-          WHERE inv."id" = ${invId}
-          LIMIT 1
-        `);
-        const r = rows[0];
-        commercialFamilyId = r?.commercialFamilyId != null ? Number(r.commercialFamilyId) : null;
-        priceBy = r?.priceBy != null ? String(r.priceBy) : null;
+        const inv = await tx.inventoryItem.findUnique({
+          where: { id: invId },
+          select: {
+            commercialFamilyId: true,
+            commercialFamily: { select: { priceBy: true } },
+          },
+        });
+        commercialFamilyId = inv?.commercialFamilyId != null ? Number(inv.commercialFamilyId) : null;
+        priceBy = inv?.commercialFamily?.priceBy != null ? String(inv.commercialFamily.priceBy) : null;
       }
 
       const base = lineBase(after, priceBy);
@@ -123,16 +122,15 @@ export async function DELETE(request: Request, { params }: { params: { id: strin
       const priceByMap = new Map<number, string | null>();
       if (invIds.length > 0) {
         const unique = Array.from(new Set(invIds));
-        const inList = unique.join(',');
-        const rows: any[] = await tx.$queryRawUnsafe(`
-          SELECT inv."id" AS "inventoryItemId", cf."priceBy" AS "priceBy"
-          FROM "InventoryItem" inv
-          LEFT JOIN "CommercialFamily" cf ON cf."id" = inv."commercialFamilyId"
-          WHERE inv."id" IN (${inList})
-        `);
-        for (const r of rows) {
-          const iid = Number(r.inventoryItemId);
-          if (Number.isFinite(iid) && iid > 0) priceByMap.set(iid, r.priceBy != null ? String(r.priceBy) : null);
+        const invs = await tx.inventoryItem.findMany({
+          where: { id: { in: unique } },
+          select: {
+            id: true,
+            commercialFamily: { select: { priceBy: true } },
+          },
+        });
+        for (const inv of invs) {
+          priceByMap.set(inv.id, inv.commercialFamily?.priceBy != null ? String(inv.commercialFamily.priceBy) : null);
         }
       }
 
