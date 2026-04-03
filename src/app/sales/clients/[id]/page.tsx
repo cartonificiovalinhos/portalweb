@@ -256,6 +256,13 @@ export default function ClientDetailsPage() {
 
   const cartCount = cartItems.length;
 
+  const orderTotal = (o: SalesOrder) =>
+    (o.items || []).reduce((acc, item) => {
+      const total = item.quantity * item.unitPrice;
+      const discount = total * (item.discountPct / 100);
+      return acc + (total - discount);
+    }, 0);
+
   const formatDoc = (doc: string | null | undefined) => {
     if (!doc) return '-';
     const d = doc.replace(/\D/g, '');
@@ -330,37 +337,69 @@ export default function ClientDetailsPage() {
               </button>
             )}
           </div>
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="bg-gray-50">
-                <th className="p-2 text-left">Item</th>
-                <th className="p-2 text-left">SKU</th>
-                <th className="p-2 text-left">Un.</th>
-                <th className="p-2 text-left">Qtd</th>
-                <th className="p-2 text-left">Preço Unit R$</th>
-                <th className="p-2 text-left">Ações</th>
-              </tr>
-            </thead>
-            <tbody>
-              {cartItems.map((it) => (
-                <tr key={it.inventoryItemId} className="border-t">
-                  <td className="p-2">{it.name}</td>
-                  <td className="p-2">{it.sku || '-'}</td>
-                  <td className="p-2">{it.unit || '-'}</td>
-                  <td className="p-2">
-                    <input type="number" className="w-20 px-2 py-1 border rounded" value={it.quantity} onChange={(e) => updateCartQty(it.inventoryItemId, Number(e.target.value))} />
-                  </td>
-                  <td className="p-2">{(it.unitPrice ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
-                  <td className="p-2">
-                    <button className="px-2 py-1 text-xs border rounded" onClick={() => removeFromCart(it.inventoryItemId)}>Excluir</button>
-                  </td>
+          <div className="sm:hidden divide-y">
+            {cartItems.map((it) => (
+              <div key={it.inventoryItemId} className="p-3">
+                <div className="flex items-start gap-3">
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-semibold text-gray-900 break-words">{it.name}</div>
+                    <div className="mt-1 text-xs text-gray-600 font-mono">{it.sku || '-'}</div>
+                    <div className="mt-1 text-xs text-gray-600">{it.unit || '-'}</div>
+                    <div className="mt-2 flex items-center gap-3">
+                      <div className="text-xs text-gray-600">Qtd</div>
+                      <input
+                        type="number"
+                        className="w-24 px-2 py-1 border rounded"
+                        value={it.quantity}
+                        onChange={(e) => updateCartQty(it.inventoryItemId, Number(e.target.value))}
+                      />
+                      <div className="ml-auto text-sm font-medium text-gray-900">
+                        {(it.unitPrice ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                      </div>
+                    </div>
+                  </div>
+                  <button className="px-3 py-2 text-xs border rounded" onClick={() => removeFromCart(it.inventoryItemId)}>
+                    Excluir
+                  </button>
+                </div>
+              </div>
+            ))}
+            {cartItems.length === 0 && <div className="p-3 text-gray-500 text-sm">Carrinho vazio</div>}
+          </div>
+
+          <div className="hidden sm:block overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-gray-50">
+                  <th className="p-2 text-left">Item</th>
+                  <th className="p-2 text-left">SKU</th>
+                  <th className="p-2 text-left">Un.</th>
+                  <th className="p-2 text-left">Qtd</th>
+                  <th className="p-2 text-left">Preço Unit R$</th>
+                  <th className="p-2 text-left">Ações</th>
                 </tr>
-              ))}
-              {cartItems.length === 0 && (
-                <tr><td className="p-3 text-gray-500" colSpan={6}>Carrinho vazio</td></tr>
-              )}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {cartItems.map((it) => (
+                  <tr key={it.inventoryItemId} className="border-t">
+                    <td className="p-2">{it.name}</td>
+                    <td className="p-2">{it.sku || '-'}</td>
+                    <td className="p-2">{it.unit || '-'}</td>
+                    <td className="p-2">
+                      <input type="number" className="w-20 px-2 py-1 border rounded" value={it.quantity} onChange={(e) => updateCartQty(it.inventoryItemId, Number(e.target.value))} />
+                    </td>
+                    <td className="p-2">{(it.unitPrice ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
+                    <td className="p-2">
+                      <button className="px-2 py-1 text-xs border rounded" onClick={() => removeFromCart(it.inventoryItemId)}>Excluir</button>
+                    </td>
+                  </tr>
+                ))}
+                {cartItems.length === 0 && (
+                  <tr><td className="p-3 text-gray-500" colSpan={6}>Carrinho vazio</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
@@ -374,7 +413,90 @@ export default function ClientDetailsPage() {
             </a>
           </div>
         </div>
-        <div className="overflow-x-auto">
+        <div className="sm:hidden divide-y">
+          {orders.map((o) => (
+            <div key={o.id} className="p-3">
+              <div className="flex items-start gap-3">
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-semibold text-gray-900 font-mono break-words">{o.code || o.id}</div>
+                  <div className="mt-1 text-xs text-gray-600">
+                    {o.orderDate ? new Date(o.orderDate).toLocaleDateString('pt-BR') : '-'}
+                  </div>
+                  <div className="mt-2 flex items-center gap-2">
+                    <span className={`px-2 py-0.5 rounded text-xs ${statusColor(statusLabelPt(o.status))}`}>{statusLabelPt(o.status)}</span>
+                    <span className="ml-auto text-sm font-medium text-gray-900">
+                      {orderTotal(o).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                    </span>
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <button className="px-3 py-2 text-xs border rounded" onClick={() => setSelected(o)}>Itens</button>
+                    <button className="px-3 py-2 text-xs border rounded" onClick={() => { window.location.href = `/sales/orders/${o.id}`; }}>Detalhes</button>
+                    <button
+                      className="px-3 py-2 text-xs border rounded disabled:opacity-50"
+                      disabled={integratingId === o.id || !['Orçamento', 'Erro na integração'].includes(statusLabelPt(o.status))}
+                      onClick={async () => {
+                        if (!confirm('Confirma enviar este pedido para o ERP?')) return;
+                        setIntegratingId(o.id);
+                        try {
+                          const res = await fetch(`/api/sales/orders/${o.id}/integrate`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' }
+                          });
+                          if (!res.ok) {
+                            const err = await res.json();
+                            throw new Error(err.error || 'Falha ao enviar para ERP');
+                          }
+                          const data = await res.json();
+
+                          if (data.newStatus === 'Erro na integração') {
+                            alert('Houve erros na integração. Verifique o histórico de situação.');
+                          } else if (data.newStatus === 'Integrado') {
+                            alert('Pedido integrado com sucesso!');
+                          } else {
+                            alert('Envio realizado. Verifique o status atual.');
+                          }
+
+                          const c = client;
+                          if (c?.doc) {
+                            const ro = await fetch(`/api/sales/orders?doc=${encodeURIComponent(c.doc)}`, { cache: 'no-store' });
+                            if (ro.ok) {
+                              const list: SalesOrder[] = await ro.json();
+                              setOrders(Array.isArray(list) ? list : []);
+                            }
+                          }
+                        } catch (e: any) {
+                          alert(e?.message || String(e));
+                        } finally {
+                          setIntegratingId(null);
+                        }
+                      }}
+                    >
+                      {integratingId === o.id ? 'Enviando...' : 'Enviar ERP'}
+                    </button>
+                    <button
+                      className="px-3 py-2 text-xs border rounded disabled:opacity-50"
+                      disabled={!isEditableStatus(o.status)}
+                      onClick={async () => {
+                        if (!confirm('Confirma excluir este pedido?')) return;
+                        const r = await fetch(`/api/sales/orders/${o.id}`, { method: 'DELETE' });
+                        if (r.ok) {
+                          setOrders(orders.filter(x => x.id !== o.id));
+                        } else {
+                          alert('Erro ao excluir pedido');
+                        }
+                      }}
+                    >
+                      Excluir
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))}
+          {orders.length === 0 && <div className="p-3 text-gray-500 text-sm text-center">Sem pedidos</div>}
+        </div>
+
+        <div className="hidden sm:block overflow-x-auto">
           <table className="min-w-full text-sm">
             <thead className="bg-gray-100 text-gray-700">
               <tr>
@@ -396,11 +518,7 @@ export default function ClientDetailsPage() {
                   <td className="px-3 py-2">{o.customerName || '-'}</td>
                   <td className="px-3 py-2">{o.orderDate ? new Date(o.orderDate).toLocaleDateString('pt-BR') : '-'}</td>
                   <td className="px-3 py-2 text-right">
-                    {((o.items || []).reduce((acc, item) => {
-                      const total = item.quantity * item.unitPrice;
-                      const discount = total * (item.discountPct / 100);
-                      return acc + (total - discount);
-                    }, 0)).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                    {orderTotal(o).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                   </td>
                   <td className="px-3 py-2"><span className={`px-2 py-0.5 rounded text-xs ${statusColor(statusLabelPt(o.status))}`}>{statusLabelPt(o.status)}</span></td>
                   <td className="px-3 py-2 text-center">
@@ -491,30 +609,48 @@ export default function ClientDetailsPage() {
             )}
           </button>
         </div>
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="bg-gray-50">
-              <th className="p-2 text-left">Código</th>
-              <th className="p-2 text-left">Descrição</th>
-              <th className="p-2 text-left">Parcelas</th>
-            </tr>
-          </thead>
-          <tbody>
-            {(expandPaymentTerms ? paymentTerms : []).map((pt) => (
-              <tr key={pt.id} className="border-t">
-                <td className="p-2">{pt.code != null ? pt.code : '-'}</td>
-                <td className="p-2">{pt.description}</td>
-                <td className="p-2">{pt.installments != null ? pt.installments : '-'}</td>
+        <div className="sm:hidden divide-y">
+          {(expandPaymentTerms ? paymentTerms : []).map((pt) => (
+            <div key={pt.id} className="p-3">
+              <div className="text-sm font-semibold text-gray-900">{pt.description}</div>
+              <div className="mt-1 text-xs text-gray-600 flex flex-wrap gap-x-3 gap-y-1">
+                <span className="font-mono">Código: {pt.code != null ? pt.code : '-'}</span>
+                <span>Parcelas: {pt.installments != null ? pt.installments : '-'}</span>
+              </div>
+            </div>
+          ))}
+          {paymentTerms.length === 0 && <div className="p-3 text-gray-500 text-sm">Sem condições</div>}
+          {!expandPaymentTerms && paymentTerms.length > 0 && (
+            <div className="p-2 text-center text-xs text-gray-500 italic">{paymentTerms.length} condições ocultas...</div>
+          )}
+        </div>
+
+        <div className="hidden sm:block overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-gray-50">
+                <th className="p-2 text-left">Código</th>
+                <th className="p-2 text-left">Descrição</th>
+                <th className="p-2 text-left">Parcelas</th>
               </tr>
-            ))}
-            {paymentTerms.length === 0 && (
-              <tr><td className="p-3 text-gray-500" colSpan={3}>Sem condições</td></tr>
-            )}
-            {!expandPaymentTerms && paymentTerms.length > 0 && (
-              <tr><td className="p-2 text-center text-xs text-gray-500 italic" colSpan={3}>{paymentTerms.length} condições ocultas...</td></tr>
-            )}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {(expandPaymentTerms ? paymentTerms : []).map((pt) => (
+                <tr key={pt.id} className="border-t">
+                  <td className="p-2">{pt.code != null ? pt.code : '-'}</td>
+                  <td className="p-2">{pt.description}</td>
+                  <td className="p-2">{pt.installments != null ? pt.installments : '-'}</td>
+                </tr>
+              ))}
+              {paymentTerms.length === 0 && (
+                <tr><td className="p-3 text-gray-500" colSpan={3}>Sem condições</td></tr>
+              )}
+              {!expandPaymentTerms && paymentTerms.length > 0 && (
+                <tr><td className="p-2 text-center text-xs text-gray-500 italic" colSpan={3}>{paymentTerms.length} condições ocultas...</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       <div className="border rounded bg-white">
@@ -528,44 +664,82 @@ export default function ClientDetailsPage() {
              )}
            </button>
         </div>
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="bg-gray-50">
-              <th className="p-2 text-left">Item</th>
-              <th className="p-2 text-left">SKU</th>
-              <th className="p-2 text-left">Larg.</th>
-              <th className="p-2 text-left">Compr.</th>
-              <th className="p-2 text-left">Gram.</th>
-              <th className="p-2 text-left">Un.</th>
-              <th className="p-2 text-left">Preço Unit R$</th>
-              <th className="p-2 text-left">Ações</th>
-            </tr>
-          </thead>
-          <tbody>
-            {(expandItems ? linkedItems : []).map((it, i) => (
-              <tr key={i} className="border-t">
-                <td className="p-2">{it.name}</td>
-                <td className="p-2">{it.sku || '-'}</td>
-                <td className="p-2">{it.width || '-'}</td>
-                <td className="p-2">{it.length || '-'}</td>
-                <td className="p-2">{it.grammage || '-'}</td>
-                <td className="p-2">{it.unit || '-'}</td>
-                <td className="p-2">{(it.unitPrice ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
-                <td className="p-2">
-                  <button className="inline-flex items-center justify-center w-8 h-8 border rounded hover:bg-gray-100" title="Adicionar ao carrinho" aria-label="Adicionar ao carrinho" onClick={() => addToCart(it.id)}>
-                    <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M7 18a2 2 0 1 0 0 4 2 2 0 0 0 0-4Zm10 0a2 2 0 1 0 0 4 2 2 0 0 0 0-4ZM6.2 6l-.9-2H1V2h4.1l1.7 4H21l-2 7H8.1l-1 2H19v2H6a1 1 0 0 1-.9-.6L2 6h4.2Z"/></svg>
-                  </button>
-                </td>
+        <div className="sm:hidden divide-y">
+          {(expandItems ? linkedItems : []).map((it, i) => (
+            <div key={i} className="p-3">
+              <div className="flex items-start gap-3">
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-semibold text-gray-900 break-words">{it.name}</div>
+                  <div className="mt-1 text-xs text-gray-600 font-mono">{it.sku || '-'}</div>
+                  <div className="mt-1 text-xs text-gray-600 flex flex-wrap gap-x-3 gap-y-1">
+                    <span>Larg: {it.width || '-'}</span>
+                    <span>Compr: {it.length || '-'}</span>
+                    <span>Gram: {it.grammage || '-'}</span>
+                    <span>Un: {it.unit || '-'}</span>
+                  </div>
+                  <div className="mt-2 flex items-center">
+                    <div className="text-sm font-medium text-gray-900">
+                      {(it.unitPrice ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                    </div>
+                    <button
+                      className="ml-auto px-3 py-2 text-xs border rounded"
+                      title="Adicionar ao carrinho"
+                      aria-label="Adicionar ao carrinho"
+                      onClick={() => addToCart(it.id)}
+                    >
+                      Adicionar
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))}
+          {linkedItems.length === 0 && <div className="p-3 text-gray-500 text-sm">Sem itens</div>}
+          {!expandItems && linkedItems.length > 0 && (
+            <div className="p-2 text-center text-xs text-gray-500 italic">{linkedItems.length} itens ocultos...</div>
+          )}
+        </div>
+
+        <div className="hidden sm:block overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-gray-50">
+                <th className="p-2 text-left">Item</th>
+                <th className="p-2 text-left">SKU</th>
+                <th className="p-2 text-left">Larg.</th>
+                <th className="p-2 text-left">Compr.</th>
+                <th className="p-2 text-left">Gram.</th>
+                <th className="p-2 text-left">Un.</th>
+                <th className="p-2 text-left">Preço Unit R$</th>
+                <th className="p-2 text-left">Ações</th>
               </tr>
-            ))}
-            {linkedItems.length === 0 && (
-              <tr><td className="p-3 text-gray-500" colSpan={8}>Sem itens</td></tr>
-            )}
-            {!expandItems && linkedItems.length > 0 && (
-              <tr><td className="p-2 text-center text-xs text-gray-500 italic" colSpan={8}>{linkedItems.length} itens ocultos...</td></tr>
-            )}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {(expandItems ? linkedItems : []).map((it, i) => (
+                <tr key={i} className="border-t">
+                  <td className="p-2">{it.name}</td>
+                  <td className="p-2">{it.sku || '-'}</td>
+                  <td className="p-2">{it.width || '-'}</td>
+                  <td className="p-2">{it.length || '-'}</td>
+                  <td className="p-2">{it.grammage || '-'}</td>
+                  <td className="p-2">{it.unit || '-'}</td>
+                  <td className="p-2">{(it.unitPrice ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
+                  <td className="p-2">
+                    <button className="inline-flex items-center justify-center w-8 h-8 border rounded hover:bg-gray-100" title="Adicionar ao carrinho" aria-label="Adicionar ao carrinho" onClick={() => addToCart(it.id)}>
+                      <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M7 18a2 2 0 1 0 0 4 2 2 0 0 0 0-4Zm10 0a2 2 0 1 0 0 4 2 2 0 0 0 0-4ZM6.2 6l-.9-2H1V2h4.1l1.7 4H21l-2 7H8.1l-1 2H19v2H6a1 1 0 0 1-.9-.6L2 6h4.2Z"/></svg>
+                    </button>
+                  </td>
+                </tr>
+              ))}
+              {linkedItems.length === 0 && (
+                <tr><td className="p-3 text-gray-500" colSpan={8}>Sem itens</td></tr>
+              )}
+              {!expandItems && linkedItems.length > 0 && (
+                <tr><td className="p-2 text-center text-xs text-gray-500 italic" colSpan={8}>{linkedItems.length} itens ocultos...</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       
@@ -578,29 +752,49 @@ export default function ClientDetailsPage() {
               <button className="ml-auto text-gray-500 hover:text-black" onClick={() => setSelected(null)} aria-label="Fechar">×</button>
             </div>
             <div className="p-4">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="text-gray-700">
-                    <th className="text-left px-2 py-1">Item</th>
-                    <th className="text-right px-2 py-1">Qtd</th>
-                    <th className="text-right px-2 py-1">Preço</th>
-                    <th className="text-right px-2 py-1">Desc (%)</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {(selected.items || []).map((it) => (
-                    <tr key={it.id} className="border-t">
-                      <td className="px-2 py-1">{it.name}</td>
-                      <td className="px-2 py-1 text-right">{it.quantity}</td>
-                      <td className="px-2 py-1 text-right">{it.unitPrice.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
-                      <td className="px-2 py-1 text-right">{it.discountPct}%</td>
+              <div className="sm:hidden divide-y border rounded overflow-hidden">
+                {(selected.items || []).map((it) => (
+                  <div key={it.id} className="p-3">
+                    <div className="text-sm font-semibold text-gray-900 break-words">{it.name}</div>
+                    <div className="mt-1 text-xs text-gray-600 flex flex-wrap gap-x-3 gap-y-1">
+                      <span>Qtd: {it.quantity}</span>
+                      <span>Desc: {it.discountPct}%</span>
+                      <span className="ml-auto font-medium text-gray-900">
+                        {it.unitPrice.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+                {(selected.items || []).length === 0 && (
+                  <div className="p-3 text-center text-gray-500 text-sm">Sem itens</div>
+                )}
+              </div>
+
+              <div className="hidden sm:block overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-gray-700">
+                      <th className="text-left px-2 py-1">Item</th>
+                      <th className="text-right px-2 py-1">Qtd</th>
+                      <th className="text-right px-2 py-1">Preço</th>
+                      <th className="text-right px-2 py-1">Desc (%)</th>
                     </tr>
-                  ))}
-                  {(selected.items || []).length === 0 && (
-                    <tr><td colSpan={4} className="px-2 py-2 text-center text-gray-500">Sem itens</td></tr>
-                  )}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {(selected.items || []).map((it) => (
+                      <tr key={it.id} className="border-t">
+                        <td className="px-2 py-1">{it.name}</td>
+                        <td className="px-2 py-1 text-right">{it.quantity}</td>
+                        <td className="px-2 py-1 text-right">{it.unitPrice.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
+                        <td className="px-2 py-1 text-right">{it.discountPct}%</td>
+                      </tr>
+                    ))}
+                    {(selected.items || []).length === 0 && (
+                      <tr><td colSpan={4} className="px-2 py-2 text-center text-gray-500">Sem itens</td></tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
             <div className="px-4 py-3 border-t text-right">
               <button className="px-3 py-1.5 border rounded hover:bg-gray-100" onClick={() => setSelected(null)}>Fechar</button>
