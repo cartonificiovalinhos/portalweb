@@ -330,7 +330,7 @@ export default function SalesDashboard() {
             </button>
           </div>
 
-          <div className="mt-2 border rounded bg-gray-50 p-2 text-sm text-gray-600 min-h-24">
+          <div className="mt-2">
             {activeGroupTab === 'FAMILY' && <GroupGrid firstColLabel="Descrição Família" />}
             {activeGroupTab === 'CUSTOMER' && <GroupGrid firstColLabel="Descrição Cliente" />}
             {activeGroupTab === 'REP' && <GroupGrid firstColLabel="Descrição Representante" />}
