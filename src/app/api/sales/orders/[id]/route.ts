@@ -26,37 +26,57 @@ async function canAccessOrderByCustomerDoc(userId: number, customerDoc?: string 
 }
 
 export async function GET(_: Request, { params }: { params: { id: string } }) {
-  const session = await getServerSession(authOptions);
-  const userId = session?.user ? Number((session.user as any).id) : null;
-  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  try {
+    const session = await getServerSession(authOptions);
+    const userId = session?.user ? Number((session.user as any).id) : null;
+    if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const id = Number(params.id);
-  const orderExists = await prisma.salesOrder.findUnique({ where: { id }, select: { id: true, customerDoc: true } });
-  if (!orderExists) return NextResponse.json({ error: 'Pedido não encontrado' }, { status: 404 });
+    const id = Number(params.id);
+    if (!Number.isFinite(id) || id <= 0) {
+      return NextResponse.json({ error: 'ID inválido' }, { status: 400 });
+    }
 
-  if (await shouldRestrictToLinkedClients(userId)) {
-    const ok = await canAccessOrderByCustomerDoc(userId, orderExists.customerDoc);
-    if (!ok) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-  }
+    const orderExists = await prisma.salesOrder.findUnique({ where: { id }, select: { id: true, customerDoc: true } });
+    if (!orderExists) return NextResponse.json({ error: 'Pedido não encontrado' }, { status: 404 });
 
-  const order = await prisma.salesOrder.findUnique({
-    where: { id },
-    include: {
-      entity: true,
-      items: {
-        include: {
-          inventoryItem: { include: { commercialFamily: true } }
+    if (await shouldRestrictToLinkedClients(userId)) {
+      const ok = await canAccessOrderByCustomerDoc(userId, orderExists.customerDoc);
+      if (!ok) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
+    const order = await prisma.salesOrder.findUnique({
+      where: { id },
+      include: {
+        entity: true,
+        items: {
+          include: {
+            inventoryItem: { include: { commercialFamily: true } }
+          }
         }
       }
+    });
+    if (!order) return NextResponse.json({ error: 'Pedido não encontrado' }, { status: 404 });
+
+    let history: any[] = [];
+    try {
+      history = await prisma.salesOrderStatusHistory.findMany({
+        where: { orderId: id },
+        orderBy: { changedAt: 'desc' },
+        select: { id: true, status: true, changedAt: true, messages: true },
+      });
+    } catch {
+      const base = await prisma.salesOrderStatusHistory.findMany({
+        where: { orderId: id },
+        orderBy: { changedAt: 'desc' },
+        select: { id: true, status: true, changedAt: true },
+      });
+      history = base.map((h) => ({ ...h, messages: [] }));
     }
-  });
-  if (!order) return NextResponse.json({ error: 'Pedido não encontrado' }, { status: 404 });
-  const history = await prisma.salesOrderStatusHistory.findMany({
-    where: { orderId: id },
-    orderBy: { changedAt: 'desc' },
-    select: { id: true, status: true, changedAt: true, messages: true },
-  });
-  return NextResponse.json({ ...order, statusHistory: history });
+
+    return NextResponse.json({ ...order, statusHistory: history });
+  } catch (err: any) {
+    return NextResponse.json({ error: String(err?.message || err) }, { status: 500 });
+  }
 }
 
 export async function PATCH(request: Request, { params }: { params: { id: string } }) {
