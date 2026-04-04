@@ -7,7 +7,8 @@ function normalizeDoc(doc: string): string {
 }
 
 // PATCH: Atualiza dados básicos do usuário
-export async function PATCH(request: Request, { params }: { params: { id: string } }) {
+export async function PATCH(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const id = Number(params.id);
     if (!id || Number.isNaN(id)) return NextResponse.json({ error: 'ID inválido' }, { status: 400 });
@@ -37,7 +38,8 @@ export async function PATCH(request: Request, { params }: { params: { id: string
 }
 
 // DELETE: Remove usuário e todos os vínculos relacionados
-export async function DELETE(_: Request, { params }: { params: { id: string } }) {
+export async function DELETE(_: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const id = Number(params.id);
     if (!id || Number.isNaN(id)) return NextResponse.json({ error: 'ID inválido' }, { status: 400 });

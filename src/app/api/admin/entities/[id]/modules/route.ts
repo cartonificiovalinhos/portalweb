@@ -5,7 +5,8 @@ import { prisma } from '../../../../../../lib/prisma';
 import { isProgramAllowed } from '../../../../../../lib/isProgramAllowed';
 
 
-export async function PUT(request: Request, { params }: { params: { id: string } }) {
+export async function PUT(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const session = await getServerSession(authOptions);
     const uid = session?.user ? Number((session.user as any).id) : undefined;
@@ -39,7 +40,8 @@ export async function PUT(request: Request, { params }: { params: { id: string }
 }
 
 // Operações em lote: vincular todos ou desvincular todos os módulos da entidade
-export async function PATCH(request: Request, { params }: { params: { id: string } }) {
+export async function PATCH(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const session = await getServerSession(authOptions);
     const uid = session?.user ? Number((session.user as any).id) : undefined;
@@ -78,7 +80,8 @@ export async function PATCH(request: Request, { params }: { params: { id: string
 }
 
 // Lista todos os módulos ativos e indica se estão vinculados à entidade
-export async function GET(request: Request, { params }: { params: { id: string } }) {
+export async function GET(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const session = await getServerSession(authOptions);
     const uid = session?.user ? Number((session.user as any).id) : undefined;

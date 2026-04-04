@@ -4,7 +4,8 @@ import fs from 'fs';
 import path from 'path';
 import { randomUUID } from 'crypto';
 
-export async function GET(_: Request, { params }: { params: { id: string } }) {
+export async function GET(_: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const assetId = Number(params.id);
   const items = await prisma.assetAttachment.findMany({ where: { assetId }, orderBy: { uploadedAt: 'desc' } });
   // Opcional: filtrar somente imagens via query (?images=1 ou ?onlyImages=1)
@@ -23,7 +24,8 @@ export async function GET(_: Request, { params }: { params: { id: string } }) {
   return NextResponse.json(items);
 }
 
-export async function POST(request: Request, { params }: { params: { id: string } }) {
+export async function POST(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const assetId = Number(params.id);
   const ct = request.headers.get('content-type') || '';
 
@@ -66,7 +68,8 @@ export async function POST(request: Request, { params }: { params: { id: string 
   return NextResponse.json(created, { status: 201 });
 }
 
-export async function DELETE(request: Request, { params }: { params: { id: string } }) {
+export async function DELETE(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const assetId = Number(params.id);
   let photoId: number | null = null;
   try {

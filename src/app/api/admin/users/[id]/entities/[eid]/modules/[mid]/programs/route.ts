@@ -70,7 +70,11 @@ async function getAllowedProgramIdSet(userEntityModuleId: number, programIds: nu
 }
 
 // GET: Lista programas vinculados à entidade/módulo e flag se estão permitidos ao usuário
-export async function GET(request: Request, { params }: { params: { id: string; eid: string; mid: string } }) {
+export async function GET(
+  request: Request,
+  props: { params: Promise<{ id: string; eid: string; mid: string }> }
+) {
+  const params = await props.params;
   try {
     const url = new URL(request.url);
     const userDoc = normalizeDoc(String(url.searchParams.get('userDoc') || ''));
@@ -124,7 +128,11 @@ export async function GET(request: Request, { params }: { params: { id: string; 
 }
 
 // PUT: Vincula/Desvincula/Permite programa ao usuário para entidade/módulo
-export async function PUT(request: Request, { params }: { params: { id: string; eid: string; mid: string } }) {
+export async function PUT(
+  request: Request,
+  props: { params: Promise<{ id: string; eid: string; mid: string }> }
+) {
+  const params = await props.params;
   try {
     let userId = Number(params.id);
     let entityId = Number(params.eid);
@@ -184,7 +192,11 @@ export async function PUT(request: Request, { params }: { params: { id: string; 
 }
 
 // PATCH: Operações em lote para programas do usuário dentro da entidade/módulo
-export async function PATCH(request: Request, { params }: { params: { id: string; eid: string; mid: string } }) {
+export async function PATCH(
+  request: Request,
+  props: { params: Promise<{ id: string; eid: string; mid: string }> }
+) {
+  const params = await props.params;
   try {
     let userId = Number(params.id);
     let entityId = Number(params.eid);

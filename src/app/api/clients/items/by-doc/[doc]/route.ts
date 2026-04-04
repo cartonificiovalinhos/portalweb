@@ -5,7 +5,8 @@ function normalizeDoc(doc: string): string {
   return (doc || '').replace(/\D+/g, '');
 }
 
-export async function GET(request: Request, { params }: { params: { doc: string } }) {
+export async function GET(request: Request, props: { params: Promise<{ doc: string }> }) {
+  const params = await props.params;
   try {
     const url = new URL(request.url);
     const q = (url.searchParams.get('q') || '').trim().toLowerCase();

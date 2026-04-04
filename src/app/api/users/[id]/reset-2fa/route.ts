@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '../../../../../lib/prisma';
 
-export async function POST(req: Request, { params }: { params: { id: string } }) {
+export async function POST(req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const id = Number(params.id);
     if (!id || Number.isNaN(id)) {

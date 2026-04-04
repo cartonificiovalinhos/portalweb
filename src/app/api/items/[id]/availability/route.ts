@@ -2,7 +2,8 @@ import { NextResponse } from 'next/server';
 import { prisma } from '../../../../../lib/prisma';
 
 // GET: estrutura de disponibilidade do item por entidade/módulo
-export async function GET(_: Request, { params }: { params: { id: string } }) {
+export async function GET(_: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const itemId = Number(params.id);
     if (!itemId || Number.isNaN(itemId)) return NextResponse.json({ error: 'ID inválido' }, { status: 400 });
@@ -29,7 +30,8 @@ export async function GET(_: Request, { params }: { params: { id: string } }) {
 
   // POST: atualizar disponibilidade (permitir ou remover ligação)
   // body: { entityId?: number, moduleId?: number, entityModuleId?: number, allowed: boolean }
-export async function POST(request: Request, { params }: { params: { id: string } }) {
+export async function POST(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const itemId = Number(params.id);
     if (!itemId || Number.isNaN(itemId)) return NextResponse.json({ error: 'ID inválido' }, { status: 400 });

@@ -3,7 +3,8 @@ import { prisma } from '../../../../../../lib/prisma';
 import { writeFile, mkdir } from 'fs/promises';
 import path from 'path';
 
-export async function GET(request: Request, { params }: { params: { id: string } }) {
+export async function GET(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const orderId = Number(params.id);
   if (isNaN(orderId)) return NextResponse.json([]);
 
@@ -18,7 +19,8 @@ export async function GET(request: Request, { params }: { params: { id: string }
   }
 }
 
-export async function POST(request: Request, { params }: { params: { id: string } }) {
+export async function POST(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const formData = await request.formData();
     const orderId = Number(params.id);

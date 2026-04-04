@@ -47,7 +47,8 @@ async function ensureUserEntityModuleId(userEntityId: number, moduleId: number):
 }
 
 // GET: Lista módulos vinculados à entidade (apenas os vinculados) e flag se estão vinculados ao usuário
-export async function GET(request: Request, { params }: { params: { id: string; eid: string } }) {
+export async function GET(request: Request, props: { params: Promise<{ id: string; eid: string }> }) {
+  const params = await props.params;
   try {
     const url = new URL(request.url);
     const userDoc = normalizeDoc(String(url.searchParams.get('userDoc') || ''));
@@ -103,7 +104,8 @@ export async function GET(request: Request, { params }: { params: { id: string; 
 }
 
 // PUT: Vincula/Desvincula módulo ao usuário dentro da entidade
-export async function PUT(request: Request, { params }: { params: { id: string; eid: string } }) {
+export async function PUT(request: Request, props: { params: Promise<{ id: string; eid: string }> }) {
+  const params = await props.params;
   try {
     let userId = Number(params.id);
     let entityId = Number(params.eid);
@@ -160,7 +162,8 @@ export async function PUT(request: Request, { params }: { params: { id: string; 
 }
 
 // PATCH: Operações em lote para módulos do usuário dentro da entidade
-export async function PATCH(request: Request, { params }: { params: { id: string; eid: string } }) {
+export async function PATCH(request: Request, props: { params: Promise<{ id: string; eid: string }> }) {
+  const params = await props.params;
   try {
     let userId = Number(params.id);
     let entityId = Number(params.eid);

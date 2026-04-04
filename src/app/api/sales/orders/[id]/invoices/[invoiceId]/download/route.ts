@@ -4,7 +4,11 @@ import { readFile } from 'fs/promises';
 import path from 'path';
 import { existsSync } from 'fs';
 
-export async function GET(request: Request, { params }: { params: { id: string, invoiceId: string } }) {
+export async function GET(
+  request: Request,
+  props: { params: Promise<{ id: string, invoiceId: string }> }
+) {
+  const params = await props.params;
   const url = new URL(request.url);
   const type = url.searchParams.get('type');
   const invoiceId = Number(params.invoiceId);

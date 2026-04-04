@@ -36,7 +36,8 @@ function fixString(s: string | null | undefined): string | null {
   return t;
 }
 
-export async function GET(_: Request, { params }: { params: { id: string } }) {
+export async function GET(_: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const id = Number(params.id);
   const a = await prisma.asset.findUnique({ where: { id } });
   if (!a) return NextResponse.json(null);
@@ -52,7 +53,8 @@ export async function GET(_: Request, { params }: { params: { id: string } }) {
   return NextResponse.json(asset);
 }
 
-export async function PATCH(request: Request, { params }: { params: { id: string } }) {
+export async function PATCH(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const id = Number(params.id);
   const data = await request.json();
   const updateData: any = {};
@@ -69,7 +71,8 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   return NextResponse.json(updated);
 }
 
-export async function DELETE(_: Request, { params }: { params: { id: string } }) {
+export async function DELETE(_: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const id = Number(params.id);
   await prisma.asset.delete({ where: { id } });
   return NextResponse.json({ ok: true });

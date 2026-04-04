@@ -108,7 +108,8 @@ async function resolvePaymentTermIds(body: any): Promise<number[] | null> {
   return out;
 }
 
-export async function GET(_: Request, { params }: { params: { id: string } }) {
+export async function GET(_: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const id = Number(params.id);
     if (!Number.isFinite(id)) {
@@ -145,7 +146,8 @@ export async function GET(_: Request, { params }: { params: { id: string } }) {
   }
 }
 
-export async function PATCH(request: Request, { params }: { params: { id: string } }) {
+export async function PATCH(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const id = Number(params.id);
     if (!Number.isFinite(id)) return NextResponse.json({ error: 'id inválido' }, { status: 400 });
@@ -232,7 +234,8 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   }
 }
 
-export async function DELETE(_: Request, { params }: { params: { id: string } }) {
+export async function DELETE(_: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const id = Number(params.id);
     if (!Number.isFinite(id)) return NextResponse.json({ error: 'id inválido' }, { status: 400 });

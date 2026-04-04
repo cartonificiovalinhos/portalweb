@@ -19,7 +19,8 @@ async function resolveEntityIdByCnpj(entityCnpj: string): Promise<number> {
   return match?.id || 0;
 }
 
-export async function GET(request: Request, { params }: { params: { id: string } }) {
+export async function GET(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const url = new URL(request.url);
     const userDoc = normalizeDoc(String(url.searchParams.get('userDoc') || ''));
@@ -47,7 +48,8 @@ export async function GET(request: Request, { params }: { params: { id: string }
   }
 }
 
-export async function PUT(request: Request, { params }: { params: { id: string } }) {
+export async function PUT(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     let userId = Number(params.id);
     const body = await request.json();

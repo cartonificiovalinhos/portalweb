@@ -4,7 +4,8 @@ import { authOptions } from '../../../../../../../../lib/auth';
 import { prisma } from '../../../../../../../../lib/prisma';
 import { isProgramAllowed } from '../../../../../../../../lib/isProgramAllowed';
 
-export async function GET(_: Request, { params }: { params: { id: string; moduleId: string } }) {
+export async function GET(_: Request, props: { params: Promise<{ id: string; moduleId: string }> }) {
+  const params = await props.params;
   try {
     const session = await getServerSession(authOptions);
     const uid = session?.user ? Number((session.user as any).id) : undefined;
@@ -33,7 +34,11 @@ export async function GET(_: Request, { params }: { params: { id: string; module
   }
 }
 
-export async function PUT(request: Request, { params }: { params: { id: string; moduleId: string } }) {
+export async function PUT(
+  request: Request,
+  props: { params: Promise<{ id: string; moduleId: string }> }
+) {
+  const params = await props.params;
   try {
     const session = await getServerSession(authOptions);
     const uid = session?.user ? Number((session.user as any).id) : undefined;
@@ -73,7 +78,11 @@ export async function PUT(request: Request, { params }: { params: { id: string; 
 }
 
 // Operações em lote nos programas do módulo selecionado
-export async function PATCH(request: Request, { params }: { params: { id: string; moduleId: string } }) {
+export async function PATCH(
+  request: Request,
+  props: { params: Promise<{ id: string; moduleId: string }> }
+) {
+  const params = await props.params;
   try {
     const session = await getServerSession(authOptions);
     const uid = session?.user ? Number((session.user as any).id) : undefined;

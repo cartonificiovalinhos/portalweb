@@ -3,7 +3,8 @@ import { prisma } from '../../../../../lib/prisma';
 
 // GET /api/dev/user-modules/:id
 // Lista módulos vinculados ao usuário (por entidade), sem exigir sessão
-export async function GET(_: Request, { params }: { params: { id: string } }) {
+export async function GET(_: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const uid = Number(params.id);
     if (!uid) return NextResponse.json({ ok: false, error: 'id de usuário inválido' }, { status: 400 });

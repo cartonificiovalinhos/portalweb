@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '../../../../../lib/prisma';
 
-export async function GET(_: Request, { params }: { params: { sku: string } }) {
+export async function GET(_: Request, props: { params: Promise<{ sku: string }> }) {
+  const params = await props.params;
   try {
     const raw = params.sku ?? '';
     const sku = decodeURIComponent(raw).trim();
@@ -14,7 +15,8 @@ export async function GET(_: Request, { params }: { params: { sku: string } }) {
   }
 }
 
-export async function PATCH(request: Request, { params }: { params: { sku: string } }) {
+export async function PATCH(request: Request, props: { params: Promise<{ sku: string }> }) {
+  const params = await props.params;
   try {
     const raw = params.sku ?? '';
     const sku = decodeURIComponent(raw).trim();
@@ -45,7 +47,8 @@ export async function PATCH(request: Request, { params }: { params: { sku: strin
   }
 }
 
-export async function DELETE(_: Request, { params }: { params: { sku: string } }) {
+export async function DELETE(_: Request, props: { params: Promise<{ sku: string }> }) {
+  const params = await props.params;
   try {
     const raw = params.sku ?? '';
     const sku = decodeURIComponent(raw).trim();

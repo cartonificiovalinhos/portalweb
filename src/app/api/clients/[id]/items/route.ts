@@ -5,7 +5,8 @@ function normalizeDoc(doc: string): string {
   return (doc || '').replace(/\D+/g, '');
 }
 
-export async function GET(request: Request, { params }: { params: { id: string } }) {
+export async function GET(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const clientId = Number(params.id);
     if (!Number.isFinite(clientId) || clientId <= 0) return NextResponse.json([]);
@@ -99,7 +100,8 @@ export async function GET(request: Request, { params }: { params: { id: string }
 }
 
 // Upsert vínculo de item para cliente (usado pelo ERP)
-export async function POST(request: Request, { params }: { params: { id: string } }) {
+export async function POST(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const clientId = Number(params.id);
     if (!Number.isFinite(clientId) || clientId <= 0) return NextResponse.json({ error: 'clientId inválido' }, { status: 400 });
@@ -236,7 +238,8 @@ export async function POST(request: Request, { params }: { params: { id: string 
 }
 
 // Remover vínculo
-export async function DELETE(request: Request, { params }: { params: { id: string } }) {
+export async function DELETE(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const clientId = Number(params.id);
     const url = new URL(request.url);

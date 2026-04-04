@@ -1,17 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '../../../../../../lib/prisma';
 
-function extractTailParamFromPath(request: Request): string {
-  const { pathname } = new URL(request.url);
-  const parts = pathname.split('/').filter(Boolean);
-  const tail = parts.length > 0 ? parts[parts.length - 1] : '';
-  try {
-    return decodeURIComponent(tail);
-  } catch {
-    return tail;
-  }
-}
-
 function parseIdParam(raw: unknown): number | null {
   const s = String(raw ?? '').trim();
   if (!/^\d+$/.test(s)) return null;
@@ -41,9 +30,10 @@ function lineBase(it: { quantity?: number | null; unitPrice?: number | null; wid
   return qty * price;
 }
 
-export async function GET(request: Request, { params }: { params: { id: string } }) {
+export async function GET(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
-    const id = parseIdParam((params as any)?.id ?? extractTailParamFromPath(request));
+    const id = parseIdParam(params.id);
     if (!id) return NextResponse.json({ error: 'ID inválido' }, { status: 400 });
     const item = await prisma.salesOrderItem.findUnique({
       where: { id },
@@ -56,9 +46,10 @@ export async function GET(request: Request, { params }: { params: { id: string }
   }
 }
 
-export async function PATCH(request: Request, { params }: { params: { id: string } }) {
+export async function PATCH(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
-    const id = parseIdParam((params as any)?.id ?? extractTailParamFromPath(request));
+    const id = parseIdParam(params.id);
     if (!id) return NextResponse.json({ error: 'ID inválido' }, { status: 400 });
     const body = await request.json();
     const allowed: Record<string, any> = {};
@@ -114,9 +105,10 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   }
 }
 
-export async function DELETE(request: Request, { params }: { params: { id: string } }) {
+export async function DELETE(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
-    const id = parseIdParam((params as any)?.id ?? extractTailParamFromPath(request));
+    const id = parseIdParam(params.id);
     if (!id) return NextResponse.json({ error: 'ID inválido' }, { status: 400 });
 
     await prisma.$transaction(async (tx) => {

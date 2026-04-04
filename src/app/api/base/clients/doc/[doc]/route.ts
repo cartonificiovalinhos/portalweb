@@ -130,7 +130,8 @@ async function resolvePaymentTermIds(body: any): Promise<number[] | null> {
   return out;
 }
 
-export async function GET(_: Request, { params }: { params: { doc: string } }) {
+export async function GET(_: Request, props: { params: Promise<{ doc: string }> }) {
+  const params = await props.params;
   try {
     const raw = params.doc ?? '';
     const doc = normalizeDoc(raw);
@@ -166,7 +167,8 @@ export async function GET(_: Request, { params }: { params: { doc: string } }) {
   }
 }
 
-export async function PATCH(request: Request, { params }: { params: { doc: string } }) {
+export async function PATCH(request: Request, props: { params: Promise<{ doc: string }> }) {
+  const params = await props.params;
   try {
     const raw = params.doc ?? '';
     const doc = normalizeDoc(raw);

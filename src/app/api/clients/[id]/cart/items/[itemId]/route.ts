@@ -1,7 +1,11 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '../../../../../../../lib/prisma';
 
-export async function PATCH(request: Request, { params }: { params: { id: string, itemId: string } }) {
+export async function PATCH(
+  request: Request,
+  props: { params: Promise<{ id: string, itemId: string }> }
+) {
+  const params = await props.params;
   try {
     const clientId = Number(params.id);
     const inventoryItemId = Number(params.itemId);
@@ -23,7 +27,11 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   }
 }
 
-export async function DELETE(request: Request, { params }: { params: { id: string, itemId: string } }) {
+export async function DELETE(
+  request: Request,
+  props: { params: Promise<{ id: string, itemId: string }> }
+) {
+  const params = await props.params;
   try {
     const clientId = Number(params.id);
     const inventoryItemId = Number(params.itemId);

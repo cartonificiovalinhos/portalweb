@@ -6,7 +6,8 @@ import { isProgramAllowed } from '../../../../../../../lib/isProgramAllowed';
 
 // DELETE /api/admin/modules/:id/programs/:pid
 // Remove o programa indicado e todos os vínculos com entidades e usuários
-export async function DELETE(_req: Request, { params }: { params: { id: string; pid: string } }) {
+export async function DELETE(_req: Request, props: { params: Promise<{ id: string; pid: string }> }) {
+  const params = await props.params;
   try {
     const session = await getServerSession(authOptions);
     const uid = session?.user ? Number((session.user as any).id) : undefined;
@@ -36,7 +37,8 @@ export async function DELETE(_req: Request, { params }: { params: { id: string; 
   }
 }
 
-export async function PUT(request: Request, { params }: { params: { id: string; pid: string } }) {
+export async function PUT(request: Request, props: { params: Promise<{ id: string; pid: string }> }) {
+  const params = await props.params;
   try {
     const session = await getServerSession(authOptions);
     const uid = session?.user ? Number((session.user as any).id) : undefined;

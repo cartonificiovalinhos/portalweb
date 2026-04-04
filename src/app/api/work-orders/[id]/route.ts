@@ -4,13 +4,15 @@ import { differenceInMinutes } from 'date-fns';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '../../../../lib/auth';
 
-export async function GET(_: Request, { params }: { params: { id: string } }) {
+export async function GET(_: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const id = Number(params.id);
   const wo = await prisma.workOrder.findUnique({ where: { id }, include: { asset: true, attachments: true } });
   return NextResponse.json(wo);
 }
 
-export async function PATCH(request: Request, { params }: { params: { id: string } }) {
+export async function PATCH(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const id = Number(params.id);
   const session = await getServerSession(authOptions);
   const role = (session?.user as any)?.role as string | undefined;
