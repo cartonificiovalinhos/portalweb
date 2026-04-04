@@ -40,13 +40,24 @@ export async function GET(_: Request, { params }: { params: { id: string } }) {
     const userId = session?.user ? Number((session.user as any).id) : null;
     if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const id = parsePositiveInt(params.id);
-    if (!id) {
-      return NextResponse.json({ error: 'ID inválido' }, { status: 400 });
+    const rawKey = String(params.id ?? '').trim();
+    if (!rawKey) return NextResponse.json({ error: 'ID inválido' }, { status: 400 });
+
+    let id = parsePositiveInt(rawKey);
+    let orderExists = id
+      ? await prisma.salesOrder.findUnique({ where: { id }, select: { id: true, customerDoc: true } })
+      : null;
+
+    if (!orderExists) {
+      const code = rawKey.toUpperCase();
+      const looksLikeCode = /^[A-Z]{1,10}\d{2,}$/.test(code);
+      if (!looksLikeCode) return NextResponse.json({ error: 'ID inválido' }, { status: 400 });
+
+      orderExists = await prisma.salesOrder.findFirst({ where: { code }, select: { id: true, customerDoc: true } });
+      if (orderExists?.id) id = Number(orderExists.id);
     }
 
-    const orderExists = await prisma.salesOrder.findUnique({ where: { id }, select: { id: true, customerDoc: true } });
-    if (!orderExists) return NextResponse.json({ error: 'Pedido não encontrado' }, { status: 404 });
+    if (!orderExists || !id) return NextResponse.json({ error: 'Pedido não encontrado' }, { status: 404 });
 
     if (await shouldRestrictToLinkedClients(userId)) {
       const ok = await canAccessOrderByCustomerDoc(userId, orderExists.customerDoc);
