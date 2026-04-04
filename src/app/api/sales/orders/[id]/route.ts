@@ -24,8 +24,17 @@ async function shouldRestrictToLinkedClients(userId: number): Promise<boolean> {
   return hasLinks;
 }
 
-async function canAccessOrderByCustomerDoc(userId: number, customerDoc?: string | null): Promise<boolean> {
-  const doc = normalizeDoc(String(customerDoc || ''));
+async function canAccessOrder(userId: number, order: { clientId?: number | null; customerDoc?: string | null }): Promise<boolean> {
+  const clientId = order?.clientId != null ? Number(order.clientId) : null;
+  if (clientId && Number.isFinite(clientId) && clientId > 0) {
+    const byId = await prisma.userClientRep.findFirst({
+      where: { userId, clientId: Math.trunc(clientId) },
+      select: { id: true }
+    });
+    if (byId) return true;
+  }
+
+  const doc = normalizeDoc(String(order?.customerDoc || ''));
   if (!doc) return false;
   const link = await prisma.userClientRep.findFirst({
     where: { userId, client: { is: { doc } } },
@@ -45,7 +54,7 @@ export async function GET(_: Request, { params }: { params: { id: string } }) {
 
     let id = parsePositiveInt(rawKey);
     let orderExists = id
-      ? await prisma.salesOrder.findUnique({ where: { id }, select: { id: true, customerDoc: true } })
+      ? await prisma.salesOrder.findUnique({ where: { id }, select: { id: true, customerDoc: true, clientId: true } })
       : null;
 
     if (!orderExists) {
@@ -53,14 +62,14 @@ export async function GET(_: Request, { params }: { params: { id: string } }) {
       const looksLikeCode = /^[A-Z]{1,10}\d{2,}$/.test(code);
       if (!looksLikeCode) return NextResponse.json({ error: 'ID inválido' }, { status: 400 });
 
-      orderExists = await prisma.salesOrder.findFirst({ where: { code }, select: { id: true, customerDoc: true } });
+      orderExists = await prisma.salesOrder.findFirst({ where: { code }, select: { id: true, customerDoc: true, clientId: true } });
       if (orderExists?.id) id = Number(orderExists.id);
     }
 
     if (!orderExists || !id) return NextResponse.json({ error: 'Pedido não encontrado' }, { status: 404 });
 
     if (await shouldRestrictToLinkedClients(userId)) {
-      const ok = await canAccessOrderByCustomerDoc(userId, orderExists.customerDoc);
+      const ok = await canAccessOrder(userId, orderExists);
       if (!ok) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
@@ -107,11 +116,11 @@ export async function PATCH(request: Request, { params }: { params: { id: string
 
     const id = parsePositiveInt(params.id);
     if (!id) return NextResponse.json({ error: 'ID inválido' }, { status: 400 });
-    const orderExists = await prisma.salesOrder.findUnique({ where: { id }, select: { id: true, customerDoc: true } });
+    const orderExists = await prisma.salesOrder.findUnique({ where: { id }, select: { id: true, customerDoc: true, clientId: true } });
     if (!orderExists) return NextResponse.json({ error: 'Pedido não encontrado' }, { status: 404 });
 
     if (await shouldRestrictToLinkedClients(userId)) {
-      const ok = await canAccessOrderByCustomerDoc(userId, orderExists.customerDoc);
+      const ok = await canAccessOrder(userId, orderExists);
       if (!ok) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
@@ -194,7 +203,7 @@ export async function DELETE(_: Request, { params }: { params: { id: string } })
 
     let id = parsePositiveInt(rawKey);
     let orderExists = id
-      ? await prisma.salesOrder.findUnique({ where: { id }, select: { id: true, customerDoc: true } })
+      ? await prisma.salesOrder.findUnique({ where: { id }, select: { id: true, customerDoc: true, clientId: true } })
       : null;
 
     if (!orderExists) {
@@ -202,7 +211,7 @@ export async function DELETE(_: Request, { params }: { params: { id: string } })
       const looksLikeCode = /^[A-Z]{1,10}\d{2,}$/.test(code);
       if (!looksLikeCode) return NextResponse.json({ error: 'ID inválido' }, { status: 400 });
 
-      orderExists = await prisma.salesOrder.findFirst({ where: { code }, select: { id: true, customerDoc: true } });
+      orderExists = await prisma.salesOrder.findFirst({ where: { code }, select: { id: true, customerDoc: true, clientId: true } });
       if (orderExists?.id) id = Number(orderExists.id);
     }
 

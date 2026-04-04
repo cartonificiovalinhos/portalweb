@@ -430,6 +430,13 @@ export default function SalesOrderMaintenancePage() {
   };
 
   useEffect(() => {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 20000);
+    const hardTimeout = setTimeout(() => {
+      setError((prev) => prev ?? 'Tempo limite ao carregar o pedido. Tente novamente.');
+      setLoading(false);
+    }, 30000);
+
     const load = async () => {
       if (!idKey) {
         setError('ID do pedido inválido na URL');
@@ -439,13 +446,6 @@ export default function SalesOrderMaintenancePage() {
 
       setLoading(true);
       setError(null);
-
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 20000);
-      const hardTimeout = setTimeout(() => {
-        setError((prev) => prev ?? 'Tempo limite ao carregar o pedido. Tente novamente.');
-        setLoading(false);
-      }, 30000);
 
       try {
         const res = await fetch(`/api/sales/orders/${encodeURIComponent(idKey)}`, { cache: 'no-store', signal: controller.signal });
@@ -498,12 +498,17 @@ export default function SalesOrderMaintenancePage() {
           setError(e?.message || String(e));
         }
       } finally {
-        clearTimeout(timeout);
-        clearTimeout(hardTimeout);
         setLoading(false);
       }
     };
 
+    load();
+
+    return () => {
+      clearTimeout(timeout);
+      clearTimeout(hardTimeout);
+      controller.abort();
+    };
   }, [idKey]);
 
   const fmtCurrency = (n: number | undefined) => (n ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });

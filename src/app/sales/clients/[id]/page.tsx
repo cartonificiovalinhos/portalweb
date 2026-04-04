@@ -569,7 +569,8 @@ export default function ClientDetailsPage() {
                             if (r.ok) {
                               setOrders((prev) => prev.filter((x) => x.id !== o.id));
                             } else {
-                              alert('Erro ao excluir pedido');
+                              const body = await r.json().catch(() => null as any);
+                              alert(body?.error || 'Erro ao excluir pedido');
                             }
                           }}
                         >
@@ -668,7 +669,8 @@ export default function ClientDetailsPage() {
                                 if (r.ok) {
                                     setOrders((prev) => prev.filter((x) => x.id !== o.id));
                                 } else {
-                                    alert('Erro ao excluir pedido');
+                                    const body = await r.json().catch(() => null as any);
+                                    alert(body?.error || 'Erro ao excluir pedido');
                                 }
                             }}
                           > <TrashIcon /> </IconBtn>
