@@ -3,6 +3,8 @@ import { prisma } from '../../../../../lib/prisma';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '../../../../../lib/auth';
 
+const API_TAG = 'orders-[id]-route@2026-04-04';
+
 function normalizeDoc(doc: string): string {
   return (doc || '').replace(/\D+/g, '');
 }
@@ -73,12 +75,12 @@ export async function GET(_: Request, { params }: { params: { id: string } }) {
     if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const rawKey = String(params.id ?? '').trim();
-    if (!rawKey) return NextResponse.json({ error: 'ID inválido' }, { status: 400 });
+    if (!rawKey) return NextResponse.json({ error: `ID inválido (${API_TAG})` }, { status: 400 });
 
     const orderKey = await resolveOrderKey(rawKey);
     if (!orderKey) {
       if (!/^[A-Za-z0-9-]+$/.test(rawKey) || rawKey.length > 32) {
-        return NextResponse.json({ error: 'ID inválido' }, { status: 400 });
+        return NextResponse.json({ error: `ID inválido (${API_TAG})` }, { status: 400 });
       }
       return NextResponse.json({ error: 'Pedido não encontrado' }, { status: 404 });
     }
@@ -131,7 +133,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const id = parsePositiveInt(params.id);
-    if (!id) return NextResponse.json({ error: 'ID inválido' }, { status: 400 });
+    if (!id) return NextResponse.json({ error: `ID inválido (${API_TAG})` }, { status: 400 });
     const orderExists = await prisma.salesOrder.findUnique({ where: { id }, select: { id: true, customerDoc: true, clientId: true } });
     if (!orderExists) return NextResponse.json({ error: 'Pedido não encontrado' }, { status: 404 });
 
@@ -215,12 +217,12 @@ export async function DELETE(_: Request, { params }: { params: { id: string } })
     if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const rawKey = String(params.id ?? '').trim();
-    if (!rawKey) return NextResponse.json({ error: 'ID inválido' }, { status: 400 });
+    if (!rawKey) return NextResponse.json({ error: `ID inválido (${API_TAG})` }, { status: 400 });
 
     const orderKey = await resolveOrderKey(rawKey);
     if (!orderKey) {
       if (!/^[A-Za-z0-9-]+$/.test(rawKey) || rawKey.length > 32) {
-        return NextResponse.json({ error: 'ID inválido' }, { status: 400 });
+        return NextResponse.json({ error: `ID inválido (${API_TAG})` }, { status: 400 });
       }
       return NextResponse.json({ error: 'Pedido não encontrado' }, { status: 404 });
     }
