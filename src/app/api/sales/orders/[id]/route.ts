@@ -16,6 +16,29 @@ function parsePositiveInt(raw: unknown): number | null {
   return Math.trunc(n);
 }
 
+async function resolveOrderKey(rawKey: string): Promise<{ id: number; customerDoc: string | null; clientId: number | null } | null> {
+  const key = String(rawKey ?? '').trim();
+  if (!key) return null;
+  if (!/^[A-Za-z0-9-]+$/.test(key)) return null;
+
+  const numeric = parsePositiveInt(key);
+  if (numeric) {
+    const byId = await prisma.salesOrder.findUnique({
+      where: { id: numeric },
+      select: { id: true, customerDoc: true, clientId: true },
+    });
+    if (byId) return byId;
+  }
+
+  const code = key.toUpperCase();
+  if (code.length > 32) return null;
+  const byCode = await prisma.salesOrder.findFirst({
+    where: { code },
+    select: { id: true, customerDoc: true, clientId: true },
+  });
+  return byCode;
+}
+
 async function shouldRestrictToLinkedClients(userId: number): Promise<boolean> {
   const user = await prisma.user.findUnique({ where: { id: userId }, select: { salesRepAdmin: true, isSalesAdmin: true } });
   if (user?.isSalesAdmin) return false;
@@ -52,24 +75,17 @@ export async function GET(_: Request, { params }: { params: { id: string } }) {
     const rawKey = String(params.id ?? '').trim();
     if (!rawKey) return NextResponse.json({ error: 'ID inválido' }, { status: 400 });
 
-    let id = parsePositiveInt(rawKey);
-    let orderExists = id
-      ? await prisma.salesOrder.findUnique({ where: { id }, select: { id: true, customerDoc: true, clientId: true } })
-      : null;
-
-    if (!orderExists) {
-      const code = rawKey.toUpperCase();
-      const looksLikeCode = /^[A-Z]{1,10}\d{2,}$/.test(code);
-      if (!looksLikeCode) return NextResponse.json({ error: 'ID inválido' }, { status: 400 });
-
-      orderExists = await prisma.salesOrder.findFirst({ where: { code }, select: { id: true, customerDoc: true, clientId: true } });
-      if (orderExists?.id) id = Number(orderExists.id);
+    const orderKey = await resolveOrderKey(rawKey);
+    if (!orderKey) {
+      if (!/^[A-Za-z0-9-]+$/.test(rawKey) || rawKey.length > 32) {
+        return NextResponse.json({ error: 'ID inválido' }, { status: 400 });
+      }
+      return NextResponse.json({ error: 'Pedido não encontrado' }, { status: 404 });
     }
-
-    if (!orderExists || !id) return NextResponse.json({ error: 'Pedido não encontrado' }, { status: 404 });
+    const id = Number(orderKey.id);
 
     if (await shouldRestrictToLinkedClients(userId)) {
-      const ok = await canAccessOrder(userId, orderExists);
+      const ok = await canAccessOrder(userId, orderKey);
       if (!ok) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
@@ -201,24 +217,17 @@ export async function DELETE(_: Request, { params }: { params: { id: string } })
     const rawKey = String(params.id ?? '').trim();
     if (!rawKey) return NextResponse.json({ error: 'ID inválido' }, { status: 400 });
 
-    let id = parsePositiveInt(rawKey);
-    let orderExists = id
-      ? await prisma.salesOrder.findUnique({ where: { id }, select: { id: true, customerDoc: true, clientId: true } })
-      : null;
-
-    if (!orderExists) {
-      const code = rawKey.toUpperCase();
-      const looksLikeCode = /^[A-Z]{1,10}\d{2,}$/.test(code);
-      if (!looksLikeCode) return NextResponse.json({ error: 'ID inválido' }, { status: 400 });
-
-      orderExists = await prisma.salesOrder.findFirst({ where: { code }, select: { id: true, customerDoc: true, clientId: true } });
-      if (orderExists?.id) id = Number(orderExists.id);
+    const orderKey = await resolveOrderKey(rawKey);
+    if (!orderKey) {
+      if (!/^[A-Za-z0-9-]+$/.test(rawKey) || rawKey.length > 32) {
+        return NextResponse.json({ error: 'ID inválido' }, { status: 400 });
+      }
+      return NextResponse.json({ error: 'Pedido não encontrado' }, { status: 404 });
     }
-
-    if (!orderExists || !id) return NextResponse.json({ error: 'Pedido não encontrado' }, { status: 404 });
+    const id = Number(orderKey.id);
 
     if (await shouldRestrictToLinkedClients(userId)) {
-      const ok = await canAccessOrderByCustomerDoc(userId, orderExists.customerDoc);
+      const ok = await canAccessOrder(userId, orderKey);
       if (!ok) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
