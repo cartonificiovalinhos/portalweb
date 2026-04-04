@@ -435,12 +435,19 @@ export default function SalesOrderMaintenancePage() {
     const hardTimeout = setTimeout(() => {
       setError((prev) => prev ?? 'Tempo limite ao carregar o pedido. Tente novamente.');
       setLoading(false);
+      controller.abort();
     }, 30000);
+
+    const clearTimers = () => {
+      clearTimeout(timeout);
+      clearTimeout(hardTimeout);
+    };
 
     const load = async () => {
       if (!idKey) {
         setError('ID do pedido inválido na URL');
         setLoading(false);
+        clearTimers();
         return;
       }
 
@@ -462,6 +469,7 @@ export default function SalesOrderMaintenancePage() {
           setError(msg);
           setOrder(null);
           setOrderItems([]);
+          clearTimers();
           return;
         }
 
@@ -499,14 +507,14 @@ export default function SalesOrderMaintenancePage() {
         }
       } finally {
         setLoading(false);
+        clearTimers();
       }
     };
 
     load();
 
     return () => {
-      clearTimeout(timeout);
-      clearTimeout(hardTimeout);
+      clearTimers();
       controller.abort();
     };
   }, [idKey]);
