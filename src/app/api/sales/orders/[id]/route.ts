@@ -9,6 +9,17 @@ function normalizeDoc(doc: string): string {
   return (doc || '').replace(/\D+/g, '');
 }
 
+function extractTailParamFromPath(request: Request): string {
+  const { pathname } = new URL(request.url);
+  const parts = pathname.split('/').filter(Boolean);
+  const tail = parts.length > 0 ? parts[parts.length - 1] : '';
+  try {
+    return decodeURIComponent(tail);
+  } catch {
+    return tail;
+  }
+}
+
 function parsePositiveInt(raw: unknown): number | null {
   const s = String(raw ?? '').trim();
   const m = s.match(/^\d+/);
@@ -75,7 +86,7 @@ export async function GET(_: Request, { params }: { params: { id: string } }) {
     if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const rawParam = (params as any)?.id;
-    const rawKey = String(rawParam ?? '').trim();
+    const rawKey = String(rawParam ?? extractTailParamFromPath(_)).trim();
     if (!rawKey) return NextResponse.json({ error: `ID inválido (${API_TAG}) param="${String(rawParam)}" key="${rawKey}"` }, { status: 400 });
 
     const orderKey = await resolveOrderKey(rawKey);
@@ -133,7 +144,8 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     const userId = session?.user ? Number((session.user as any).id) : null;
     if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const id = parsePositiveInt(params.id);
+    const rawId = (params as any)?.id ?? extractTailParamFromPath(request);
+    const id = parsePositiveInt(rawId);
     if (!id) return NextResponse.json({ error: `ID inválido (${API_TAG})` }, { status: 400 });
     const orderExists = await prisma.salesOrder.findUnique({ where: { id }, select: { id: true, customerDoc: true, clientId: true } });
     if (!orderExists) return NextResponse.json({ error: 'Pedido não encontrado' }, { status: 404 });
@@ -218,7 +230,7 @@ export async function DELETE(_: Request, { params }: { params: { id: string } })
     if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const rawParam = (params as any)?.id;
-    const rawKey = String(rawParam ?? '').trim();
+    const rawKey = String(rawParam ?? extractTailParamFromPath(_)).trim();
     if (!rawKey) return NextResponse.json({ error: `ID inválido (${API_TAG}) param="${String(rawParam)}" key="${rawKey}"` }, { status: 400 });
 
     const orderKey = await resolveOrderKey(rawKey);
