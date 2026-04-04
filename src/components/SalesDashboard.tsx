@@ -303,28 +303,28 @@ export default function SalesDashboard() {
             <button
               type="button"
               onClick={() => setActiveGroupTab('FAMILY')}
-              className={`px-1 pb-1 text-sm ${activeGroupTab === 'FAMILY' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-600 hover:text-gray-900'}`}
+              className={`px-1 pb-1 text-sm ${activeGroupTab === 'FAMILY' ? 'text-blue-600 border-b-2 border-solid border-blue-600' : 'text-gray-600 hover:text-gray-900'}`}
             >
               Por Família
             </button>
             <button
               type="button"
               onClick={() => setActiveGroupTab('CUSTOMER')}
-              className={`px-1 pb-1 text-sm ${activeGroupTab === 'CUSTOMER' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-600 hover:text-gray-900'}`}
+              className={`px-1 pb-1 text-sm ${activeGroupTab === 'CUSTOMER' ? 'text-blue-600 border-b-2 border-solid border-blue-600' : 'text-gray-600 hover:text-gray-900'}`}
             >
               Por Cliente
             </button>
             <button
               type="button"
               onClick={() => setActiveGroupTab('REP')}
-              className={`px-1 pb-1 text-sm ${activeGroupTab === 'REP' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-600 hover:text-gray-900'}`}
+              className={`px-1 pb-1 text-sm ${activeGroupTab === 'REP' ? 'text-blue-600 border-b-2 border-solid border-blue-600' : 'text-gray-600 hover:text-gray-900'}`}
             >
               Por Representante
             </button>
             <button
               type="button"
               onClick={() => setActiveGroupTab('REGION')}
-              className={`px-1 pb-1 text-sm ${activeGroupTab === 'REGION' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-600 hover:text-gray-900'}`}
+              className={`px-1 pb-1 text-sm ${activeGroupTab === 'REGION' ? 'text-blue-600 border-b-2 border-solid border-blue-600' : 'text-gray-600 hover:text-gray-900'}`}
             >
               Por Região
             </button>

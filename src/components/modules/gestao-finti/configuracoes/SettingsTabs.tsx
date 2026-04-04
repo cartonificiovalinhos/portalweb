@@ -39,7 +39,7 @@ export function SettingsTabs({
                   key={tab}
                   onClick={() => setActiveTab(id)}
                   className={`
-                    whitespace-nowrap border-b-2 py-4 px-1 text-sm font-medium
+                    whitespace-nowrap border-b-2 border-solid py-4 px-1 text-sm font-medium
                     ${activeTab === id
                       ? "border-blue-500 text-blue-600"
                       : "border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700"}

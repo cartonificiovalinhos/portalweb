@@ -449,7 +449,7 @@ export default function ClientDetailsPage() {
             <li className="mr-2">
               <button
                 onClick={() => setActiveTab("orders")}
-                className={`inline-block px-3 py-2 border-b-2 rounded-t-lg transition-colors duration-200 ${
+                className={`inline-block px-3 py-2 border-b-2 border-solid rounded-t-lg transition-colors duration-200 ${
                   activeTab === "orders"
                     ? "text-blue-600 border-blue-600 active group-hover:text-blue-600"
                     : "border-transparent hover:text-gray-600 hover:border-gray-300"
@@ -462,7 +462,7 @@ export default function ClientDetailsPage() {
             <li className="mr-2">
               <button
                 onClick={() => setActiveTab("paymentTerms")}
-                className={`inline-block px-3 py-2 border-b-2 rounded-t-lg transition-colors duration-200 ${
+                className={`inline-block px-3 py-2 border-b-2 border-solid rounded-t-lg transition-colors duration-200 ${
                   activeTab === "paymentTerms"
                     ? "text-blue-600 border-blue-600 active group-hover:text-blue-600"
                     : "border-transparent hover:text-gray-600 hover:border-gray-300"
@@ -475,7 +475,7 @@ export default function ClientDetailsPage() {
             <li className="mr-2">
               <button
                 onClick={() => setActiveTab("linkedItems")}
-                className={`inline-block px-3 py-2 border-b-2 rounded-t-lg transition-colors duration-200 ${
+                className={`inline-block px-3 py-2 border-b-2 border-solid rounded-t-lg transition-colors duration-200 ${
                   activeTab === "linkedItems"
                     ? "text-blue-600 border-blue-600 active group-hover:text-blue-600"
                     : "border-transparent hover:text-gray-600 hover:border-gray-300"
