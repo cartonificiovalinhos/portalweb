@@ -1,6 +1,103 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '../../../../../lib/prisma';
 
+function normalizeDoc(doc: string): string {
+  return (doc || '').replace(/\D+/g, '');
+}
+
+export async function GET(request: Request, { params }: { params: { id: string } }) {
+  try {
+    const clientId = Number(params.id);
+    if (!Number.isFinite(clientId) || clientId <= 0) return NextResponse.json([]);
+
+    const url = new URL(request.url);
+    const q = (url.searchParams.get('q') || '').trim().toLowerCase();
+
+    const client = await prisma.client.findUnique({
+      where: { id: clientId },
+      select: { id: true, doc: true },
+    }).catch(() => null);
+    if (!client) return NextResponse.json([]);
+
+    const links = await prisma.clientItem.findMany({
+      where: { clientId: client.id, allowed: true },
+      include: { inventoryItem: { include: { commercialFamily: true } } }
+    });
+
+    let items = links.map((l) => ({
+      id: l.inventoryItem.id,
+      sku: l.inventoryItem.sku,
+      name: l.inventoryItem.name,
+      unit: l.unit ?? l.inventoryItem.unit,
+      commercialFamily: l.inventoryItem.commercialFamily,
+      unitPrice: l.unitPrice,
+      width: l.inventoryItem.width,
+      length: l.inventoryItem.length,
+      grammage: l.inventoryItem.grammage
+    }));
+
+    if (items.length === 0) {
+      const docDigits = normalizeDoc(String(client.doc || ''));
+      const docRaw = String(client.doc || '').trim();
+      const whereDoc = docDigits
+        ? { OR: [{ customerDoc: docDigits }, ...(docRaw ? [{ customerDoc: docRaw }] : [])] }
+        : docRaw
+        ? { customerDoc: docRaw }
+        : null;
+
+      if (whereDoc) {
+        const orders = await prisma.salesOrder.findMany({
+          where: whereDoc as any,
+          include: {
+            items: {
+              include: {
+                inventoryItem: { include: { commercialFamily: true } }
+              }
+            }
+          },
+          orderBy: { createdAt: 'desc' },
+          take: 50
+        }).catch(() => []);
+
+        const byInvId = new Map<number, any>();
+        for (const o of orders || []) {
+          const orderItems: any[] = Array.isArray((o as any).items) ? (o as any).items : [];
+          for (const it of orderItems) {
+            const inv = it?.inventoryItem;
+            const invId = Number(inv?.id);
+            if (!Number.isFinite(invId) || invId <= 0) continue;
+            if (byInvId.has(invId)) continue;
+            byInvId.set(invId, {
+              id: invId,
+              sku: inv?.sku ?? null,
+              name: String(inv?.name || it?.name || ''),
+              unit: inv?.unit ?? it?.unit ?? null,
+              commercialFamily: inv?.commercialFamily ?? null,
+              unitPrice: Number(it?.unitPrice ?? inv?.unitPrice ?? 0),
+              width: inv?.width ?? it?.width ?? null,
+              length: inv?.length ?? it?.length ?? null,
+              grammage: inv?.grammage ?? it?.grammage ?? null
+            });
+          }
+        }
+        items = Array.from(byInvId.values());
+      }
+    }
+
+    const filtered = q
+      ? items.filter((it: any) => {
+          const name = String(it?.name || '').toLowerCase();
+          const sku = String(it?.sku || '').toLowerCase();
+          return name.includes(q) || sku.includes(q);
+        })
+      : items;
+
+    return NextResponse.json(filtered);
+  } catch (err: any) {
+    return NextResponse.json({ error: String(err?.message || err) }, { status: 500 });
+  }
+}
+
 // Upsert vínculo de item para cliente (usado pelo ERP)
 export async function POST(request: Request, { params }: { params: { id: string } }) {
   try {

@@ -185,15 +185,15 @@ export default function ClientDetailsPage() {
           } else {
             setOrders([]);
           }
-          const li = await fetch(`/api/clients/items/by-doc/${encodeURIComponent(normalizeDoc(c.doc))}`, { cache: 'no-store' });
-          if (li.ok) {
-            const linked: LinkedItem[] = await li.json();
-            setLinkedItems(Array.isArray(linked) ? linked : []);
-          } else {
-            setLinkedItems([]);
-          }
         } else {
           setOrders([]);
+        }
+
+        const li = await fetch(`/api/clients/${encodeURIComponent(String(id))}/items`, { cache: 'no-store' });
+        if (li.ok) {
+          const linked: LinkedItem[] = await li.json();
+          setLinkedItems(Array.isArray(linked) ? linked : []);
+        } else {
           setLinkedItems([]);
         }
       } catch (e: any) {

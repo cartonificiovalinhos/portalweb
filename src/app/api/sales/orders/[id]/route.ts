@@ -7,6 +7,15 @@ function normalizeDoc(doc: string): string {
   return (doc || '').replace(/\D+/g, '');
 }
 
+function parsePositiveInt(raw: unknown): number | null {
+  const s = String(raw ?? '').trim();
+  const m = s.match(/^\d+/);
+  if (!m) return null;
+  const n = Number(m[0]);
+  if (!Number.isFinite(n) || n <= 0) return null;
+  return Math.trunc(n);
+}
+
 async function shouldRestrictToLinkedClients(userId: number): Promise<boolean> {
   const user = await prisma.user.findUnique({ where: { id: userId }, select: { salesRepAdmin: true, isSalesAdmin: true } });
   if (user?.isSalesAdmin) return false;
@@ -31,8 +40,8 @@ export async function GET(_: Request, { params }: { params: { id: string } }) {
     const userId = session?.user ? Number((session.user as any).id) : null;
     if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const id = Number(params.id);
-    if (!Number.isFinite(id) || id <= 0) {
+    const id = parsePositiveInt(params.id);
+    if (!id) {
       return NextResponse.json({ error: 'ID inválido' }, { status: 400 });
     }
 
@@ -85,7 +94,8 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     const userId = session?.user ? Number((session.user as any).id) : null;
     if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const id = Number(params.id);
+    const id = parsePositiveInt(params.id);
+    if (!id) return NextResponse.json({ error: 'ID inválido' }, { status: 400 });
     const orderExists = await prisma.salesOrder.findUnique({ where: { id }, select: { id: true, customerDoc: true } });
     if (!orderExists) return NextResponse.json({ error: 'Pedido não encontrado' }, { status: 404 });
 
@@ -168,7 +178,8 @@ export async function DELETE(_: Request, { params }: { params: { id: string } })
     const userId = session?.user ? Number((session.user as any).id) : null;
     if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const id = Number(params.id);
+    const id = parsePositiveInt(params.id);
+    if (!id) return NextResponse.json({ error: 'ID inválido' }, { status: 400 });
     const orderExists = await prisma.salesOrder.findUnique({ where: { id }, select: { id: true, customerDoc: true } });
     if (!orderExists) return NextResponse.json({ error: 'Pedido não encontrado' }, { status: 404 });
 
