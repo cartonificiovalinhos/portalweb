@@ -36,6 +36,8 @@ type SalesOrder = {
 type LinkedItem = { id: number; name: string; sku?: string | null; unit?: string | null; unitPrice?: number; width?: number; length?: number; grammage?: number };
 type CartItem = { id: number; inventoryItemId: number; name: string; sku?: string | null; unit?: string | null; quantity: number; unitPrice: number };
 
+const normalizeDoc = (doc?: string | null) => String(doc || '').replace(/\D+/g, '');
+
 const statusColor = (s: string) => {
   const v = (s || '').trim();
   switch (v) {
@@ -183,7 +185,7 @@ export default function ClientDetailsPage() {
           } else {
             setOrders([]);
           }
-          const li = await fetch(`/api/clients/items/by-doc/${encodeURIComponent(c.doc)}`, { cache: 'no-store' });
+          const li = await fetch(`/api/clients/items/by-doc/${encodeURIComponent(normalizeDoc(c.doc))}`, { cache: 'no-store' });
           if (li.ok) {
             const linked: LinkedItem[] = await li.json();
             setLinkedItems(Array.isArray(linked) ? linked : []);
