@@ -74,13 +74,14 @@ export async function GET(_: Request, { params }: { params: { id: string } }) {
     const userId = session?.user ? Number((session.user as any).id) : null;
     if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const rawKey = String(params.id ?? '').trim();
-    if (!rawKey) return NextResponse.json({ error: `ID inválido (${API_TAG})` }, { status: 400 });
+    const rawParam = (params as any)?.id;
+    const rawKey = String(rawParam ?? '').trim();
+    if (!rawKey) return NextResponse.json({ error: `ID inválido (${API_TAG}) param="${String(rawParam)}" key="${rawKey}"` }, { status: 400 });
 
     const orderKey = await resolveOrderKey(rawKey);
     if (!orderKey) {
       if (!/^[A-Za-z0-9-]+$/.test(rawKey) || rawKey.length > 32) {
-        return NextResponse.json({ error: `ID inválido (${API_TAG})` }, { status: 400 });
+        return NextResponse.json({ error: `ID inválido (${API_TAG}) param="${String(rawParam)}" key="${rawKey}"` }, { status: 400 });
       }
       return NextResponse.json({ error: 'Pedido não encontrado' }, { status: 404 });
     }
@@ -216,13 +217,14 @@ export async function DELETE(_: Request, { params }: { params: { id: string } })
     const userId = session?.user ? Number((session.user as any).id) : null;
     if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const rawKey = String(params.id ?? '').trim();
-    if (!rawKey) return NextResponse.json({ error: `ID inválido (${API_TAG})` }, { status: 400 });
+    const rawParam = (params as any)?.id;
+    const rawKey = String(rawParam ?? '').trim();
+    if (!rawKey) return NextResponse.json({ error: `ID inválido (${API_TAG}) param="${String(rawParam)}" key="${rawKey}"` }, { status: 400 });
 
     const orderKey = await resolveOrderKey(rawKey);
     if (!orderKey) {
       if (!/^[A-Za-z0-9-]+$/.test(rawKey) || rawKey.length > 32) {
-        return NextResponse.json({ error: `ID inválido (${API_TAG})` }, { status: 400 });
+        return NextResponse.json({ error: `ID inválido (${API_TAG}) param="${String(rawParam)}" key="${rawKey}"` }, { status: 400 });
       }
       return NextResponse.json({ error: 'Pedido não encontrado' }, { status: 404 });
     }
