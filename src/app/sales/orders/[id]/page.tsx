@@ -482,7 +482,7 @@ export default function SalesOrderMaintenancePage() {
           try {
             const docDigits = String(data.customerDoc || '').replace(/\D+/g, '');
             if (docDigits) {
-              const cRes = await fetch(`/api/base/clients?q=${encodeURIComponent(docDigits)}`);
+              const cRes = await fetch(`/api/base/clients?q=${encodeURIComponent(docDigits)}`, { cache: 'no-store', signal: controller.signal });
               const cArr = await cRes.json();
               if (Array.isArray(cArr)) {
                 const match = cArr.find((x: any) => String(x?.doc || '').replace(/\D+/g, '') === docDigits) || cArr[0];
