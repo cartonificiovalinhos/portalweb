@@ -122,6 +122,8 @@ export async function POST(request: Request) {
   const data: any = { name: String(body.name || '').trim() };
   if (body.sku !== undefined) data.sku = String(body.sku || '').trim();
   if (body.unit !== undefined) data.unit = String(body.unit || '').trim();
+  if (body.quantity !== undefined) data.quantity = Number(body.quantity);
+  if (body.minStock !== undefined) data.minStock = Number(body.minStock);
   if (body.width !== undefined) data.width = Number(body.width);
   if (body.length !== undefined) data.length = Number(body.length);
   if (body.grammage !== undefined) data.grammage = Number(body.grammage);

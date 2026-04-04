@@ -495,7 +495,7 @@ export default function BaseItemMaintenancePage() {
                             <td className="p-2 text-center">
                               <input type="checkbox" checked={m.allowed} onChange={async (ev) => {
                                 try {
-                                  const res = await fetch(`/api/inventory/${editingId}/availability`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ entityId: activeEntityId, moduleId: m.moduleId, allowed: ev.target.checked }) });
+                                  const res = await fetch(`/api/items/${editingId}/availability`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ entityId: activeEntityId, moduleId: m.moduleId, allowed: ev.target.checked }) });
                                   const ok = res.ok;
                                   if (!ok) { const d = await res.json().catch(()=>({})); throw new Error(d?.error || `Erro ${res.status}`); }
                                   // Atualizar estado

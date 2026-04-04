@@ -9,7 +9,7 @@ export default function InventoryPage() {
 
   const load = () => {
     setLoading(true);
-    fetch("/api/inventory")
+    fetch("/api/items")
       .then((r) => safeParseJson(r, []))
       .then((data) => setItems(Array.isArray(data) ? data : []))
       .finally(() => setLoading(false));
@@ -21,7 +21,7 @@ export default function InventoryPage() {
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    await fetch("/api/inventory", {
+    await fetch("/api/items", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(form),

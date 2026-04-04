@@ -33,7 +33,7 @@ export default function DashboardCards() {
     Promise.all([
       safeFetch("/api/work-orders"),
       safeFetch("/api/assets"),
-      safeFetch("/api/inventory"),
+      safeFetch("/api/items"),
     ])
       .then(([wo, assets, inventory]) => {
         const workOrders = Array.isArray(wo) ? wo : [];
