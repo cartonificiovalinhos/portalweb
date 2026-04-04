@@ -28,9 +28,16 @@ export default function AdminEntitiesPage() {
       const res = await fetch('/api/admin/entities');
       if (!res.ok) throw new Error((await res.json()).error || `Erro ${res.status}`);
       const data = await res.json();
-      setEntities(data.entities || []);
-      const firstId = data.entities?.[0]?.id ?? null;
-      setSelectedEntityId((prev) => prev ?? firstId);
+      const normalized: Entity[] = (Array.isArray(data.entities) ? data.entities : [])
+        .map((e: any) => ({
+          id: Number(e?.id),
+          name: String(e?.name || ''),
+          cnpj: String(e?.cnpj || ''),
+        }))
+        .filter((e: any) => Number.isFinite(e.id) && e.id > 0);
+      setEntities(normalized);
+      const firstId = normalized[0]?.id ?? null;
+      setSelectedEntityId((prev) => (prev && prev > 0 ? prev : firstId));
     } catch (e: any) {
       setErr(e?.message || String(e));
     } finally { setLoading(false); }
@@ -252,7 +259,7 @@ export default function AdminEntitiesPage() {
           </div>
           <div className="space-y-2">
             {entities.map(e => (
-              <button key={e.id} onClick={() => setSelectedEntityId(e.id)} className={`w-full text-left px-2 py-1 rounded ${selectedEntityId===e.id?'bg-blue-50 border border-blue-200':'hover:bg-gray-50 border'}`}>
+              <button key={e.id} onClick={() => setSelectedEntityId(Number(e.id))} className={`w-full text-left px-2 py-1 rounded ${selectedEntityId===e.id?'bg-blue-50 border border-blue-200':'hover:bg-gray-50 border'}`}>
                 <div className="text-sm font-medium">{e.name}</div>
                 <div className="text-xs text-gray-500">{e.cnpj}</div>
               </button>

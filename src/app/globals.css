@@ -7,6 +7,9 @@
 html, body, #__next { height: 100%; }
 body { background-color: #f9fafb; }
 
+button:not(:disabled) { cursor: pointer; }
+button:disabled { cursor: not-allowed; }
+
 .sidebar-scroll {
   scrollbar-width: thin;
   scrollbar-color: #374151 #111827;

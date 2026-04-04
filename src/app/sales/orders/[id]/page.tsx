@@ -442,6 +442,10 @@ export default function SalesOrderMaintenancePage() {
 
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 20000);
+      const hardTimeout = setTimeout(() => {
+        setError((prev) => prev ?? 'Tempo limite ao carregar o pedido. Tente novamente.');
+        setLoading(false);
+      }, 30000);
 
       try {
         const res = await fetch(`/api/sales/orders/${encodeURIComponent(idKey)}`, { cache: 'no-store', signal: controller.signal });
@@ -495,6 +499,7 @@ export default function SalesOrderMaintenancePage() {
         }
       } finally {
         clearTimeout(timeout);
+        clearTimeout(hardTimeout);
         setLoading(false);
       }
     };
