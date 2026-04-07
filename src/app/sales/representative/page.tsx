@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 type User = { id: number; name: string; email: string };
 type Client = { id: number; doc?: string; name: string; cidade?: string; estado?: string };
+type BasePriceRow = { sku: string; salesRepKey: string; unit: string; unitPrice: number };
 
 export default function RepresentativePage() {
   const [users, setUsers] = useState<User[]>([]);
@@ -13,6 +14,8 @@ export default function RepresentativePage() {
   const [linked, setLinked] = useState<Client[]>([]);
   const [clientQuery, setClientQuery] = useState("");
   const [mode, setMode] = useState<"all" | "linked" | "unlinked">("linked");
+  const [activeTab, setActiveTab] = useState<"clients" | "basePrice">("clients");
+  const [basePrices, setBasePrices] = useState<BasePriceRow[]>([]);
 
   const filteredUsers = useMemo(() => {
     const q = userQuery.trim().toLowerCase();
@@ -98,6 +101,7 @@ export default function RepresentativePage() {
     }
   };
 
+  const fmtCurrency = useCallback((n: number) => n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }), []);
   
 
   return (
@@ -133,49 +137,116 @@ export default function RepresentativePage() {
         </div>
       </div>
 
-      <div className="space-y-3">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-2 items-end">
-          <div>
-            <label className="text-xs text-gray-600">Filtro</label>
-            <input value={clientQuery} onChange={(e)=>setClientQuery(e.target.value)} placeholder="Nome, CNPJ/CPF, cidade ou estado" className="w-full border rounded px-3 py-2" />
-          </div>
-          <div>
-            <label className="text-xs text-gray-600">Exibição</label>
-            <select value={mode} onChange={(e)=>setMode(e.target.value as any)} className="w-full border rounded px-3 py-2">
-              <option value="all">Todos</option>
-              <option value="linked">Vinculados</option>
-              <option value="unlinked">Não vinculados</option>
-            </select>
-          </div>
+      <div className="mt-4">
+        <div className="border-b border-gray-200">
+          <nav className="-mb-px flex space-x-8" aria-label="Abas">
+            <button
+              type="button"
+              onClick={() => setActiveTab("clients")}
+              className={`
+                whitespace-nowrap border-b-2 border-solid py-3 px-1 text-sm font-medium
+                ${activeTab === "clients"
+                  ? "border-blue-500 text-blue-600"
+                  : "border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700"}
+              `}
+            >
+              Clientes
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab("basePrice")}
+              className={`
+                whitespace-nowrap border-b-2 border-solid py-3 px-1 text-sm font-medium
+                ${activeTab === "basePrice"
+                  ? "border-blue-500 text-blue-600"
+                  : "border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700"}
+              `}
+            >
+              Preço Base
+            </button>
+          </nav>
         </div>
 
-        <div className="border rounded">
-          <table className="min-w-full text-sm">
-            <thead>
-              <tr className="bg-gray-50 text-left">
-                <th className="p-2 w-10"><input type="checkbox" checked={displayClients.length > 0 && displayClients.every((c:any)=>c.isLinked)} onChange={(e)=>toggleAllVisible(e.target.checked)} /></th>
-                <th className="p-2">Cliente</th>
-                <th className="p-2">CNPJ/CPF</th>
-                <th className="p-2">Cidade</th>
-                <th className="p-2">Estado</th>
-              </tr>
-            </thead>
-            <tbody>
-              {displayClients.map((c:any) => (
-                <tr key={c.id} className="border-b">
-                  <td className="p-2 text-center"><input type="checkbox" checked={c.isLinked} onChange={(e)=>toggleRow(c, e.target.checked)} disabled={!selectedUserId} /></td>
-                  <td className="p-2">{c.name}</td>
-                  <td className="p-2">{c.doc || ''}</td>
-                  <td className="p-2">{c.cidade || ''}</td>
-                  <td className="p-2">{c.estado || ''}</td>
-                </tr>
-              ))}
-              {displayClients.length === 0 && (
-                <tr><td colSpan={5} className="p-2 text-gray-500">Nenhum cliente</td></tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+        {activeTab === "clients" ? (
+          <div className="mt-3 space-y-3">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-2 items-end">
+              <div>
+                <label className="text-xs text-gray-600">Filtro</label>
+                <input value={clientQuery} onChange={(e)=>setClientQuery(e.target.value)} placeholder="Nome, CNPJ/CPF, cidade ou estado" className="w-full border rounded px-3 py-2" />
+              </div>
+              <div>
+                <label className="text-xs text-gray-600">Exibição</label>
+                <select value={mode} onChange={(e)=>setMode(e.target.value as any)} className="w-full border rounded px-3 py-2">
+                  <option value="all">Todos</option>
+                  <option value="linked">Vinculados</option>
+                  <option value="unlinked">Não vinculados</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="border rounded">
+              <table className="min-w-full text-sm">
+                <thead>
+                  <tr className="bg-gray-50 text-left">
+                    <th className="p-2 w-10"><input type="checkbox" checked={displayClients.length > 0 && displayClients.every((c:any)=>c.isLinked)} onChange={(e)=>toggleAllVisible(e.target.checked)} /></th>
+                    <th className="p-2">Cliente</th>
+                    <th className="p-2">CNPJ/CPF</th>
+                    <th className="p-2">Cidade</th>
+                    <th className="p-2">Estado</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {displayClients.map((c:any) => (
+                    <tr key={c.id} className="border-b">
+                      <td className="p-2 text-center"><input type="checkbox" checked={c.isLinked} onChange={(e)=>toggleRow(c, e.target.checked)} disabled={!selectedUserId} /></td>
+                      <td className="p-2">{c.name}</td>
+                      <td className="p-2">{c.doc || ''}</td>
+                      <td className="p-2">{c.cidade || ''}</td>
+                      <td className="p-2">{c.estado || ''}</td>
+                    </tr>
+                  ))}
+                  {displayClients.length === 0 && (
+                    <tr><td colSpan={5} className="p-2 text-gray-500">Nenhum cliente</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        ) : (
+          <div className="mt-3 space-y-3">
+            <div className="border rounded">
+              <table className="min-w-full text-sm">
+                <thead>
+                  <tr className="bg-gray-50 text-left">
+                    <th className="p-2">SKU</th>
+                    <th className="p-2">Chave Rep.</th>
+                    <th className="p-2">UN</th>
+                    <th className="p-2 text-right">Preço Unitário</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {basePrices.map((r) => (
+                    <tr key={`${r.sku}::${r.salesRepKey}::${r.unit}`} className="border-b">
+                      <td className="p-2 font-mono">{r.sku}</td>
+                      <td className="p-2 font-mono">{r.salesRepKey}</td>
+                      <td className="p-2">{r.unit}</td>
+                      <td className="p-2 text-right">{fmtCurrency(r.unitPrice)}</td>
+                    </tr>
+                  ))}
+                  {basePrices.length === 0 && (
+                    <tr>
+                      <td colSpan={4} className="p-2 text-gray-500">Nenhum preço base</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {selectedUserId && basePrices.length === 0 && (
+              <div className="text-xs text-gray-500">Representante selecionado: {selectedUserId}</div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
