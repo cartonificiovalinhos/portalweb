@@ -24,8 +24,16 @@ export async function GET(request: Request, props: { params: Promise<{ id: strin
     if (!client) return NextResponse.json([]);
 
     if (mode === 'unlinked') {
+      const repLinks = await prisma.userClientRep.findMany({
+        where: { clientId: client.id },
+        select: { userId: true },
+      });
+      const repUserIds = Array.from(new Set(repLinks.map((x) => Number(x.userId)).filter((x) => Number.isFinite(x) && x > 0)));
+      if (repUserIds.length === 0) return NextResponse.json([]);
+
       const where: any = {
         clientItems: { none: { clientId: client.id, allowed: true } },
+        userInventoryItemPrices: { some: { userId: { in: repUserIds } } },
       };
       if (q) {
         where.OR = [
