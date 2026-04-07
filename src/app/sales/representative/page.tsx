@@ -241,10 +241,6 @@ export default function RepresentativePage() {
                 </tbody>
               </table>
             </div>
-
-            {selectedUserId && basePrices.length === 0 && (
-              <div className="text-xs text-gray-500">Representante selecionado: {selectedUserId}</div>
-            )}
           </div>
         )}
       </div>
