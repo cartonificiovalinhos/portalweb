@@ -13,12 +13,48 @@ export async function GET(request: Request, props: { params: Promise<{ id: strin
 
     const url = new URL(request.url);
     const q = (url.searchParams.get('q') || '').trim().toLowerCase();
+    const mode = (url.searchParams.get('mode') || '').trim().toLowerCase();
+    const takeRaw = Number(url.searchParams.get('take') || 200);
+    const take = Number.isFinite(takeRaw) ? Math.min(200, Math.max(1, takeRaw)) : 200;
 
     const client = await prisma.client.findUnique({
       where: { id: clientId },
       select: { id: true, doc: true },
     }).catch(() => null);
     if (!client) return NextResponse.json([]);
+
+    if (mode === 'unlinked') {
+      const where: any = {
+        clientItems: { none: { clientId: client.id, allowed: true } },
+      };
+      if (q) {
+        where.OR = [
+          { name: { contains: q, mode: 'insensitive' } },
+          { sku: { contains: q, mode: 'insensitive' } },
+        ];
+      }
+
+      const items = await prisma.inventoryItem.findMany({
+        where,
+        include: { commercialFamily: true },
+        orderBy: { name: 'asc' },
+        take,
+      });
+
+      return NextResponse.json(
+        items.map((it) => ({
+          id: it.id,
+          sku: it.sku,
+          name: it.name,
+          unit: it.unit,
+          commercialFamily: it.commercialFamily,
+          unitPrice: null,
+          width: it.width,
+          length: it.length,
+          grammage: it.grammage,
+        }))
+      );
+    }
 
     const links = await prisma.clientItem.findMany({
       where: { clientId: client.id, allowed: true },
@@ -107,6 +143,80 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
     if (!Number.isFinite(clientId) || clientId <= 0) return NextResponse.json({ error: 'clientId inválido' }, { status: 400 });
 
     const rawBody = await request.json();
+    if (rawBody && typeof rawBody === 'object' && !Array.isArray(rawBody) && typeof (rawBody as any).action === 'string') {
+      const action = String((rawBody as any).action || '').trim();
+
+      if (action === 'unlink') {
+        const inventoryItemIdsRaw = (rawBody as any).inventoryItemIds;
+        const inventoryItemIds = Array.isArray(inventoryItemIdsRaw)
+          ? inventoryItemIdsRaw.map((x: any) => Number(x)).filter((x: number) => Number.isFinite(x) && x > 0)
+          : [];
+        if (!inventoryItemIds.length) return NextResponse.json({ error: 'inventoryItemIds é obrigatório' }, { status: 400 });
+
+        const del = await prisma.clientItem.deleteMany({
+          where: { clientId, inventoryItemId: { in: inventoryItemIds } },
+        });
+        return NextResponse.json({ ok: true, deletedCount: del.count });
+      }
+
+      if (action === 'applyAdjust') {
+        const repUserId = Number((rawBody as any).repUserId);
+        const percent = Number((rawBody as any).percent);
+        if (!Number.isFinite(repUserId) || repUserId <= 0) return NextResponse.json({ error: 'repUserId inválido' }, { status: 400 });
+        if (!Number.isFinite(percent)) return NextResponse.json({ error: 'percent inválido' }, { status: 400 });
+
+        const multiplier = 1 + percent / 100;
+        const clientItems = await prisma.clientItem.findMany({
+          where: { clientId, allowed: true },
+          select: {
+            id: true,
+            inventoryItemId: true,
+            unit: true,
+            inventoryItem: { select: { unit: true } },
+          },
+        });
+
+        const invIds = Array.from(new Set(clientItems.map((x) => x.inventoryItemId)));
+        if (!invIds.length) return NextResponse.json({ ok: true, updatedCount: 0, skippedCount: 0 });
+
+        const basePrices = await prisma.userInventoryItemPrice.findMany({
+          where: { userId: repUserId, inventoryItemId: { in: invIds } },
+          select: { inventoryItemId: true, unit: true, unitPrice: true },
+        });
+
+        const basePriceMap = new Map<string, number>();
+        for (const bp of basePrices) {
+          const unit = String(bp.unit || '').trim();
+          if (!unit) continue;
+          basePriceMap.set(`${bp.inventoryItemId}::${unit}`, Number(bp.unitPrice ?? 0));
+        }
+
+        let updatedCount = 0;
+        let skippedCount = 0;
+        await prisma.$transaction(async (tx) => {
+          for (const row of clientItems) {
+            const unit = String(row.unit ?? row.inventoryItem?.unit ?? '').trim();
+            if (!unit) {
+              skippedCount += 1;
+              continue;
+            }
+            const base = basePriceMap.get(`${row.inventoryItemId}::${unit}`) ?? null;
+            if (!base || base <= 0) {
+              skippedCount += 1;
+              continue;
+            }
+
+            await tx.clientItem.update({
+              where: { id: row.id },
+              data: { unitPrice: base * multiplier },
+            });
+            updatedCount += 1;
+          }
+        });
+
+        return NextResponse.json({ ok: true, updatedCount, skippedCount });
+      }
+    }
     const isArrayPayload = Array.isArray(rawBody);
     const items = isArrayPayload ? rawBody : [rawBody];
     const results: any[] = [];

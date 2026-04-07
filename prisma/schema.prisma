@@ -27,6 +27,7 @@ model User {
   userClientReps     UserClientRep[]
   userEntities       UserEntity[]
   assignedWorkOrders WorkOrder[]
+  userInventoryItemPrices UserInventoryItemPrice[]
 
   // Gestão FinTI Relations
   gestaoFintiCategoriasCriadas       GestaoFintiCategoria[]   @relation("GestaoFintiCategoriaCriadoPor")
@@ -93,6 +94,7 @@ model InventoryItem {
   // Vínculos por cliente e carrinho
   clientItems     ClientItem[]
   clientCartItems ClientCartItem[]
+  userInventoryItemPrices UserInventoryItemPrice[]
 
   @@map("inventoryitem")
 }
@@ -466,6 +468,24 @@ model UserClientRep {
 
   @@unique([userId, clientId])
   @@map("userclientrep")
+}
+
+model UserInventoryItemPrice {
+  id              Int           @id @default(autoincrement())
+  userId          Int
+  inventoryItemId Int
+  unit            String
+  unitPrice       Float         @default(0)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  inventoryItem InventoryItem @relation(fields: [inventoryItemId], references: [id])
+
+  @@unique([userId, inventoryItemId, unit])
+  @@index([userId])
+  @@index([inventoryItemId])
+  @@map("userinventoryitemprice")
 }
 
 model Complaint {

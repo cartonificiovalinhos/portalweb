@@ -35,6 +35,8 @@ type SalesOrder = {
 };
 type LinkedItem = { id: number; name: string; sku?: string | null; unit?: string | null; unitPrice?: number; width?: number; length?: number; grammage?: number };
 type CartItem = { id: number; inventoryItemId: number; name: string; sku?: string | null; unit?: string | null; quantity: number; unitPrice: number };
+type Representative = { id: number; name: string };
+type BasePriceRow = { inventoryItemId: number; unit: string; unitPrice: number };
 
 const normalizeDoc = (doc?: string | null) => String(doc || '').replace(/\D+/g, '');
 
@@ -143,8 +145,28 @@ export default function ClientDetailsPage() {
   const [ordersPage, setOrdersPage] = useState(0);
   const [paymentTermsPage, setPaymentTermsPage] = useState(0);
   const [linkedItemsPage, setLinkedItemsPage] = useState(0);
+  const [itemsSubTab, setItemsSubTab] = useState<"linked" | "unlinked">("linked");
+  const [unlinkedItems, setUnlinkedItems] = useState<LinkedItem[]>([]);
+  const [selectedLinkedItemIds, setSelectedLinkedItemIds] = useState<number[]>([]);
+  const [basePriceRep, setBasePriceRep] = useState<Representative | null>(null);
+  const [basePrices, setBasePrices] = useState<Record<string, number>>({});
+  const [adjustPercent, setAdjustPercent] = useState<string>("");
+  const [loadingUnlinkedItems, setLoadingUnlinkedItems] = useState(false);
+  const [loadingBasePrices, setLoadingBasePrices] = useState(false);
+  const [unlinking, setUnlinking] = useState(false);
+  const [applyingAdjust, setApplyingAdjust] = useState(false);
 
   const PAGE_SIZE = 20;
+
+  const refreshLinkedItems = useCallback(async () => {
+    const li = await fetch(`/api/clients/${encodeURIComponent(String(id))}/items`, { cache: 'no-store' });
+    if (li.ok) {
+      const linked: LinkedItem[] = await li.json();
+      setLinkedItems(Array.isArray(linked) ? linked : []);
+    } else {
+      setLinkedItems([]);
+    }
+  }, [id]);
 
   const refreshCart = useCallback(async () => {
     if (!client) return;
@@ -188,26 +210,23 @@ export default function ClientDetailsPage() {
         } else {
           setOrders([]);
         }
-
-        const li = await fetch(`/api/clients/${encodeURIComponent(String(id))}/items`, { cache: 'no-store' });
-        if (li.ok) {
-          const linked: LinkedItem[] = await li.json();
-          setLinkedItems(Array.isArray(linked) ? linked : []);
-        } else {
-          setLinkedItems([]);
-        }
+        await refreshLinkedItems();
       } catch (e: any) {
         setError(e?.message || String(e));
       } finally { setLoading(false); }
     };
     if (Number.isFinite(id)) load();
-  }, [id]);
+  }, [id, refreshLinkedItems]);
 
   useEffect(() => {
     if (client) {
         refreshCart();
     }
   }, [client, refreshCart]);
+
+  useEffect(() => {
+    setSelectedLinkedItemIds([]);
+  }, [linkedItems]);
 
   useEffect(() => {
     const last = Math.max(0, Math.ceil(orders.length / PAGE_SIZE) - 1);
@@ -223,6 +242,127 @@ export default function ClientDetailsPage() {
     const last = Math.max(0, Math.ceil(linkedItems.length / PAGE_SIZE) - 1);
     setLinkedItemsPage((p) => Math.min(p, last));
   }, [linkedItems.length]);
+
+  useEffect(() => {
+    const loadBasePrices = async () => {
+      setLoadingBasePrices(true);
+      setBasePriceRep(null);
+      setBasePrices({});
+      try {
+        const repsRes = await fetch(`/api/clients/${encodeURIComponent(String(id))}/representatives`, { cache: 'no-store' });
+        if (!repsRes.ok) return;
+        const reps: Representative[] = await repsRes.json();
+        if (!Array.isArray(reps) || reps.length === 0) return;
+
+        for (const rep of reps) {
+          const bpRes = await fetch(`/api/sales/representatives/${encodeURIComponent(String(rep.id))}/base-prices`, { cache: 'no-store' });
+          if (!bpRes.ok) continue;
+          const rows: any[] = await bpRes.json();
+          if (!Array.isArray(rows) || rows.length === 0) continue;
+
+          const rec: Record<string, number> = {};
+          for (const r of rows as BasePriceRow[]) {
+            const inventoryItemId = Number((r as any).inventoryItemId);
+            const unit = String((r as any).unit || '').trim();
+            const unitPrice = Number((r as any).unitPrice ?? 0);
+            if (!Number.isFinite(inventoryItemId) || inventoryItemId <= 0) continue;
+            if (!unit) continue;
+            rec[`${inventoryItemId}::${unit}`] = unitPrice;
+          }
+          if (Object.keys(rec).length > 0) {
+            setBasePriceRep(rep);
+            setBasePrices(rec);
+            break;
+          }
+        }
+      } finally {
+        setLoadingBasePrices(false);
+      }
+    };
+
+    if (activeTab === "linkedItems") {
+      loadBasePrices().catch(() => {});
+    }
+  }, [activeTab, id]);
+
+  useEffect(() => {
+    const loadUnlinked = async () => {
+      setLoadingUnlinkedItems(true);
+      try {
+        const r = await fetch(`/api/clients/${encodeURIComponent(String(id))}/items?mode=unlinked`, { cache: 'no-store' });
+        if (r.ok) {
+          const arr: LinkedItem[] = await r.json();
+          setUnlinkedItems(Array.isArray(arr) ? arr : []);
+        } else {
+          setUnlinkedItems([]);
+        }
+      } finally {
+        setLoadingUnlinkedItems(false);
+      }
+    };
+
+    if (activeTab === "linkedItems" && itemsSubTab === "unlinked") {
+      loadUnlinked().catch(() => {});
+    }
+  }, [activeTab, id, itemsSubTab]);
+
+  const selectedLinkedItemSet = useMemo(() => new Set(selectedLinkedItemIds), [selectedLinkedItemIds]);
+  const allLinkedSelected = useMemo(() => {
+    if (linkedItems.length === 0) return false;
+    return selectedLinkedItemSet.size === new Set(linkedItems.map((x) => x.id)).size;
+  }, [linkedItems, selectedLinkedItemSet]);
+
+  const hasBasePrices = useMemo(() => Object.keys(basePrices).length > 0, [basePrices]);
+
+  const getBasePrice = useCallback((it: LinkedItem) => {
+    const unit = String(it.unit || '').trim();
+    if (!unit) return null;
+    const v = basePrices[`${it.id}::${unit}`];
+    const n = Number(v);
+    if (!Number.isFinite(n) || n <= 0) return null;
+    return n;
+  }, [basePrices]);
+
+  const unlinkSelectedItems = useCallback(async () => {
+    if (!client) return;
+    if (selectedLinkedItemIds.length === 0) return;
+    setUnlinking(true);
+    try {
+      const res = await fetch(`/api/clients/${client.id}/items`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'unlink', inventoryItemIds: selectedLinkedItemIds }),
+      });
+      if (!res.ok) throw new Error('Falha ao desvincular item(ns)');
+      await refreshLinkedItems();
+    } catch (e: any) {
+      alert(e?.message || String(e));
+    } finally {
+      setUnlinking(false);
+    }
+  }, [client, refreshLinkedItems, selectedLinkedItemIds]);
+
+  const applyAdjustToClientItems = useCallback(async () => {
+    if (!client) return;
+    if (!hasBasePrices || !basePriceRep) return;
+    const pct = Number(String(adjustPercent).replace(',', '.'));
+    if (!Number.isFinite(pct)) return;
+
+    setApplyingAdjust(true);
+    try {
+      const res = await fetch(`/api/clients/${client.id}/items`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'applyAdjust', repUserId: basePriceRep.id, percent: pct }),
+      });
+      if (!res.ok) throw new Error('Falha ao aplicar reajuste');
+      await refreshLinkedItems();
+    } catch (e: any) {
+      alert(e?.message || String(e));
+    } finally {
+      setApplyingAdjust(false);
+    }
+  }, [adjustPercent, basePriceRep, client, hasBasePrices, refreshLinkedItems]);
 
   const addToCart = async (inventoryItemId: number) => {
     if (!client) return;
@@ -768,14 +908,217 @@ export default function ClientDetailsPage() {
         {activeTab === "linkedItems" && (
           <div className="border rounded bg-white overflow-hidden">
             <div className="px-3 py-2 border-b bg-gray-50 flex items-center">
-              <div className="text-sm text-gray-700">Itens vinculados ao cliente</div>
-              <div className="ml-auto text-xs text-gray-500">{linkedItems.length} registro(s)</div>
+              <div className="flex items-center gap-2">
+                <button
+                  className={`text-sm px-2 py-1 rounded ${itemsSubTab === "linked" ? "bg-white border" : "text-gray-600 hover:text-gray-900"}`}
+                  onClick={() => setItemsSubTab("linked")}
+                >
+                  Itens Vinculados
+                </button>
+                <button
+                  className={`text-sm px-2 py-1 rounded ${itemsSubTab === "unlinked" ? "bg-white border" : "text-gray-600 hover:text-gray-900"}`}
+                  onClick={() => setItemsSubTab("unlinked")}
+                >
+                  Itens Não Vinculados
+                </button>
+              </div>
+              <div className="ml-auto text-xs text-gray-500">{itemsSubTab === "linked" ? linkedItems.length : unlinkedItems.length} registro(s)</div>
             </div>
-            <div className="sm:hidden divide-y">
-              {linkedItemsView.map((it, i) => (
-                <div key={i} className="p-3">
-                  <div className="flex items-start gap-3">
-                    <div className="flex-1 min-w-0">
+            {itemsSubTab === "linked" && (
+              <>
+                <div className="px-3 py-2 border-b flex flex-wrap items-center gap-3">
+                  <label className="inline-flex items-center gap-2 text-sm text-gray-700">
+                    <input
+                      type="checkbox"
+                      checked={allLinkedSelected}
+                      onChange={(e) => {
+                        const checked = e.target.checked;
+                        setSelectedLinkedItemIds(checked ? linkedItems.map((x) => x.id) : []);
+                      }}
+                    />
+                    <span>Selecionar todos</span>
+                  </label>
+
+                  <button
+                    className="px-3 py-2 text-xs border rounded bg-white hover:bg-gray-100 disabled:opacity-50"
+                    disabled={unlinking || selectedLinkedItemIds.length === 0}
+                    onClick={unlinkSelectedItems}
+                  >
+                    Desvincular Item(ns)
+                  </button>
+
+                  {hasBasePrices && (
+                    <div className="flex items-center gap-2">
+                      <div className="text-xs text-gray-600">
+                        {loadingBasePrices ? "Carregando preço base..." : basePriceRep ? `Preço base: ${basePriceRep.name}` : ""}
+                      </div>
+                      <label className="text-xs text-gray-700 whitespace-nowrap">Reajuste(%)</label>
+                      <input
+                        className="w-24 px-2 py-1 border rounded text-sm"
+                        inputMode="decimal"
+                        value={adjustPercent}
+                        onChange={(e) => setAdjustPercent(e.target.value)}
+                      />
+                      <button
+                        className="px-3 py-2 text-xs border rounded bg-white hover:bg-gray-100 disabled:opacity-50"
+                        disabled={applyingAdjust || !basePriceRep || !Number.isFinite(Number(String(adjustPercent).replace(',', '.')))}
+                        onClick={applyAdjustToClientItems}
+                      >
+                        Aplicar
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                <div className="sm:hidden divide-y">
+                  {linkedItemsView.map((it, i) => {
+                    const basePrice = hasBasePrices ? getBasePrice(it) : null;
+                    return (
+                      <div key={i} className="p-3">
+                        <div className="flex items-start gap-3">
+                          <input
+                            type="checkbox"
+                            className="mt-1"
+                            checked={selectedLinkedItemSet.has(it.id)}
+                            onChange={(e) => {
+                              const checked = e.target.checked;
+                              setSelectedLinkedItemIds((prev) => {
+                                const s = new Set(prev);
+                                if (checked) s.add(it.id);
+                                else s.delete(it.id);
+                                return Array.from(s);
+                              });
+                            }}
+                          />
+                          <div className="flex-1 min-w-0">
+                            <div className="text-sm font-semibold text-gray-900 break-words">{it.name}</div>
+                            <div className="mt-1 text-xs text-gray-600 font-mono">{it.sku || '-'}</div>
+                            <div className="mt-1 text-xs text-gray-600 flex flex-wrap gap-x-3 gap-y-1">
+                              <span>Larg: {it.width || '-'}</span>
+                              <span>Compr: {it.length || '-'}</span>
+                              <span>Gram: {it.grammage || '-'}</span>
+                              {hasBasePrices && <span>Preço Base: {basePrice != null ? basePrice.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : '-'}</span>}
+                              <span>Un: {it.unit || '-'}</span>
+                            </div>
+                            <div className="mt-2 flex items-center">
+                              <div className="text-sm font-medium text-gray-900">
+                                {(it.unitPrice ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                              </div>
+                              <button
+                                className="ml-auto px-3 py-2 text-xs border rounded"
+                                title="Adicionar ao carrinho"
+                                aria-label="Adicionar ao carrinho"
+                                onClick={() => addToCart(it.id)}
+                              >
+                                Adicionar
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {linkedItems.length === 0 && <div className="p-3 text-gray-500 text-sm">Sem itens</div>}
+                </div>
+
+                <div className="hidden sm:block overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="bg-gray-50">
+                        <th className="p-2 text-left w-10"></th>
+                        <th className="p-2 text-left">Item</th>
+                        <th className="p-2 text-left">SKU</th>
+                        <th className="p-2 text-left">Larg.</th>
+                        <th className="p-2 text-left">Compr.</th>
+                        <th className="p-2 text-left">Gram.</th>
+                        {hasBasePrices && <th className="p-2 text-left">Preço Base R$</th>}
+                        <th className="p-2 text-left">Un.</th>
+                        <th className="p-2 text-left">Preço Unit R$</th>
+                        <th className="p-2 text-left">Ações</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {linkedItems.length === 0 && (
+                        <tr><td className="p-3 text-gray-500" colSpan={hasBasePrices ? 10 : 9}>Sem itens</td></tr>
+                      )}
+                      {linkedItemsView.map((it, i) => {
+                        const basePrice = hasBasePrices ? getBasePrice(it) : null;
+                        return (
+                          <tr key={i} className="border-t">
+                            <td className="p-2">
+                              <input
+                                type="checkbox"
+                                checked={selectedLinkedItemSet.has(it.id)}
+                                onChange={(e) => {
+                                  const checked = e.target.checked;
+                                  setSelectedLinkedItemIds((prev) => {
+                                    const s = new Set(prev);
+                                    if (checked) s.add(it.id);
+                                    else s.delete(it.id);
+                                    return Array.from(s);
+                                  });
+                                }}
+                              />
+                            </td>
+                            <td className="p-2">{it.name}</td>
+                            <td className="p-2">{it.sku || '-'}</td>
+                            <td className="p-2">{it.width || '-'}</td>
+                            <td className="p-2">{it.length || '-'}</td>
+                            <td className="p-2">{it.grammage || '-'}</td>
+                            {hasBasePrices && <td className="p-2">{basePrice != null ? basePrice.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : ''}</td>}
+                            <td className="p-2">{it.unit || '-'}</td>
+                            <td className="p-2">{(it.unitPrice ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
+                            <td className="p-2">
+                              <button className="inline-flex items-center justify-center w-8 h-8 border rounded hover:bg-gray-100" title="Adicionar ao carrinho" aria-label="Adicionar ao carrinho" onClick={() => addToCart(it.id)}>
+                                <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M7 18a2 2 0 1 0 0 4 2 2 0 0 0 0-4Zm10 0a2 2 0 1 0 0 4 2 2 0 0 0 0-4ZM6.2 6l-.9-2H1V2h4.1l1.7 4H21l-2 7H8.1l-1 2H19v2H6a1 1 0 0 1-.9-.6L2 6h4.2Z"/></svg>
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </>
+            )}
+
+            {itemsSubTab === "unlinked" && (
+              <>
+                <div className="p-3 text-sm text-gray-600 border-b">
+                  {loadingUnlinkedItems ? "Carregando itens não vinculados..." : "Itens que não possuem vínculo ativo com este cliente."}
+                </div>
+                <div className="hidden sm:block overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="bg-gray-50">
+                        <th className="p-2 text-left">Item</th>
+                        <th className="p-2 text-left">SKU</th>
+                        <th className="p-2 text-left">Larg.</th>
+                        <th className="p-2 text-left">Compr.</th>
+                        <th className="p-2 text-left">Gram.</th>
+                        <th className="p-2 text-left">Un.</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {unlinkedItems.length === 0 && !loadingUnlinkedItems && (
+                        <tr><td className="p-3 text-gray-500" colSpan={6}>Sem itens</td></tr>
+                      )}
+                      {unlinkedItems.map((it, i) => (
+                        <tr key={i} className="border-t">
+                          <td className="p-2">{it.name}</td>
+                          <td className="p-2">{it.sku || '-'}</td>
+                          <td className="p-2">{it.width || '-'}</td>
+                          <td className="p-2">{it.length || '-'}</td>
+                          <td className="p-2">{it.grammage || '-'}</td>
+                          <td className="p-2">{it.unit || '-'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <div className="sm:hidden divide-y">
+                  {unlinkedItems.map((it, i) => (
+                    <div key={i} className="p-3">
                       <div className="text-sm font-semibold text-gray-900 break-words">{it.name}</div>
                       <div className="mt-1 text-xs text-gray-600 font-mono">{it.sku || '-'}</div>
                       <div className="mt-1 text-xs text-gray-600 flex flex-wrap gap-x-3 gap-y-1">
@@ -784,81 +1127,34 @@ export default function ClientDetailsPage() {
                         <span>Gram: {it.grammage || '-'}</span>
                         <span>Un: {it.unit || '-'}</span>
                       </div>
-                      <div className="mt-2 flex items-center">
-                        <div className="text-sm font-medium text-gray-900">
-                          {(it.unitPrice ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                        </div>
-                        <button
-                          className="ml-auto px-3 py-2 text-xs border rounded"
-                          title="Adicionar ao carrinho"
-                          aria-label="Adicionar ao carrinho"
-                          onClick={() => addToCart(it.id)}
-                        >
-                          Adicionar
-                        </button>
-                      </div>
                     </div>
-                  </div>
-                </div>
-              ))}
-              {linkedItems.length === 0 && <div className="p-3 text-gray-500 text-sm">Sem itens</div>}
-            </div>
-
-            <div className="hidden sm:block overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="bg-gray-50">
-                    <th className="p-2 text-left">Item</th>
-                    <th className="p-2 text-left">SKU</th>
-                    <th className="p-2 text-left">Larg.</th>
-                    <th className="p-2 text-left">Compr.</th>
-                    <th className="p-2 text-left">Gram.</th>
-                    <th className="p-2 text-left">Un.</th>
-                    <th className="p-2 text-left">Preço Unit R$</th>
-                    <th className="p-2 text-left">Ações</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {linkedItems.length === 0 && (
-                    <tr><td className="p-3 text-gray-500" colSpan={8}>Sem itens</td></tr>
-                  )}
-                  {linkedItemsView.map((it, i) => (
-                    <tr key={i} className="border-t">
-                      <td className="p-2">{it.name}</td>
-                      <td className="p-2">{it.sku || '-'}</td>
-                      <td className="p-2">{it.width || '-'}</td>
-                      <td className="p-2">{it.length || '-'}</td>
-                      <td className="p-2">{it.grammage || '-'}</td>
-                      <td className="p-2">{it.unit || '-'}</td>
-                      <td className="p-2">{(it.unitPrice ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
-                      <td className="p-2">
-                        <button className="inline-flex items-center justify-center w-8 h-8 border rounded hover:bg-gray-100" title="Adicionar ao carrinho" aria-label="Adicionar ao carrinho" onClick={() => addToCart(it.id)}>
-                          <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M7 18a2 2 0 1 0 0 4 2 2 0 0 0 0-4Zm10 0a2 2 0 1 0 0 4 2 2 0 0 0 0-4ZM6.2 6l-.9-2H1V2h4.1l1.7 4H21l-2 7H8.1l-1 2H19v2H6a1 1 0 0 1-.9-.6L2 6h4.2Z"/></svg>
-                        </button>
-                      </td>
-                    </tr>
                   ))}
-                </tbody>
-              </table>
-            </div>
+                  {unlinkedItems.length === 0 && !loadingUnlinkedItems && (
+                    <div className="p-3 text-gray-500 text-sm">Sem itens</div>
+                  )}
+                </div>
+              </>
+            )}
 
-            <div className="px-3 py-2 border-t bg-gray-50 flex items-center justify-between text-xs text-gray-600">
-              <button
-                className="px-3 py-1.5 border rounded bg-white hover:bg-gray-100 disabled:opacity-50"
-                disabled={linkedItemsPage <= 0}
-                onClick={() => setLinkedItemsPage((p) => Math.max(0, p - 1))}
-              >
-                Anterior
-              </button>
-              <span>Página {Math.min(linkedItemsPage, linkedItemsTotalPages - 1) + 1} de {linkedItemsTotalPages}</span>
-              <button
-                className="px-3 py-1.5 border rounded bg-white hover:bg-gray-100 disabled:opacity-50"
-                disabled={linkedItemsPage >= linkedItemsTotalPages - 1}
-                onClick={() => setLinkedItemsPage((p) => Math.min(linkedItemsTotalPages - 1, p + 1))}
-              >
-                Próxima
-              </button>
-            </div>
+            {itemsSubTab === "linked" && (
+              <div className="px-3 py-2 border-t bg-gray-50 flex items-center justify-between text-xs text-gray-600">
+                <button
+                  className="px-3 py-1.5 border rounded bg-white hover:bg-gray-100 disabled:opacity-50"
+                  disabled={linkedItemsPage <= 0}
+                  onClick={() => setLinkedItemsPage((p) => Math.max(0, p - 1))}
+                >
+                  Anterior
+                </button>
+                <span>Página {Math.min(linkedItemsPage, linkedItemsTotalPages - 1) + 1} de {linkedItemsTotalPages}</span>
+                <button
+                  className="px-3 py-1.5 border rounded bg-white hover:bg-gray-100 disabled:opacity-50"
+                  disabled={linkedItemsPage >= linkedItemsTotalPages - 1}
+                  onClick={() => setLinkedItemsPage((p) => Math.min(linkedItemsTotalPages - 1, p + 1))}
+                >
+                  Próxima
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>

@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 type User = { id: number; name: string; email: string };
 type Client = { id: number; doc?: string; name: string; cidade?: string; estado?: string };
-type BasePriceRow = { sku: string; salesRepKey: string; unit: string; unitPrice: number };
+type BasePriceRow = { sku: string; description: string; unit: string; unitPrice: number };
 
 export default function RepresentativePage() {
   const [users, setUsers] = useState<User[]>([]);
@@ -219,16 +219,16 @@ export default function RepresentativePage() {
                 <thead>
                   <tr className="bg-gray-50 text-left">
                     <th className="p-2">SKU</th>
-                    <th className="p-2">Chave Rep.</th>
+                    <th className="p-2">Descrição</th>
                     <th className="p-2">UN</th>
                     <th className="p-2 text-right">Preço Unitário</th>
                   </tr>
                 </thead>
                 <tbody>
                   {basePrices.map((r) => (
-                    <tr key={`${r.sku}::${r.salesRepKey}::${r.unit}`} className="border-b">
+                    <tr key={`${r.sku}::${r.unit}`} className="border-b">
                       <td className="p-2 font-mono">{r.sku}</td>
-                      <td className="p-2 font-mono">{r.salesRepKey}</td>
+                      <td className="p-2">{r.description}</td>
                       <td className="p-2">{r.unit}</td>
                       <td className="p-2 text-right">{fmtCurrency(r.unitPrice)}</td>
                     </tr>
