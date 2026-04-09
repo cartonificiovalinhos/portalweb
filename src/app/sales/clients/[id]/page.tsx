@@ -330,14 +330,37 @@ export default function ClientDetailsPage() {
 
   const hasBasePrices = useMemo(() => Object.keys(basePrices).length > 0, [basePrices]);
 
+  const basePriceFallbackByItemId = useMemo(() => {
+    const byItem = new Map<number, number[]>();
+    for (const [k, v] of Object.entries(basePrices)) {
+      const [invIdRaw] = String(k).split('::');
+      const invId = Number(invIdRaw);
+      const n = Number(v);
+      if (!Number.isFinite(invId) || invId <= 0) continue;
+      if (!Number.isFinite(n) || n <= 0) continue;
+      const list = byItem.get(invId) || [];
+      list.push(n);
+      byItem.set(invId, list);
+    }
+    const out: Record<number, number> = {};
+    for (const [invId, prices] of byItem.entries()) {
+      const uniq = Array.from(new Set(prices));
+      if (uniq.length === 1) out[invId] = uniq[0];
+    }
+    return out;
+  }, [basePrices]);
+
   const getBasePrice = useCallback((it: LinkedItem) => {
     const unit = String(it.unit || '').trim();
-    if (!unit) return null;
-    const v = basePrices[`${it.id}::${unit}`];
-    const n = Number(v);
-    if (!Number.isFinite(n) || n <= 0) return null;
-    return n;
-  }, [basePrices]);
+    if (unit) {
+      const v = basePrices[`${it.id}::${unit}`];
+      const n = Number(v);
+      if (Number.isFinite(n) && n > 0) return n;
+    }
+    const fallback = Number((basePriceFallbackByItemId as any)[it.id]);
+    if (Number.isFinite(fallback) && fallback > 0) return fallback;
+    return null;
+  }, [basePriceFallbackByItemId, basePrices]);
 
   const unlinkSelectedItems = useCallback(async () => {
     if (!client) return;
@@ -381,6 +404,10 @@ export default function ClientDetailsPage() {
   const applyAdjustToClientItems = useCallback(async () => {
     if (!client) return;
     if (!hasBasePrices || !basePriceRep) return;
+    if (selectedLinkedItemIds.length === 0) {
+      alert('Selecione ao menos um item para aplicar o reajuste.');
+      return;
+    }
     const pct = Number(String(adjustPercent).replace(',', '.'));
     if (!Number.isFinite(pct)) return;
 
@@ -389,7 +416,7 @@ export default function ClientDetailsPage() {
       const res = await fetch(`/api/clients/${client.id}/items`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'applyAdjust', repUserId: basePriceRep.id, percent: pct }),
+        body: JSON.stringify({ action: 'applyAdjust', repUserId: basePriceRep.id, percent: pct, inventoryItemIds: selectedLinkedItemIds }),
       });
       if (!res.ok) throw new Error('Falha ao aplicar reajuste');
       await refreshLinkedItems();
@@ -398,7 +425,7 @@ export default function ClientDetailsPage() {
     } finally {
       setApplyingAdjust(false);
     }
-  }, [adjustPercent, basePriceRep, client, hasBasePrices, refreshLinkedItems]);
+  }, [adjustPercent, basePriceRep, client, hasBasePrices, refreshLinkedItems, selectedLinkedItemIds]);
 
   const addToCart = async (inventoryItemId: number) => {
     if (!client) return;

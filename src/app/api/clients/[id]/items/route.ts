@@ -195,9 +195,15 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
         if (!Number.isFinite(repUserId) || repUserId <= 0) return NextResponse.json({ error: 'repUserId inválido' }, { status: 400 });
         if (!Number.isFinite(percent)) return NextResponse.json({ error: 'percent inválido' }, { status: 400 });
 
+        const inventoryItemIdsRaw = (rawBody as any).inventoryItemIds;
+        const inventoryItemIds = Array.isArray(inventoryItemIdsRaw)
+          ? inventoryItemIdsRaw.map((x: any) => Number(x)).filter((x: number) => Number.isFinite(x) && x > 0)
+          : [];
+        if (!inventoryItemIds.length) return NextResponse.json({ error: 'Selecione ao menos um item' }, { status: 400 });
+
         const multiplier = 1 + percent / 100;
         const clientItems = await prisma.clientItem.findMany({
-          where: { clientId, allowed: true },
+          where: { clientId, allowed: true, inventoryItemId: { in: inventoryItemIds } },
           select: {
             id: true,
             inventoryItemId: true,
@@ -215,10 +221,23 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
         });
 
         const basePriceMap = new Map<string, number>();
+        const basePriceByItem = new Map<number, number[]>();
         for (const bp of basePrices) {
           const unit = String(bp.unit || '').trim();
           if (!unit) continue;
-          basePriceMap.set(`${bp.inventoryItemId}::${unit}`, Number(bp.unitPrice ?? 0));
+          const n = Number(bp.unitPrice ?? 0);
+          basePriceMap.set(`${bp.inventoryItemId}::${unit}`, n);
+          if (Number.isFinite(n) && n > 0) {
+            const list = basePriceByItem.get(bp.inventoryItemId) || [];
+            list.push(n);
+            basePriceByItem.set(bp.inventoryItemId, list);
+          }
+        }
+
+        const fallbackByItemId = new Map<number, number>();
+        for (const [invId, prices] of basePriceByItem.entries()) {
+          const uniq = Array.from(new Set(prices));
+          if (uniq.length === 1) fallbackByItemId.set(invId, uniq[0]);
         }
 
         let updatedCount = 0;
@@ -226,11 +245,8 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
         await prisma.$transaction(async (tx) => {
           for (const row of clientItems) {
             const unit = String(row.unit ?? row.inventoryItem?.unit ?? '').trim();
-            if (!unit) {
-              skippedCount += 1;
-              continue;
-            }
-            const base = basePriceMap.get(`${row.inventoryItemId}::${unit}`) ?? null;
+            const baseExact = unit ? (basePriceMap.get(`${row.inventoryItemId}::${unit}`) ?? null) : null;
+            const base = (baseExact != null && baseExact > 0) ? baseExact : (fallbackByItemId.get(row.inventoryItemId) ?? null);
             if (!base || base <= 0) {
               skippedCount += 1;
               continue;
