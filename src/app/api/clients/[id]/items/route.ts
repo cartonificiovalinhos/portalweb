@@ -167,6 +167,28 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
         return NextResponse.json({ ok: true, deletedCount: del.count });
       }
 
+      if (action === 'link') {
+        const inventoryItemIdsRaw = (rawBody as any).inventoryItemIds;
+        const inventoryItemIds = Array.isArray(inventoryItemIdsRaw)
+          ? inventoryItemIdsRaw.map((x: any) => Number(x)).filter((x: number) => Number.isFinite(x) && x > 0)
+          : [];
+        if (!inventoryItemIds.length) return NextResponse.json({ error: 'inventoryItemIds é obrigatório' }, { status: 400 });
+
+        let upsertedCount = 0;
+        await prisma.$transaction(async (tx) => {
+          for (const inventoryItemId of inventoryItemIds) {
+            await tx.clientItem.upsert({
+              where: { clientId_inventoryItemId: { clientId, inventoryItemId } },
+              update: { allowed: true },
+              create: { clientId, inventoryItemId, unit: null, unitPrice: 0, allowed: true },
+            });
+            upsertedCount += 1;
+          }
+        });
+
+        return NextResponse.json({ ok: true, upsertedCount });
+      }
+
       if (action === 'applyAdjust') {
         const repUserId = Number((rawBody as any).repUserId);
         const percent = Number((rawBody as any).percent);

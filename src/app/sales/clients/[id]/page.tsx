@@ -148,12 +148,14 @@ export default function ClientDetailsPage() {
   const [itemsSubTab, setItemsSubTab] = useState<"linked" | "unlinked">("linked");
   const [unlinkedItems, setUnlinkedItems] = useState<LinkedItem[]>([]);
   const [selectedLinkedItemIds, setSelectedLinkedItemIds] = useState<number[]>([]);
+  const [selectedUnlinkedItemIds, setSelectedUnlinkedItemIds] = useState<number[]>([]);
   const [basePriceRep, setBasePriceRep] = useState<Representative | null>(null);
   const [basePrices, setBasePrices] = useState<Record<string, number>>({});
   const [adjustPercent, setAdjustPercent] = useState<string>("");
   const [loadingUnlinkedItems, setLoadingUnlinkedItems] = useState(false);
   const [loadingBasePrices, setLoadingBasePrices] = useState(false);
   const [unlinking, setUnlinking] = useState(false);
+  const [linkingItems, setLinkingItems] = useState(false);
   const [applyingAdjust, setApplyingAdjust] = useState(false);
 
   const PAGE_SIZE = 20;
@@ -165,6 +167,16 @@ export default function ClientDetailsPage() {
       setLinkedItems(Array.isArray(linked) ? linked : []);
     } else {
       setLinkedItems([]);
+    }
+  }, [id]);
+
+  const refreshUnlinkedItems = useCallback(async () => {
+    const r = await fetch(`/api/clients/${encodeURIComponent(String(id))}/items?mode=unlinked`, { cache: 'no-store' });
+    if (r.ok) {
+      const arr: LinkedItem[] = await r.json();
+      setUnlinkedItems(Array.isArray(arr) ? arr : []);
+    } else {
+      setUnlinkedItems([]);
     }
   }, [id]);
 
@@ -229,6 +241,10 @@ export default function ClientDetailsPage() {
   }, [linkedItems]);
 
   useEffect(() => {
+    setSelectedUnlinkedItemIds([]);
+  }, [unlinkedItems]);
+
+  useEffect(() => {
     const last = Math.max(0, Math.ceil(orders.length / PAGE_SIZE) - 1);
     setOrdersPage((p) => Math.min(p, last));
   }, [orders.length]);
@@ -289,13 +305,7 @@ export default function ClientDetailsPage() {
     const loadUnlinked = async () => {
       setLoadingUnlinkedItems(true);
       try {
-        const r = await fetch(`/api/clients/${encodeURIComponent(String(id))}/items?mode=unlinked`, { cache: 'no-store' });
-        if (r.ok) {
-          const arr: LinkedItem[] = await r.json();
-          setUnlinkedItems(Array.isArray(arr) ? arr : []);
-        } else {
-          setUnlinkedItems([]);
-        }
+        await refreshUnlinkedItems();
       } finally {
         setLoadingUnlinkedItems(false);
       }
@@ -304,13 +314,19 @@ export default function ClientDetailsPage() {
     if (activeTab === "linkedItems" && itemsSubTab === "unlinked") {
       loadUnlinked().catch(() => {});
     }
-  }, [activeTab, id, itemsSubTab]);
+  }, [activeTab, id, itemsSubTab, refreshUnlinkedItems]);
 
   const selectedLinkedItemSet = useMemo(() => new Set(selectedLinkedItemIds), [selectedLinkedItemIds]);
   const allLinkedSelected = useMemo(() => {
     if (linkedItems.length === 0) return false;
     return selectedLinkedItemSet.size === new Set(linkedItems.map((x) => x.id)).size;
   }, [linkedItems, selectedLinkedItemSet]);
+
+  const selectedUnlinkedItemSet = useMemo(() => new Set(selectedUnlinkedItemIds), [selectedUnlinkedItemIds]);
+  const allUnlinkedSelected = useMemo(() => {
+    if (unlinkedItems.length === 0) return false;
+    return selectedUnlinkedItemSet.size === new Set(unlinkedItems.map((x) => x.id)).size;
+  }, [unlinkedItems, selectedUnlinkedItemSet]);
 
   const hasBasePrices = useMemo(() => Object.keys(basePrices).length > 0, [basePrices]);
 
@@ -341,6 +357,26 @@ export default function ClientDetailsPage() {
       setUnlinking(false);
     }
   }, [client, refreshLinkedItems, selectedLinkedItemIds]);
+
+  const linkSelectedItems = useCallback(async () => {
+    if (!client) return;
+    if (selectedUnlinkedItemIds.length === 0) return;
+    setLinkingItems(true);
+    try {
+      const res = await fetch(`/api/clients/${client.id}/items`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'link', inventoryItemIds: selectedUnlinkedItemIds }),
+      });
+      if (!res.ok) throw new Error('Falha ao vincular item(ns)');
+      await Promise.all([refreshLinkedItems(), refreshUnlinkedItems()]);
+      setSelectedUnlinkedItemIds([]);
+    } catch (e: any) {
+      alert(e?.message || String(e));
+    } finally {
+      setLinkingItems(false);
+    }
+  }, [client, refreshLinkedItems, refreshUnlinkedItems, selectedUnlinkedItemIds]);
 
   const applyAdjustToClientItems = useCallback(async () => {
     if (!client) return;
@@ -1084,13 +1120,34 @@ export default function ClientDetailsPage() {
 
             {itemsSubTab === "unlinked" && (
               <>
-                <div className="p-3 text-sm text-gray-600 border-b">
-                  {loadingUnlinkedItems ? "Carregando itens não vinculados..." : "Itens que não possuem vínculo ativo com este cliente."}
+                <div className="px-3 py-2 border-b flex flex-wrap items-center gap-3">
+                  <label className="inline-flex items-center gap-2 text-sm text-gray-700">
+                    <input
+                      type="checkbox"
+                      checked={allUnlinkedSelected}
+                      onChange={(e) => {
+                        const checked = e.target.checked;
+                        setSelectedUnlinkedItemIds(checked ? unlinkedItems.map((x) => x.id) : []);
+                      }}
+                    />
+                    <span>Selecionar todos</span>
+                  </label>
+
+                  <button
+                    className="px-3 py-2 text-xs border rounded bg-white hover:bg-gray-100 disabled:opacity-50"
+                    disabled={linkingItems || selectedUnlinkedItemIds.length === 0}
+                    onClick={linkSelectedItems}
+                  >
+                    Vincular Itens
+                  </button>
+
+                  {loadingUnlinkedItems && <div className="text-xs text-gray-600">Carregando...</div>}
                 </div>
                 <div className="hidden sm:block overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="bg-gray-50">
+                        <th className="p-2 text-left w-10"></th>
                         <th className="p-2 text-left">Item</th>
                         <th className="p-2 text-left">SKU</th>
                         <th className="p-2 text-left">Larg.</th>
@@ -1101,10 +1158,25 @@ export default function ClientDetailsPage() {
                     </thead>
                     <tbody>
                       {unlinkedItems.length === 0 && !loadingUnlinkedItems && (
-                        <tr><td className="p-3 text-gray-500" colSpan={6}>Sem itens</td></tr>
+                        <tr><td className="p-3 text-gray-500" colSpan={7}>Sem itens</td></tr>
                       )}
                       {unlinkedItems.map((it, i) => (
                         <tr key={i} className="border-t">
+                          <td className="p-2">
+                            <input
+                              type="checkbox"
+                              checked={selectedUnlinkedItemSet.has(it.id)}
+                              onChange={(e) => {
+                                const checked = e.target.checked;
+                                setSelectedUnlinkedItemIds((prev) => {
+                                  const s = new Set(prev);
+                                  if (checked) s.add(it.id);
+                                  else s.delete(it.id);
+                                  return Array.from(s);
+                                });
+                              }}
+                            />
+                          </td>
                           <td className="p-2">{it.name}</td>
                           <td className="p-2">{it.sku || '-'}</td>
                           <td className="p-2">{it.width || '-'}</td>
@@ -1119,13 +1191,31 @@ export default function ClientDetailsPage() {
                 <div className="sm:hidden divide-y">
                   {unlinkedItems.map((it, i) => (
                     <div key={i} className="p-3">
-                      <div className="text-sm font-semibold text-gray-900 break-words">{it.name}</div>
+                      <div className="flex items-start gap-3">
+                        <input
+                          type="checkbox"
+                          className="mt-1"
+                          checked={selectedUnlinkedItemSet.has(it.id)}
+                          onChange={(e) => {
+                            const checked = e.target.checked;
+                            setSelectedUnlinkedItemIds((prev) => {
+                              const s = new Set(prev);
+                              if (checked) s.add(it.id);
+                              else s.delete(it.id);
+                              return Array.from(s);
+                            });
+                          }}
+                        />
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-semibold text-gray-900 break-words">{it.name}</div>
                       <div className="mt-1 text-xs text-gray-600 font-mono">{it.sku || '-'}</div>
                       <div className="mt-1 text-xs text-gray-600 flex flex-wrap gap-x-3 gap-y-1">
                         <span>Larg: {it.width || '-'}</span>
                         <span>Compr: {it.length || '-'}</span>
                         <span>Gram: {it.grammage || '-'}</span>
                         <span>Un: {it.unit || '-'}</span>
+                      </div>
+                        </div>
                       </div>
                     </div>
                   ))}
