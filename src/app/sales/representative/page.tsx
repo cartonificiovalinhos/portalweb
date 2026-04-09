@@ -72,6 +72,32 @@ export default function RepresentativePage() {
 
   useEffect(() => { Promise.all([loadUsers(), loadClients()]); }, [loadUsers, loadClients]);
   useEffect(() => { loadLinked(selectedUserId); }, [selectedUserId, loadLinked]);
+  useEffect(() => {
+    const load = async () => {
+      if (activeTab !== "basePrice") return;
+      if (!selectedUserId) { setBasePrices([]); return; }
+
+      try {
+        const res = await fetch(`/api/sales/representatives/${selectedUserId}/base-prices`, { cache: "no-store" });
+        if (!res.ok) { setBasePrices([]); return; }
+        const arr = await res.json().catch(() => []);
+        const rows = Array.isArray(arr) ? arr : [];
+        setBasePrices(
+          rows
+            .map((r: any) => ({
+              sku: String(r?.sku || ""),
+              description: String(r?.name || r?.description || ""),
+              unit: String(r?.unit || ""),
+              unitPrice: Number(r?.unitPrice ?? 0),
+            }))
+            .filter((r: BasePriceRow) => Boolean(r.sku) || Boolean(r.description))
+        );
+      } catch {
+        setBasePrices([]);
+      }
+    };
+    load();
+  }, [activeTab, selectedUserId]);
 
   const toggleRow = async (c: any, checked: boolean) => {
     if (!selectedUserId) return;
