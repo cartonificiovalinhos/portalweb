@@ -11,6 +11,7 @@ model User {
   id                 Int             @id @default(autoincrement())
   email              String?         @unique
   name               String
+  abbrevName         String?         @db.VarChar(15)
   password           String
   salesRepAdmin      Boolean         @default(false)
   isSalesAdmin       Boolean         @default(false)

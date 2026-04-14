@@ -10,7 +10,7 @@ export default function UsersPage() {
   const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-  const [form, setForm] = useState({ name: "", email: "", password: "", doc: "" });
+  const [form, setForm] = useState({ name: "", abbrevName: "", email: "", password: "", doc: "" });
   const [editingUserId, setEditingUserId] = useState<number | null>(null);
   const [formOpen, setFormOpen] = useState<boolean>(false);
 
@@ -66,14 +66,14 @@ export default function UsersPage() {
         const data = await res.json();
         if (!res.ok) throw new Error(data?.error || `Erro ${res.status}`);
         setEditingUserId(null);
-        setForm({ name: "", email: "", password: "", doc: "" });
+        setForm({ name: "", abbrevName: "", email: "", password: "", doc: "" });
         await loadUsers();
         setSelectedUserId(data.id);
       } else {
         const res = await fetch("/api/users", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(form) });
         const data = await res.json();
         if (!res.ok) throw new Error(data?.error || `Erro ${res.status}`);
-        setForm({ name: "", email: "", password: "", doc: "" });
+        setForm({ name: "", abbrevName: "", email: "", password: "", doc: "" });
         await loadUsers();
         setSelectedUserId(data.id);
       }
@@ -124,7 +124,7 @@ export default function UsersPage() {
 
   const cancelEdit = () => {
     setEditingUserId(null);
-    setForm({ name: "", email: "", password: "", doc: "" });
+    setForm({ name: "", abbrevName: "", email: "", password: "", doc: "" });
   };
 
   const toggleSalesRepAdmin = async (checked: boolean) => {
@@ -242,7 +242,7 @@ export default function UsersPage() {
 
   const openAddForm = () => {
     setEditingUserId(null);
-    setForm({ name: "", email: "", password: "", doc: "" });
+    setForm({ name: "", abbrevName: "", email: "", password: "", doc: "" });
     setSelectedUserId(null);
     setEntities([]);
     setModules([]);
@@ -382,7 +382,7 @@ export default function UsersPage() {
               {filteredUsers.map((u:any) => (
                 <tr key={u.id} className="border-b hover:bg-gray-50">
                   <td className="p-2 text-center"><input type="checkbox" checked={selectedIds.includes(u.id)} onChange={(e)=>toggleRow(u.id, e.target.checked)} /></td>
-                  <td className="p-2"><button type="button" className="text-left w-full" onClick={() => { setSelectedUserId(u.id); setEditingUserId(u.id); setForm({ name: u.name || '', email: u.email || '', password: '', doc: String(u.doc || '') }); setFormOpen(true); }}>{u.name}</button></td>
+                  <td className="p-2"><button type="button" className="text-left w-full" onClick={() => { setSelectedUserId(u.id); setEditingUserId(u.id); setForm({ name: u.name || '', abbrevName: String(u.abbrevName || ''), email: u.email || '', password: '', doc: String(u.doc || '') }); setFormOpen(true); }}>{u.name}</button></td>
                   <td className="p-2">{formatDoc(String(u.doc || ''))}</td>
                   <td className="p-2">{u.email}</td>
                 </tr>
@@ -402,6 +402,7 @@ export default function UsersPage() {
           </div>
           <form onSubmit={onSubmit} className="grid grid-cols-1 md:grid-cols-4 gap-2 content-start">
             <input className="border rounded px-3 py-2" placeholder="Nome" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
+            <input className="border rounded px-3 py-2" placeholder="Nome Abrev" maxLength={15} value={form.abbrevName} onChange={(e) => setForm({ ...form, abbrevName: e.target.value })} />
             <input className="border rounded px-3 py-2" placeholder="CPF/CNPJ" value={form.doc} onChange={(e) => setForm({ ...form, doc: e.target.value })} />
             <input className="border rounded px-3 py-2" type="email" placeholder="E-mail" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} required />
             <input className="border rounded px-3 py-2" type="password" placeholder={editingUserId ? "Nova senha (opcional)" : "Senha"} value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} required={!editingUserId} />

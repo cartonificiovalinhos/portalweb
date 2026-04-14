@@ -10,6 +10,7 @@ type SalesOrder = {
   orderDate: string;
   customerName: string;
   entity?: { name: string };
+  createdBy?: { id: number; name: string; abbrevName?: string | null } | null;
   subtotal: number;
   discountTotal: number;
   total: number;
@@ -98,9 +99,11 @@ export default function SalesOrdersPage() {
       .filter((o) => (status ? statusLabelPt(o.status) === status : true))
       .filter((o) => {
         if (!qLower) return true;
+        const repAbbrev = String((o as any)?.createdBy?.abbrevName || '').toLowerCase();
         return (
           (o.code || '').toLowerCase().includes(qLower) ||
-          (o.customerName || '').toLowerCase().includes(qLower)
+          (o.customerName || '').toLowerCase().includes(qLower) ||
+          (repAbbrev && repAbbrev.includes(qLower))
         );
       })
       .filter((o) => {
@@ -177,7 +180,7 @@ export default function SalesOrdersPage() {
       {/* Filtros */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
         <div>
-          <label className="text-xs text-gray-600">Buscar (Número ou Cliente)</label>
+          <label className="text-xs text-gray-600">Buscar (Número, Cliente ou Repres)</label>
           <input className="w-full mt-1 px-2 py-1.5 border rounded" placeholder="Ex: PED-0001 ou João" value={q} onChange={(e) => setQ(e.target.value)} />
         </div>
         <div>
@@ -259,6 +262,7 @@ export default function SalesOrdersPage() {
                 <div className="min-w-0">
                   <div className="font-mono text-xs text-gray-700">{o.code || o.id}</div>
                   <div className="text-sm font-medium text-gray-900 truncate">{o.customerName || '-'}</div>
+              <div className="text-xs text-gray-600 truncate">{String((o as any)?.createdBy?.abbrevName || '-')}</div>
                   <div className="text-xs text-gray-600 truncate">{o.entity?.name || '-'}</div>
                 </div>
                 <span className={`shrink-0 px-2 py-0.5 rounded text-xs ${statusColor(statusLabelPt(o.status))}`}>{statusLabelPt(o.status)}</span>
@@ -345,15 +349,16 @@ export default function SalesOrdersPage() {
                 <th className="text-left px-3 py-2">Data</th>
                 <th className="text-right px-3 py-2">Total Com Imp R$</th>
                 <th className="text-left px-3 py-2">Situação</th>
+                <th className="text-left px-3 py-2">Repres</th>
                 <th className="text-center px-3 py-2">Ações</th>
               </tr>
             </thead>
             <tbody>
               {loading && (
-                <tr><td colSpan={7} className="px-3 py-4 text-center text-gray-500">Carregando...</td></tr>
+                <tr><td colSpan={8} className="px-3 py-4 text-center text-gray-500">Carregando...</td></tr>
               )}
               {!loading && filtered.length === 0 && (
-                <tr><td colSpan={7} className="px-3 py-4 text-center text-gray-500">Nenhum pedido encontrado.</td></tr>
+                <tr><td colSpan={8} className="px-3 py-4 text-center text-gray-500">Nenhum pedido encontrado.</td></tr>
               )}
               {!loading && pageItems.map((o) => (
                 <tr key={o.id} className="border-t hover:bg-gray-50">
@@ -365,6 +370,7 @@ export default function SalesOrdersPage() {
                     {calcTotal(o).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                   </td>
                   <td className="px-3 py-2"><span className={`px-2 py-0.5 rounded text-xs ${statusColor(statusLabelPt(o.status))}`}>{statusLabelPt(o.status)}</span></td>
+                  <td className="px-3 py-2 text-xs text-gray-700">{String((o as any)?.createdBy?.abbrevName || '-')}</td>
                   <td className="px-3 py-2 text-center">
                     <div className="inline-flex">
                       <IconBtn title="Visualizar" onClick={() => setSelected(o)}><EyeIcon /></IconBtn>

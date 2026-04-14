@@ -116,6 +116,7 @@ export async function GET(request: Request) {
       where,
       include: {
         entity: { select: { name: true } },
+        createdBy: { select: { id: true, name: true, abbrevName: true } },
         items: {
           include: {
             inventoryItem: {

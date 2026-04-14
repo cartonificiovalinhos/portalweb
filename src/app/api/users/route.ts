@@ -17,6 +17,7 @@ export async function GET(request: Request) {
     select: {
       id: true,
       name: true,
+      abbrevName: true,
       email: true,
       doc: true,
       salesRepAdmin: true,
@@ -33,6 +34,7 @@ export async function GET(request: Request) {
     users.map((u) => ({
       id: u.id,
       name: u.name,
+      abbrevName: (u as any).abbrevName ?? null,
       email: u.email,
       doc: u.doc,
       salesRepAdmin: u.salesRepAdmin,
@@ -49,6 +51,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   const data = await request.json();
   const { name, email, password, erpIntegrationMode, salesRepAdmin } = data || {};
+  const abbrevName = (data as any)?.abbrevName != null ? String((data as any).abbrevName).trim().slice(0, 15) : null;
   const doc = normalizeDoc(String((data as any)?.doc || '')) || null;
   const passwordStr = String(password || '');
   if (!passwordStr) return NextResponse.json({ error: 'password é obrigatório' }, { status: 400 });
@@ -68,6 +71,7 @@ export async function POST(request: Request) {
   if (doc) {
     const update: any = {
       name: String(name || ''),
+      abbrevName,
       email: finalEmail ?? null,
       password: String(hashed),
       erpIntegrationMode: String(erpIntegrationMode || 'TEST'),
@@ -76,6 +80,7 @@ export async function POST(request: Request) {
 
     const create: any = {
       name: String(name || ''),
+      abbrevName,
       email: finalEmail ?? null,
       password: String(hashed),
       doc,
@@ -90,6 +95,7 @@ export async function POST(request: Request) {
       select: {
         id: true,
         name: true,
+        abbrevName: true,
         email: true,
         doc: true,
         salesRepAdmin: true,
@@ -103,8 +109,8 @@ export async function POST(request: Request) {
   }
   
   const created = await prisma.user.create({ 
-    data: { name, email: finalEmail, password: hashed, erpIntegrationMode: erpIntegrationMode || 'TEST', salesRepAdmin: Boolean(salesRepAdmin), isSalesAdmin: false }, 
-    select: { id: true, name: true, email: true, createdAt: true, updatedAt: true, salesRepAdmin: true, isSalesAdmin: true, erpIntegrationMode: true } 
+    data: { name, abbrevName, email: finalEmail, password: hashed, erpIntegrationMode: erpIntegrationMode || 'TEST', salesRepAdmin: Boolean(salesRepAdmin), isSalesAdmin: false }, 
+    select: { id: true, name: true, abbrevName: true, email: true, createdAt: true, updatedAt: true, salesRepAdmin: true, isSalesAdmin: true, erpIntegrationMode: true } 
   });
   return NextResponse.json(created);
 }
@@ -117,6 +123,7 @@ export async function PATCH(request: Request) {
 
     const update: any = {};
     if (body.name !== undefined) update.name = String(body.name);
+    if (body.abbrevName !== undefined) update.abbrevName = body.abbrevName == null ? null : String(body.abbrevName).trim().slice(0, 15);
     if (body.email !== undefined) update.email = body.email == null ? null : String(body.email);
     if (body.erpIntegrationMode !== undefined) update.erpIntegrationMode = String(body.erpIntegrationMode);
     if (body.salesRepAdmin !== undefined) update.salesRepAdmin = Boolean(body.salesRepAdmin);
@@ -133,6 +140,7 @@ export async function PATCH(request: Request) {
       select: {
         id: true,
         name: true,
+        abbrevName: true,
         email: true,
         doc: true,
         createdAt: true,
