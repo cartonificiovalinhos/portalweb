@@ -78,6 +78,7 @@ function programHref(code: string): string | null {
     case 'SETTINGS': return '/settings';
     case 'ADMIN_ENTITIES': return '/admin/entities';
     case 'ADMIN_MODULES': return '/admin/modules';
+    case 'ADMIN_APPROVAL': return '/admin/approvals';
     case 'SALES_CREATE_ORDER': return '/sales/orders/new';
     case 'SALES_ORDER_SEARCH': return '/sales/orders';
     case 'SALES_CLIENT_SEARCH': return '/sales/clients';
@@ -232,6 +233,7 @@ export default function Sidebar({ perms, mobileOpen, setMobileOpen, pathname, us
                         case 'SETTINGS': return Icon.settings;
                         case 'ADMIN_ENTITIES': return Icon.adminEntities;
                         case 'ADMIN_MODULES': return Icon.adminModules;
+                        case 'ADMIN_APPROVAL': return Icon.adminModule;
                         case 'SALES_CREATE_ORDER': return Icon.salesCreateOrder;
                         case 'SALES_ORDER_SEARCH': return Icon.salesOrderSearch;
                         case 'SALES_CLIENT_SEARCH': return Icon.salesClientSearch;

@@ -29,6 +29,7 @@ model User {
   userEntities       UserEntity[]
   assignedWorkOrders WorkOrder[]
   userInventoryItemPrices UserInventoryItemPrice[]
+  commercialFamilyApprovalUsers CommercialFamilyApprovalUser[]
 
   // Gestão FinTI Relations
   gestaoFintiCategoriasCriadas       GestaoFintiCategoria[]   @relation("GestaoFintiCategoriaCriadoPor")
@@ -582,10 +583,29 @@ model CommercialFamily {
   // Itens relacionados
   inventoryItems InventoryItem[]
   standardOccurrenceFamilies StandardOccurrenceFamily[]
+  approvalUsers  CommercialFamilyApprovalUser[]
 
   @@index([description])
   @@index([erpCode])
   @@map("commercialfamily")
+}
+
+model CommercialFamilyApprovalUser {
+  id               Int             @id @default(autoincrement())
+  commercialFamilyId Int
+  userId           Int
+  canView          Boolean         @default(true)
+  discountFrom     Float?
+  discountTo       Float?
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+
+  commercialFamily CommercialFamily @relation(fields: [commercialFamilyId], references: [id], onDelete: Cascade)
+  user             User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([commercialFamilyId, userId])
+  @@index([userId])
+  @@map("commercialfamilyapprovaluser")
 }
 
 model PaymentTerm {
