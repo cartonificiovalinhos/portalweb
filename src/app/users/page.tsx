@@ -376,6 +376,7 @@ export default function UsersPage() {
               <tr className="bg-gray-50 text-left">
                 <th className="p-2 w-10"><input type="checkbox" checked={allVisibleSelected} onChange={(e)=>toggleSelectAllVisible(e.target.checked)} /></th>
                 <th className="p-2">Nome</th>
+                <th className="p-2">Nome Abrev</th>
                 <th className="p-2">CPF/CNPJ</th>
                 <th className="p-2">E-mail</th>
               </tr>
@@ -385,12 +386,13 @@ export default function UsersPage() {
                 <tr key={u.id} className="border-b hover:bg-gray-50">
                   <td className="p-2 text-center"><input type="checkbox" checked={selectedIds.includes(u.id)} onChange={(e)=>toggleRow(u.id, e.target.checked)} /></td>
                   <td className="p-2"><button type="button" className="text-left w-full" onClick={() => { setSelectedUserId(u.id); setEditingUserId(u.id); setForm({ name: u.name || '', abbrevName: String(u.abbrevName || ''), email: u.email || '', password: '', doc: String(u.doc || '') }); setFormOpen(true); }}>{u.name}</button></td>
+                  <td className="p-2">{String(u.abbrevName || '')}</td>
                   <td className="p-2">{formatDoc(String(u.doc || ''))}</td>
                   <td className="p-2">{u.email}</td>
                 </tr>
               ))}
               {filteredUsers.length === 0 && (
-                <tr><td colSpan={4} className="p-2 text-gray-500">Nenhum usuário</td></tr>
+                <tr><td colSpan={5} className="p-2 text-gray-500">Nenhum usuário</td></tr>
               )}
             </tbody>
           </table>
