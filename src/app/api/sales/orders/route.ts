@@ -112,7 +112,7 @@ export async function GET(request: Request) {
       }
     }
 
-    const data = await prisma.salesOrder.findMany({
+    const findOrdersWithAbbrev = async () => prisma.salesOrder.findMany({
       where,
       include: {
         entity: { select: { name: true } },
@@ -127,6 +127,34 @@ export async function GET(request: Request) {
       },
       orderBy: { createdAt: 'desc' }
     });
+
+    const findOrdersWithoutAbbrev = async () => prisma.salesOrder.findMany({
+      where,
+      include: {
+        entity: { select: { name: true } },
+        createdBy: { select: { id: true, name: true } },
+        items: {
+          include: {
+            inventoryItem: {
+              include: { commercialFamily: true }
+            }
+          }
+        }
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    let data: any[] = [];
+    try {
+      data = await findOrdersWithAbbrev();
+    } catch (err: any) {
+      const msg = String(err?.message || err || '').toLowerCase();
+      if (msg.includes('abbrevname') && (msg.includes('unknown column') || msg.includes('does not exist'))) {
+        data = await findOrdersWithoutAbbrev();
+      } else {
+        throw err;
+      }
+    }
     return NextResponse.json(Array.isArray(data) ? data : []);
   } catch (err: any) {
     const message = err?.message || 'Erro ao listar pedidos';

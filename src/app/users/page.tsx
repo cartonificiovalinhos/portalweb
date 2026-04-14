@@ -48,7 +48,9 @@ export default function UsersPage() {
     setLoading(true); setErr(null);
     try {
       const res = await fetch("/api/users");
-      const data = await res.json();
+      const isJson = (res.headers.get('content-type') || '').includes('application/json');
+      const data = isJson ? await res.json().catch(() => null as any) : null;
+      if (!res.ok) throw new Error((data as any)?.error || `Erro ${res.status}`);
       const arr = Array.isArray(data) ? data : [];
       setUsers(arr);
       setSelectedUserId((prev) => prev ?? (arr.length ? arr[0].id : null));

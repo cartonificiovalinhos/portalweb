@@ -8,44 +8,79 @@ function normalizeDoc(doc: string): string {
 }
 
 export async function GET(request: Request) {
-  const url = new URL(request.url);
-  const salesRepAdmin = url.searchParams.get('salesRepAdmin');
-  const onlyReps = !!(salesRepAdmin && ['1','true','yes'].includes(String(salesRepAdmin).toLowerCase()));
-  const users = await prisma.user.findMany({
-    where: onlyReps ? { salesRepAdmin: true } : undefined,
-    orderBy: { name: 'asc' },
-    select: {
-      id: true,
-      name: true,
-      abbrevName: true,
-      email: true,
-      doc: true,
-      salesRepAdmin: true,
-      isSalesAdmin: true,
-      twoFactorRequired: true,
-      twoFactorSecret: true,
-      erpIntegrationMode: true,
-      createdAt: true,
-      updatedAt: true,
-    },
-  });
+  try {
+    const url = new URL(request.url);
+    const salesRepAdmin = url.searchParams.get('salesRepAdmin');
+    const onlyReps = !!(salesRepAdmin && ['1','true','yes'].includes(String(salesRepAdmin).toLowerCase()));
 
-  return NextResponse.json(
-    users.map((u) => ({
-      id: u.id,
-      name: u.name,
-      abbrevName: (u as any).abbrevName ?? null,
-      email: u.email,
-      doc: u.doc,
-      salesRepAdmin: u.salesRepAdmin,
-      isSalesAdmin: u.isSalesAdmin,
-      twoFactorRequired: u.twoFactorRequired,
-      erpIntegrationMode: u.erpIntegrationMode,
-      createdAt: u.createdAt,
-      updatedAt: u.updatedAt,
-      hasTwoFactorSecret: u.twoFactorSecret != null,
-    }))
-  );
+    const fetchUsersWithAbbrev = async () => prisma.user.findMany({
+      where: onlyReps ? { salesRepAdmin: true } : undefined,
+      orderBy: { name: 'asc' },
+      select: {
+        id: true,
+        name: true,
+        abbrevName: true,
+        email: true,
+        doc: true,
+        salesRepAdmin: true,
+        isSalesAdmin: true,
+        twoFactorRequired: true,
+        twoFactorSecret: true,
+        erpIntegrationMode: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+
+    const fetchUsersWithoutAbbrev = async () => prisma.user.findMany({
+      where: onlyReps ? { salesRepAdmin: true } : undefined,
+      orderBy: { name: 'asc' },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        doc: true,
+        salesRepAdmin: true,
+        isSalesAdmin: true,
+        twoFactorRequired: true,
+        twoFactorSecret: true,
+        erpIntegrationMode: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+
+    let users: any[] = [];
+    try {
+      users = await fetchUsersWithAbbrev();
+    } catch (err: any) {
+      const msg = String(err?.message || err || '').toLowerCase();
+      if (msg.includes('abbrevname') && (msg.includes('unknown column') || msg.includes('does not exist'))) {
+        users = await fetchUsersWithoutAbbrev();
+      } else {
+        throw err;
+      }
+    }
+
+    return NextResponse.json(
+      users.map((u) => ({
+        id: u.id,
+        name: u.name,
+        abbrevName: (u as any).abbrevName ?? null,
+        email: u.email,
+        doc: u.doc,
+        salesRepAdmin: u.salesRepAdmin,
+        isSalesAdmin: u.isSalesAdmin,
+        twoFactorRequired: u.twoFactorRequired,
+        erpIntegrationMode: u.erpIntegrationMode,
+        createdAt: u.createdAt,
+        updatedAt: u.updatedAt,
+        hasTwoFactorSecret: u.twoFactorSecret != null,
+      }))
+    );
+  } catch (err: any) {
+    return NextResponse.json({ error: String(err?.message || err) }, { status: 500 });
+  }
 }
 
 export async function POST(request: Request) {
