@@ -152,6 +152,9 @@ export default function ClientDetailsPage() {
   const [basePriceRep, setBasePriceRep] = useState<Representative | null>(null);
   const [basePrices, setBasePrices] = useState<Record<string, number>>({});
   const [adjustPercent, setAdjustPercent] = useState<string>("");
+  const [adjustType, setAdjustType] = useState<"value" | "percent">("percent");
+  const [linkedItemsQuery, setLinkedItemsQuery] = useState("");
+  const [unlinkedItemsQuery, setUnlinkedItemsQuery] = useState("");
   const [loadingUnlinkedItems, setLoadingUnlinkedItems] = useState(false);
   const [loadingBasePrices, setLoadingBasePrices] = useState(false);
   const [unlinking, setUnlinking] = useState(false);
@@ -255,9 +258,21 @@ export default function ClientDetailsPage() {
   }, [paymentTerms.length]);
 
   useEffect(() => {
-    const last = Math.max(0, Math.ceil(linkedItems.length / PAGE_SIZE) - 1);
+    const q = linkedItemsQuery.trim().toLowerCase();
+    const count = q
+      ? linkedItems.filter((it) => {
+          const name = String(it.name || '').toLowerCase();
+          const sku = String(it.sku || '').toLowerCase();
+          return name.includes(q) || sku.includes(q);
+        }).length
+      : linkedItems.length;
+    const last = Math.max(0, Math.ceil(count / PAGE_SIZE) - 1);
     setLinkedItemsPage((p) => Math.min(p, last));
-  }, [linkedItems.length]);
+  }, [linkedItems, linkedItemsQuery]);
+
+  useEffect(() => {
+    setLinkedItemsPage(0);
+  }, [linkedItemsQuery]);
 
   useEffect(() => {
     const loadBasePrices = async () => {
@@ -317,16 +332,40 @@ export default function ClientDetailsPage() {
   }, [activeTab, id, itemsSubTab, refreshUnlinkedItems]);
 
   const selectedLinkedItemSet = useMemo(() => new Set(selectedLinkedItemIds), [selectedLinkedItemIds]);
+  const linkedItemsFiltered = useMemo(() => {
+    const q = linkedItemsQuery.trim().toLowerCase();
+    if (!q) return linkedItems;
+    return linkedItems.filter((it) => {
+      const name = String(it.name || '').toLowerCase();
+      const sku = String(it.sku || '').toLowerCase();
+      return name.includes(q) || sku.includes(q);
+    });
+  }, [linkedItems, linkedItemsQuery]);
   const allLinkedSelected = useMemo(() => {
-    if (linkedItems.length === 0) return false;
-    return selectedLinkedItemSet.size === new Set(linkedItems.map((x) => x.id)).size;
-  }, [linkedItems, selectedLinkedItemSet]);
+    if (linkedItemsFiltered.length === 0) return false;
+    const visible = new Set(linkedItemsFiltered.map((x) => x.id));
+    let count = 0;
+    for (const id of selectedLinkedItemSet) if (visible.has(id)) count += 1;
+    return count === visible.size;
+  }, [linkedItemsFiltered, selectedLinkedItemSet]);
 
   const selectedUnlinkedItemSet = useMemo(() => new Set(selectedUnlinkedItemIds), [selectedUnlinkedItemIds]);
+  const unlinkedItemsFiltered = useMemo(() => {
+    const q = unlinkedItemsQuery.trim().toLowerCase();
+    if (!q) return unlinkedItems;
+    return unlinkedItems.filter((it) => {
+      const name = String(it.name || '').toLowerCase();
+      const sku = String(it.sku || '').toLowerCase();
+      return name.includes(q) || sku.includes(q);
+    });
+  }, [unlinkedItems, unlinkedItemsQuery]);
   const allUnlinkedSelected = useMemo(() => {
-    if (unlinkedItems.length === 0) return false;
-    return selectedUnlinkedItemSet.size === new Set(unlinkedItems.map((x) => x.id)).size;
-  }, [unlinkedItems, selectedUnlinkedItemSet]);
+    if (unlinkedItemsFiltered.length === 0) return false;
+    const visible = new Set(unlinkedItemsFiltered.map((x) => x.id));
+    let count = 0;
+    for (const id of selectedUnlinkedItemSet) if (visible.has(id)) count += 1;
+    return count === visible.size;
+  }, [unlinkedItemsFiltered, selectedUnlinkedItemSet]);
 
   const hasBasePrices = useMemo(() => Object.keys(basePrices).length > 0, [basePrices]);
 
@@ -408,15 +447,15 @@ export default function ClientDetailsPage() {
       alert('Selecione ao menos um item para aplicar o reajuste.');
       return;
     }
-    const pct = Number(String(adjustPercent).replace(',', '.'));
-    if (!Number.isFinite(pct)) return;
+    const amount = Number(String(adjustPercent).replace(',', '.'));
+    if (!Number.isFinite(amount)) return;
 
     setApplyingAdjust(true);
     try {
       const res = await fetch(`/api/clients/${client.id}/items`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'applyAdjust', repUserId: basePriceRep.id, percent: pct, inventoryItemIds: selectedLinkedItemIds }),
+        body: JSON.stringify({ action: 'applyAdjust', repUserId: basePriceRep.id, adjustType, amount, inventoryItemIds: selectedLinkedItemIds }),
       });
       if (!res.ok) throw new Error('Falha ao aplicar reajuste');
       await refreshLinkedItems();
@@ -425,7 +464,7 @@ export default function ClientDetailsPage() {
     } finally {
       setApplyingAdjust(false);
     }
-  }, [adjustPercent, basePriceRep, client, hasBasePrices, refreshLinkedItems, selectedLinkedItemIds]);
+  }, [adjustPercent, adjustType, basePriceRep, client, hasBasePrices, refreshLinkedItems, selectedLinkedItemIds]);
 
   const addToCart = async (inventoryItemId: number) => {
     if (!client) return;
@@ -495,7 +534,7 @@ export default function ClientDetailsPage() {
 
   const ordersTotalPages = Math.max(1, Math.ceil(orders.length / PAGE_SIZE));
   const paymentTermsTotalPages = Math.max(1, Math.ceil(paymentTerms.length / PAGE_SIZE));
-  const linkedItemsTotalPages = Math.max(1, Math.ceil(linkedItems.length / PAGE_SIZE));
+  const linkedItemsTotalPages = Math.max(1, Math.ceil(linkedItemsFiltered.length / PAGE_SIZE));
 
   const ordersSliceStart = ordersPage * PAGE_SIZE;
   const ordersView = orders.slice(ordersSliceStart, ordersSliceStart + PAGE_SIZE);
@@ -504,7 +543,7 @@ export default function ClientDetailsPage() {
   const paymentTermsView = paymentTerms.slice(paymentTermsSliceStart, paymentTermsSliceStart + PAGE_SIZE);
 
   const linkedItemsSliceStart = linkedItemsPage * PAGE_SIZE;
-  const linkedItemsView = linkedItems.slice(linkedItemsSliceStart, linkedItemsSliceStart + PAGE_SIZE);
+  const linkedItemsView = linkedItemsFiltered.slice(linkedItemsSliceStart, linkedItemsSliceStart + PAGE_SIZE);
 
   const formatDoc = (doc: string | null | undefined) => {
     if (!doc) return '-';
@@ -985,7 +1024,7 @@ export default function ClientDetailsPage() {
                   Itens Não Vinculados
                 </button>
               </div>
-              <div className="ml-auto text-xs text-gray-500">{itemsSubTab === "linked" ? linkedItems.length : unlinkedItems.length} registro(s)</div>
+              <div className="ml-auto text-xs text-gray-500">{itemsSubTab === "linked" ? linkedItemsFiltered.length : unlinkedItemsFiltered.length} registro(s)</div>
             </div>
             {itemsSubTab === "linked" && (
               <>
@@ -996,11 +1035,18 @@ export default function ClientDetailsPage() {
                       checked={allLinkedSelected}
                       onChange={(e) => {
                         const checked = e.target.checked;
-                        setSelectedLinkedItemIds(checked ? linkedItems.map((x) => x.id) : []);
+                        setSelectedLinkedItemIds(checked ? linkedItemsFiltered.map((x) => x.id) : []);
                       }}
                     />
                     <span>Selecionar todos</span>
                   </label>
+
+                  <input
+                    className="w-64 max-w-full px-3 py-2 text-xs border rounded bg-white"
+                    value={linkedItemsQuery}
+                    onChange={(e) => setLinkedItemsQuery(e.target.value)}
+                    placeholder="Pesquisar por nome ou SKU"
+                  />
 
                   <button
                     className="px-3 py-2 text-xs border rounded bg-white hover:bg-gray-100 disabled:opacity-50"
@@ -1012,13 +1058,20 @@ export default function ClientDetailsPage() {
 
                   {hasBasePrices && (
                     <div className="flex items-center gap-2">
-                      <div className="text-xs text-gray-600">
-                        {loadingBasePrices ? "Carregando preço base..." : basePriceRep ? `Preço base: ${basePriceRep.name}` : ""}
+                      <label className="text-xs text-gray-700 whitespace-nowrap">Reajuste</label>
+                      <div className="inline-flex items-center gap-2 text-xs text-gray-700">
+                        <label className="inline-flex items-center gap-1">
+                          <input type="radio" name="adjustType" checked={adjustType === "value"} onChange={() => setAdjustType("value")} />
+                          <span>Valor</span>
+                        </label>
+                        <label className="inline-flex items-center gap-1">
+                          <input type="radio" name="adjustType" checked={adjustType === "percent"} onChange={() => setAdjustType("percent")} />
+                          <span>Percentual</span>
+                        </label>
                       </div>
-                      <label className="text-xs text-gray-700 whitespace-nowrap">Reajuste(%)</label>
                       <input
                         className="w-24 px-2 py-1 border rounded text-sm"
-                        inputMode="decimal"
+                        inputMode="text"
                         value={adjustPercent}
                         onChange={(e) => setAdjustPercent(e.target.value)}
                       />
@@ -1081,7 +1134,7 @@ export default function ClientDetailsPage() {
                       </div>
                     );
                   })}
-                  {linkedItems.length === 0 && <div className="p-3 text-gray-500 text-sm">Sem itens</div>}
+                  {linkedItemsFiltered.length === 0 && <div className="p-3 text-gray-500 text-sm">Sem itens</div>}
                 </div>
 
                 <div className="hidden sm:block overflow-x-auto">
@@ -1101,7 +1154,7 @@ export default function ClientDetailsPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {linkedItems.length === 0 && (
+                      {linkedItemsFiltered.length === 0 && (
                         <tr><td className="p-3 text-gray-500" colSpan={hasBasePrices ? 10 : 9}>Sem itens</td></tr>
                       )}
                       {linkedItemsView.map((it, i) => {
@@ -1154,11 +1207,18 @@ export default function ClientDetailsPage() {
                       checked={allUnlinkedSelected}
                       onChange={(e) => {
                         const checked = e.target.checked;
-                        setSelectedUnlinkedItemIds(checked ? unlinkedItems.map((x) => x.id) : []);
+                        setSelectedUnlinkedItemIds(checked ? unlinkedItemsFiltered.map((x) => x.id) : []);
                       }}
                     />
                     <span>Selecionar todos</span>
                   </label>
+
+                  <input
+                    className="w-64 max-w-full px-3 py-2 text-xs border rounded bg-white"
+                    value={unlinkedItemsQuery}
+                    onChange={(e) => setUnlinkedItemsQuery(e.target.value)}
+                    placeholder="Pesquisar por nome ou SKU"
+                  />
 
                   <button
                     className="px-3 py-2 text-xs border rounded bg-white hover:bg-gray-100 disabled:opacity-50"
@@ -1184,10 +1244,10 @@ export default function ClientDetailsPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {unlinkedItems.length === 0 && !loadingUnlinkedItems && (
+                      {unlinkedItemsFiltered.length === 0 && !loadingUnlinkedItems && (
                         <tr><td className="p-3 text-gray-500" colSpan={7}>Sem itens</td></tr>
                       )}
-                      {unlinkedItems.map((it, i) => (
+                      {unlinkedItemsFiltered.map((it, i) => (
                         <tr key={i} className="border-t">
                           <td className="p-2">
                             <input
@@ -1216,7 +1276,7 @@ export default function ClientDetailsPage() {
                   </table>
                 </div>
                 <div className="sm:hidden divide-y">
-                  {unlinkedItems.map((it, i) => (
+                  {unlinkedItemsFiltered.map((it, i) => (
                     <div key={i} className="p-3">
                       <div className="flex items-start gap-3">
                         <input
@@ -1246,7 +1306,7 @@ export default function ClientDetailsPage() {
                       </div>
                     </div>
                   ))}
-                  {unlinkedItems.length === 0 && !loadingUnlinkedItems && (
+                  {unlinkedItemsFiltered.length === 0 && !loadingUnlinkedItems && (
                     <div className="p-3 text-gray-500 text-sm">Sem itens</div>
                   )}
                 </div>

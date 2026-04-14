@@ -191,9 +191,11 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
 
       if (action === 'applyAdjust') {
         const repUserId = Number((rawBody as any).repUserId);
-        const percent = Number((rawBody as any).percent);
+        const adjustTypeRaw = String((rawBody as any).adjustType || '').trim().toLowerCase();
+        const adjustType: 'value' | 'percent' = adjustTypeRaw === 'value' ? 'value' : 'percent';
+        const amount = Number((rawBody as any).amount ?? (rawBody as any).percent);
         if (!Number.isFinite(repUserId) || repUserId <= 0) return NextResponse.json({ error: 'repUserId inválido' }, { status: 400 });
-        if (!Number.isFinite(percent)) return NextResponse.json({ error: 'percent inválido' }, { status: 400 });
+        if (!Number.isFinite(amount)) return NextResponse.json({ error: 'reajuste inválido' }, { status: 400 });
 
         const inventoryItemIdsRaw = (rawBody as any).inventoryItemIds;
         const inventoryItemIds = Array.isArray(inventoryItemIdsRaw)
@@ -201,7 +203,7 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
           : [];
         if (!inventoryItemIds.length) return NextResponse.json({ error: 'Selecione ao menos um item' }, { status: 400 });
 
-        const multiplier = 1 + percent / 100;
+        const multiplier = 1 + amount / 100;
         const clientItems = await prisma.clientItem.findMany({
           where: { clientId, allowed: true, inventoryItemId: { in: inventoryItemIds } },
           select: {
@@ -254,7 +256,9 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
 
             await tx.clientItem.update({
               where: { id: row.id },
-              data: { unitPrice: base * multiplier },
+              data: {
+                unitPrice: Math.max(0, adjustType === 'value' ? base + amount : base * multiplier),
+              },
             });
             updatedCount += 1;
           }
