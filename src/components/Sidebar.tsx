@@ -221,7 +221,6 @@ export default function Sidebar({ perms, mobileOpen, setMobileOpen, pathname, us
                 <div className="mt-1 space-y-1">
                   {(m.programs || []).map((p) => {
                     const href = programHref(p.code);
-                    if (!href) return null;
                     const icon = (() => {
                       switch (p.code) {
                         case 'DASHBOARD': return Icon.dashboard;
@@ -254,6 +253,18 @@ export default function Sidebar({ perms, mobileOpen, setMobileOpen, pathname, us
                         default: return null;
                       }
                     })();
+                    if (!href) {
+                      return (
+                        <div
+                          key={p.code}
+                          className={`ml-6 flex items-center ${collapsed && !mobileOpen ? "justify-center" : "gap-2"} px-3 py-2 rounded text-sm text-gray-400 opacity-70 cursor-not-allowed`}
+                          title="Programa sem rota configurada"
+                        >
+                          {icon && <span className="text-gray-400">{icon}</span>}
+                          {(!collapsed || mobileOpen) && <span>{p.name}</span>}
+                        </div>
+                      );
+                    }
                     const active = pathname === href || (href !== "/" && pathname?.startsWith(href));
                     return (
                       <Link

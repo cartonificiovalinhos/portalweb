@@ -41,10 +41,10 @@ export async function GET() {
         
         const uemRows = await prisma
           .$queryRawUnsafe<any[]>(
-            `SELECT uem.id as id
+            `SELECT uem.id as id, uem.allowed as allowed
              FROM userentitymodule uem
              JOIN userentity ue ON ue.id = uem.userEntityId
-             WHERE ue.userId = ? AND ue.entityId = ? AND uem.moduleId = ? AND uem.allowed = 1 AND uem.id IS NOT NULL
+             WHERE ue.userId = ? AND ue.entityId = ? AND uem.moduleId = ? AND uem.id IS NOT NULL
              ORDER BY uem.id DESC
              LIMIT 1`,
             uid,
@@ -52,8 +52,11 @@ export async function GET() {
             mod.id,
           )
           .catch(() => []);
+        const userEntityModuleAllowedRaw = uemRows?.[0]?.allowed;
+        const userEntityModuleAllowed = userEntityModuleAllowedRaw === null || userEntityModuleAllowedRaw === undefined ? null : Boolean(userEntityModuleAllowedRaw);
+        if (userEntityModuleAllowed === false) continue;
         const userEntityModuleId = uemRows?.[0]?.id ? Number(uemRows[0].id) : null;
-        if (!userEntityModuleId || !Number.isFinite(userEntityModuleId)) continue;
+        const hasUserEntityModuleId = Boolean(userEntityModuleId && Number.isFinite(userEntityModuleId));
 
         // 3. Buscar programas do módulo (Program)
         // Devem estar ativos, showInMenu=true, e permitidos na entidade (EntityModuleProgram)
@@ -89,30 +92,34 @@ export async function GET() {
           entityAllowedByProgramId.set(Math.trunc(pNum), Boolean(allowed));
         }
 
-        const uempRows = programIds.length
-          ? await prisma
-              .$queryRawUnsafe<any[]>(
-                `SELECT programId
-                 FROM userentitymoduleprogram
-                 WHERE userEntityModuleId = ? AND allowed = 1 AND id IS NOT NULL AND programId IN (${programIds.map(() => '?').join(',')})`,
-                userEntityModuleId,
-                ...programIds,
-              )
-              .catch(() => [])
-          : [];
-        const userAllowedSet = new Set<number>();
-        for (const r of uempRows || []) {
-          const pid = r?.programId;
-          const pNum = pid === null || pid === undefined ? NaN : Number(pid);
-          if (!Number.isFinite(pNum)) continue;
-          userAllowedSet.add(Math.trunc(pNum));
+        const userAllowedByProgramId = new Map<number, boolean>();
+        if (hasUserEntityModuleId && programIds.length) {
+          const uempRows = await prisma
+            .$queryRawUnsafe<any[]>(
+              `SELECT id, programId, allowed
+               FROM userentitymoduleprogram
+               WHERE userEntityModuleId = ? AND id IS NOT NULL AND programId IN (${programIds.map(() => '?').join(',')})
+               ORDER BY id DESC`,
+              userEntityModuleId,
+              ...programIds,
+            )
+            .catch(() => []);
+          for (const r of uempRows || []) {
+            const pid = r?.programId;
+            const allowed = r?.allowed;
+            const pNum = pid === null || pid === undefined ? NaN : Number(pid);
+            if (!Number.isFinite(pNum)) continue;
+            const key = Math.trunc(pNum);
+            if (!userAllowedByProgramId.has(key)) userAllowedByProgramId.set(key, Boolean(allowed));
+          }
         }
 
         for (const prog of allPrograms) {
           const isEntityAllowed = entityAllowedByProgramId.has(prog.id) ? Boolean(entityAllowedByProgramId.get(prog.id)) : true;
           if (!isEntityAllowed) continue;
 
-          if (userAllowedSet.has(prog.id)) {
+          const isUserAllowed = hasUserEntityModuleId ? (userAllowedByProgramId.has(prog.id) ? Boolean(userAllowedByProgramId.get(prog.id)) : true) : true;
+          if (isUserAllowed) {
             allowedPrograms.push({
               id: prog.id,
               code: prog.code,
