@@ -96,10 +96,14 @@ export async function GET() {
         if (hasUserEntityModuleId && programIds.length) {
           const uempRows = await prisma
             .$queryRawUnsafe<any[]>(
-              `SELECT id, programId, allowed
-               FROM userentitymoduleprogram
-               WHERE userEntityModuleId = ? AND id IS NOT NULL AND programId IN (${programIds.map(() => '?').join(',')})
-               ORDER BY id DESC`,
+              `SELECT t.programId as programId, t.allowed as allowed
+               FROM userentitymoduleprogram t
+               JOIN (
+                 SELECT programId, MAX(id) as maxId
+                 FROM userentitymoduleprogram
+                 WHERE userEntityModuleId = ? AND id IS NOT NULL AND programId IN (${programIds.map(() => '?').join(',')})
+                 GROUP BY programId
+               ) x ON x.maxId = t.id`,
               userEntityModuleId,
               ...programIds,
             )
@@ -110,7 +114,7 @@ export async function GET() {
             const pNum = pid === null || pid === undefined ? NaN : Number(pid);
             if (!Number.isFinite(pNum)) continue;
             const key = Math.trunc(pNum);
-            if (!userAllowedByProgramId.has(key)) userAllowedByProgramId.set(key, Boolean(allowed));
+            userAllowedByProgramId.set(key, Boolean(allowed));
           }
         }
 
