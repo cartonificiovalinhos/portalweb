@@ -81,6 +81,8 @@ export async function GET(request: Request) {
 
     const statusTranslation: Record<string, string> = {
         'OPEN': 'Orçamento',
+        'EM APROVAÇÃO COMERCIAL': 'Em Aprovação Comercial',
+        'EM APROVACAO COMERCIAL': 'Em Aprovação Comercial',
         'AGUARDANDO INTEGRAÇÃO': 'Aguardando Integração',
         'ERRO NA INTEGRAÇÃO': 'Erro na integração',
         'INTEGRADO': 'Integrado',

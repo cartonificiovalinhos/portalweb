@@ -192,6 +192,8 @@ function statusChipStyle(s?: string): string {
     case 'Orçamento':
     case 'OPEN':
       return 'bg-yellow-100 text-yellow-800 border border-yellow-300';
+    case 'Em Aprovação Comercial':
+      return 'bg-orange-100 text-orange-800 border border-orange-300';
     case 'Aguardando Integração':
       return 'bg-amber-100 text-amber-800 border border-amber-300';
     case 'Integrado':
@@ -208,6 +210,10 @@ function statusLabelPt(s?: string): string {
   switch (v) {
     case 'OPEN':
       return 'Orçamento';
+    case 'EM APROVAÇÃO COMERCIAL':
+    case 'EM APROVACAO COMERCIAL':
+    case 'COMMERCIAL APPROVAL':
+      return 'Em Aprovação Comercial';
     case 'AGUARDANDO INTEGRAÇÃO':
     case 'AGUARDANDO INTEGRACAO':
     case 'AWAITING INTEGRATION':

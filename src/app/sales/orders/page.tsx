@@ -26,6 +26,9 @@ export default function SalesOrdersPage() {
   const [dateEnd, setDateEnd] = useState<string>("");
   const [selected, setSelected] = useState<SalesOrder | null>(null);
   const [integratingId, setIntegratingId] = useState<number | null>(null);
+  const [page, setPage] = useState(0);
+
+  const PAGE_SIZE = 30;
 
   useEffect(() => {
     const load = async () => {
@@ -48,6 +51,7 @@ export default function SalesOrdersPage() {
     const v = (s || '').trim();
     switch (v) {
       case 'Orçamento': return 'bg-gray-100 text-gray-800';
+      case 'Em Aprovação Comercial': return 'bg-orange-100 text-orange-800';
       case 'Aguardando Integração': return 'bg-yellow-100 text-yellow-800';
       case 'Erro na integração': return 'bg-red-100 text-red-800';
       case 'Integrado': return 'bg-blue-100 text-blue-800';
@@ -64,6 +68,9 @@ export default function SalesOrdersPage() {
     const v = (s || '').trim().toUpperCase();
     switch (v) {
       case 'OPEN': return 'Orçamento';
+      case 'EM APROVAÇÃO COMERCIAL':
+      case 'EM APROVACAO COMERCIAL':
+      case 'COMMERCIAL APPROVAL': return 'Em Aprovação Comercial';
       case 'AGUARDANDO INTEGRAÇÃO':
       case 'AGUARDANDO INTEGRACAO':
       case 'AWAITING INTEGRATION': return 'Aguardando Integração';
@@ -104,6 +111,18 @@ export default function SalesOrdersPage() {
         return true;
       });
   }, [orders, q, status, dateStart, dateEnd]);
+
+  useEffect(() => {
+    setPage(0);
+  }, [q, status, dateStart, dateEnd]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  useEffect(() => {
+    setPage((p) => Math.min(Math.max(0, totalPages - 1), Math.max(0, p)));
+  }, [totalPages]);
+
+  const pageSliceStart = page * PAGE_SIZE;
+  const pageItems = filtered.slice(pageSliceStart, pageSliceStart + PAGE_SIZE);
 
   const calcTotal = (o: SalesOrder) => {
     return (o.items || []).reduce((acc, item) => {
@@ -156,7 +175,7 @@ export default function SalesOrdersPage() {
       {error && <div className="text-sm text-red-600">{error}</div>}
 
       {/* Filtros */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-3 bg-gray-50 p-3 rounded border border-gray-200">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
         <div>
           <label className="text-xs text-gray-600">Buscar (Número ou Cliente)</label>
           <input className="w-full mt-1 px-2 py-1.5 border rounded" placeholder="Ex: PED-0001 ou João" value={q} onChange={(e) => setQ(e.target.value)} />
@@ -166,6 +185,7 @@ export default function SalesOrdersPage() {
           <select className="w-full mt-1 px-2 py-1.5 border rounded" value={status} onChange={(e) => setStatus(e.target.value)}>
             <option value="">Todas</option>
             <option value="Orçamento">Orçamento</option>
+            <option value="Em Aprovação Comercial">Em Aprovação Comercial</option>
             <option value="Aguardando Integração">Aguardando Integração</option>
             <option value="Erro na integração">Erro na integração</option>
             <option value="Integrado">Integrado</option>
@@ -191,6 +211,37 @@ export default function SalesOrdersPage() {
         <div className="px-3 py-2 border-b bg-gray-50 text-sm text-gray-700 flex items-center">
           <span>Listagem de pedidos</span>
           <div className="ml-auto flex items-center gap-2">
+            <div className="flex items-center gap-1">
+              <button
+                className="px-2 py-1 text-xs border rounded bg-white hover:bg-gray-100 disabled:opacity-50"
+                disabled={page <= 0}
+                onClick={() => setPage(0)}
+              >
+                «
+              </button>
+              <button
+                className="px-2 py-1 text-xs border rounded bg-white hover:bg-gray-100 disabled:opacity-50"
+                disabled={page <= 0}
+                onClick={() => setPage((p) => Math.max(0, p - 1))}
+              >
+                Anterior
+              </button>
+              <span className="px-2 text-xs text-gray-600 whitespace-nowrap">Página {Math.min(page, totalPages - 1) + 1} de {totalPages}</span>
+              <button
+                className="px-2 py-1 text-xs border rounded bg-white hover:bg-gray-100 disabled:opacity-50"
+                disabled={page >= totalPages - 1}
+                onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+              >
+                Próxima
+              </button>
+              <button
+                className="px-2 py-1 text-xs border rounded bg-white hover:bg-gray-100 disabled:opacity-50"
+                disabled={page >= totalPages - 1}
+                onClick={() => setPage(totalPages - 1)}
+              >
+                »
+              </button>
+            </div>
             <span className="text-xs text-gray-500">{filtered.length} registro(s)</span>
             <Link href="/sales/orders/new" className="px-3 py-1.5 text-xs border rounded bg-white hover:bg-gray-100">Novo Pedido</Link>
           </div>
@@ -202,7 +253,7 @@ export default function SalesOrdersPage() {
           {!loading && filtered.length === 0 && (
             <div className="px-3 py-4 text-center text-gray-500 text-sm">Nenhum pedido encontrado.</div>
           )}
-          {!loading && filtered.map((o) => (
+          {!loading && pageItems.map((o) => (
             <div key={o.id} className="px-3 py-3">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
@@ -304,7 +355,7 @@ export default function SalesOrdersPage() {
               {!loading && filtered.length === 0 && (
                 <tr><td colSpan={7} className="px-3 py-4 text-center text-gray-500">Nenhum pedido encontrado.</td></tr>
               )}
-              {!loading && filtered.map((o) => (
+              {!loading && pageItems.map((o) => (
                 <tr key={o.id} className="border-t hover:bg-gray-50">
                   <td className="px-3 py-2 font-mono text-xs">{o.code || o.id}</td>
                   <td className="px-3 py-2 text-xs text-gray-600">{o.entity?.name || '-'}</td>
