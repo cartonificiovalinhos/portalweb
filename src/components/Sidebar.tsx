@@ -125,20 +125,17 @@ export default function Sidebar({ perms, mobileOpen, setMobileOpen, pathname, us
     if (setMobileOpen) setMobileOpen(false);
   }, [pathname, setMobileOpen]);
 
-  // Expand automatically based on route
   useEffect(() => {
     const mods = perms?.modules ?? [];
-    const initial: Record<string, boolean> = {};
-    mods.forEach((m) => {
-      const hasActive = (m.programs || []).some((p) => {
-        const href = programHref(p.code);
-        if (!href) return false;
-        return pathname === href || (href !== "/" && pathname?.startsWith(href));
-      });
-      initial[m.code] = hasActive;
+    const allowed = new Set(mods.map((m) => m.code));
+    setExpanded((prev) => {
+      const next: Record<string, boolean> = {};
+      for (const [k, v] of Object.entries(prev || {})) {
+        if (allowed.has(k)) next[k] = v;
+      }
+      return next;
     });
-    setExpanded(initial);
-  }, [pathname, perms?.modules]);
+  }, [perms?.modules]);
 
   const toggleModule = (code: string) => {
     setExpanded((prev) => ({ ...prev, [code]: !prev[code] }));

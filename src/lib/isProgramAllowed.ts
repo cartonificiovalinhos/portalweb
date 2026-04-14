@@ -9,27 +9,43 @@ export async function isProgramAllowed(userId: number, entityId: number | null, 
   });
   if (!program) return false;
 
-  const userEntity = await prisma.userEntity.findUnique({
-    where: { userId_entityId: { userId, entityId } },
+  const userEntity = await prisma.userEntity.findFirst({
+    where: { userId, entityId },
+    orderBy: { id: 'desc' },
     select: { id: true },
   });
   if (!userEntity) return false;
 
-  const userEntityModule = await prisma.userEntityModule.findUnique({
-    where: { userEntityId_moduleId: { userEntityId: userEntity.id, moduleId: program.moduleId } },
-    select: { id: true, allowed: true },
+  const userEntityModuleAllowed = await prisma.userEntityModule.findFirst({
+    where: { userEntityId: userEntity.id, moduleId: program.moduleId, allowed: true },
+    orderBy: { id: 'desc' },
+    select: { id: true },
   });
 
-  const moduleAllowed = userEntityModule ? Boolean(userEntityModule.allowed) : true;
-  if (!moduleAllowed) return false;
+  if (!userEntityModuleAllowed) {
+    const anyUserEntityModule = await prisma.userEntityModule.findFirst({
+      where: { userEntityId: userEntity.id, moduleId: program.moduleId },
+      orderBy: { id: 'desc' },
+      select: { allowed: true },
+    });
+    if (anyUserEntityModule) return Boolean(anyUserEntityModule.allowed);
+    return true;
+  }
 
-  if (!userEntityModule) return true;
+  const userProgramAllowed = await prisma.userEntityModuleProgram.findFirst({
+    where: { userEntityModuleId: userEntityModuleAllowed.id, programId: program.id, allowed: true },
+    orderBy: { id: 'desc' },
+    select: { id: true },
+  });
 
-  const userProgram = await prisma.userEntityModuleProgram.findUnique({
-    where: { userEntityModuleId_programId: { userEntityModuleId: userEntityModule.id, programId: program.id } },
+  if (userProgramAllowed) return true;
+
+  const anyUserProgram = await prisma.userEntityModuleProgram.findFirst({
+    where: { userEntityModuleId: userEntityModuleAllowed.id, programId: program.id },
+    orderBy: { id: 'desc' },
     select: { allowed: true },
   });
-
-  return userProgram ? Boolean(userProgram.allowed) : true;
+  if (anyUserProgram) return Boolean(anyUserProgram.allowed);
+  return true;
 }
 
