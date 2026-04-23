@@ -294,6 +294,7 @@ export default function SalesOrderMaintenancePage() {
   const [order, setOrder] = useState<SalesOrder | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [helpOpen, setHelpOpen] = useState(false);
   const [showFeaturesFor, setShowFeaturesFor] = useState<number | null>(null);
   const [hdrDraft, setHdrDraft] = useState<{ paymentTerms?: string; deliveryDate?: string; customerName?: string; customerDoc?: string; triangularCustomerName?: string; triangularCustomerDoc?: string }>({});
   const [deliveryDateBr, setDeliveryDateBr] = useState('');
@@ -315,6 +316,15 @@ export default function SalesOrderMaintenancePage() {
   const [showBilling, setShowBilling] = useState(false);
   const [invoices, setInvoices] = useState<SalesOrderInvoice[]>([]);
   const [loadingInvoices, setLoadingInvoices] = useState(false);
+
+  useEffect(() => {
+    if (!helpOpen) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setHelpOpen(false);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [helpOpen]);
 
   useEffect(() => {
     setDeliveryDateBr(isoToBrDate(hdrDraft.deliveryDate ?? ''));
@@ -638,6 +648,19 @@ export default function SalesOrderMaintenancePage() {
           )}
         </div>
         <div className="flex gap-2">
+          <button
+            type="button"
+            className="inline-flex items-center justify-center w-8 h-8 rounded-full border border-gray-300 bg-white hover:bg-gray-50 text-gray-700"
+            title="Ajuda"
+            aria-label="Ajuda"
+            onClick={() => setHelpOpen(true)}
+          >
+            <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="9" />
+              <path d="M9.6 9.2a2.6 2.6 0 0 1 5.1.8c0 1.8-2.1 2.2-2.1 3.6" />
+              <path d="M12 17h.01" />
+            </svg>
+          </button>
           <Link href="/sales/orders/new" className="px-3 py-2 border rounded bg-white hover:bg-gray-50" title="Novo Pedido" aria-label="Novo Pedido">
             <span className="inline-flex items-center gap-2">
               <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M11 11V4h2v7h7v2h-7v7h-2v-7H4v-2h7Z"/></svg>
@@ -655,6 +678,33 @@ export default function SalesOrderMaintenancePage() {
 
       {loading && <div className="text-sm text-gray-600">Carregando…</div>}
       {error && <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded px-3 py-2">{error}</div>}
+
+      {helpOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center" onClick={() => setHelpOpen(false)}>
+          <div className="bg-white w-full max-w-2xl rounded shadow-lg" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-label="Ajuda da tela">
+            <div className="px-4 py-3 border-b flex items-center">
+              <div className="font-semibold">Ajuda • Manutenção de Pedido</div>
+              <button className="ml-auto text-gray-500 hover:text-black" onClick={() => setHelpOpen(false)} aria-label="Fechar">×</button>
+            </div>
+            <div className="p-4 text-sm text-gray-800 space-y-3">
+              <div className="text-gray-700">
+                Use esta tela para consultar e atualizar um pedido existente, acompanhar histórico e faturamento.
+              </div>
+              <ul className="list-disc pl-5 space-y-1 text-gray-700">
+                <li><span className="font-medium">Edição</span>: campos e itens podem ficar bloqueados conforme a situação do pedido.</li>
+                <li><span className="font-medium">Itens</span>: ajuste quantidade, preço unitário e desconto (%); alguns itens exigem dimensões/gramatura.</li>
+                <li><span className="font-medium">Simular Impostos</span>: recalcula o total com impostos e atualiza o pedido.</li>
+                <li><span className="font-medium">Enviar para ERP</span>: disponível quando o status permitir; atualiza a situação conforme retorno.</li>
+                <li><span className="font-medium">Copiar Pedido</span>: cria um novo pedido a partir deste.</li>
+                <li><span className="font-medium">Históricos</span>: visualize histórico de situação e faturamento; baixe DANFE/XML quando disponível.</li>
+              </ul>
+            </div>
+            <div className="px-4 py-3 border-t text-right">
+              <button className="px-3 py-1.5 border rounded hover:bg-gray-100" onClick={() => setHelpOpen(false)}>Fechar</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {order && (
         <div className="space-y-3">

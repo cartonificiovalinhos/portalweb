@@ -28,8 +28,18 @@ export default function SalesOrdersPage() {
   const [selected, setSelected] = useState<SalesOrder | null>(null);
   const [integratingId, setIntegratingId] = useState<number | null>(null);
   const [page, setPage] = useState(0);
+  const [helpOpen, setHelpOpen] = useState(false);
 
   const PAGE_SIZE = 30;
+
+  useEffect(() => {
+    if (!helpOpen) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setHelpOpen(false);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [helpOpen]);
 
   useEffect(() => {
     const load = async () => {
@@ -172,9 +182,28 @@ export default function SalesOrdersPage() {
     </svg>
   );
 
+  const HelpIcon = () => (
+    <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="9" />
+      <path d="M9.6 9.2a2.6 2.6 0 0 1 5.1.8c0 1.8-2.1 2.2-2.1 3.6" />
+      <path d="M12 17h.01" />
+    </svg>
+  );
+
   return (
     <div className="space-y-4">
-      <h1 className="text-xl font-semibold">Venda • Consulta de Pedidos</h1>
+      <div className="flex items-center justify-between gap-3">
+        <h1 className="text-xl font-semibold">Venda • Consulta de Pedidos</h1>
+        <button
+          type="button"
+          className="inline-flex items-center justify-center w-8 h-8 rounded-full border border-gray-300 bg-white hover:bg-gray-50 text-gray-700"
+          title="Ajuda"
+          aria-label="Ajuda"
+          onClick={() => setHelpOpen(true)}
+        >
+          <HelpIcon />
+        </button>
+      </div>
       {error && <div className="text-sm text-red-600">{error}</div>}
 
       {/* Filtros */}
@@ -476,6 +505,32 @@ export default function SalesOrdersPage() {
             </div>
             <div className="px-4 py-3 border-t text-right">
               <button className="px-3 py-1.5 border rounded hover:bg-gray-100" onClick={() => setSelected(null)}>Fechar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {helpOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center" onClick={() => setHelpOpen(false)}>
+          <div className="bg-white w-full max-w-2xl rounded shadow-lg" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-label="Ajuda da tela">
+            <div className="px-4 py-3 border-b flex items-center">
+              <div className="font-semibold">Ajuda • Consulta de Pedidos</div>
+              <button className="ml-auto text-gray-500 hover:text-black" onClick={() => setHelpOpen(false)} aria-label="Fechar">×</button>
+            </div>
+            <div className="p-4 text-sm text-gray-800 space-y-3">
+              <div className="text-gray-700">
+                Use esta tela para localizar pedidos, acompanhar a situação e executar ações rápidas.
+              </div>
+              <ul className="list-disc pl-5 space-y-1 text-gray-700">
+                <li><span className="font-medium">Busca</span>: filtra por número do pedido, cliente ou “Repres”.</li>
+                <li><span className="font-medium">Filtros</span>: selecione situação e período (data inicial/final).</li>
+                <li><span className="font-medium">Paginação</span>: navega em páginas com 30 registros por página.</li>
+                <li><span className="font-medium">Ações</span>: visualizar itens, abrir manutenção/detalhes, enviar para ERP e excluir (quando permitido pelo status).</li>
+                <li><span className="font-medium">Novo Pedido</span>: botão no topo da listagem para abrir a inclusão.</li>
+              </ul>
+            </div>
+            <div className="px-4 py-3 border-t text-right">
+              <button className="px-3 py-1.5 border rounded hover:bg-gray-100" onClick={() => setHelpOpen(false)}>Fechar</button>
             </div>
           </div>
         </div>
