@@ -52,6 +52,7 @@ export async function GET() {
             mod.id,
           )
           .catch(() => []);
+        if (!uemRows?.length) continue;
         const userEntityModuleAllowedRaw = uemRows?.[0]?.allowed;
         const userEntityModuleAllowed = userEntityModuleAllowedRaw === null || userEntityModuleAllowedRaw === undefined ? null : Boolean(userEntityModuleAllowedRaw);
         if (userEntityModuleAllowed === false) continue;
@@ -122,7 +123,7 @@ export async function GET() {
           const isEntityAllowed = entityAllowedByProgramId.has(prog.id) ? Boolean(entityAllowedByProgramId.get(prog.id)) : true;
           if (!isEntityAllowed) continue;
 
-          const isUserAllowed = hasUserEntityModuleId ? (userAllowedByProgramId.has(prog.id) ? Boolean(userAllowedByProgramId.get(prog.id)) : true) : true;
+          const isUserAllowed = hasUserEntityModuleId ? (userAllowedByProgramId.has(prog.id) ? Boolean(userAllowedByProgramId.get(prog.id)) : false) : false;
           if (isUserAllowed) {
             allowedPrograms.push({
               id: prog.id,
