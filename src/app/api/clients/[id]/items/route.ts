@@ -81,7 +81,9 @@ export async function GET(request: Request, props: { params: Promise<{ id: strin
       grammage: l.inventoryItem.grammage
     }));
 
-    if (items.length === 0) {
+    const fallbackParam = (url.searchParams.get('fallback') || '').trim().toLowerCase();
+    const allowFallbackFromOrders = fallbackParam === '1' || fallbackParam === 'true' || fallbackParam === 'yes' || fallbackParam === 'orders';
+    if (allowFallbackFromOrders && items.length === 0) {
       const docDigits = normalizeDoc(String(client.doc || ''));
       const docRaw = String(client.doc || '').trim();
       const whereDoc = docDigits
