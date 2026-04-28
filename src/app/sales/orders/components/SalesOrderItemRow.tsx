@@ -235,6 +235,13 @@ export const SalesOrderItemRow = ({
   const disabledClass = "bg-gray-100 text-gray-500";
   const lockToggleDisabled = !isOrderEditable || isSaving;
   const isEffectivelyLocked = !isOrderEditable || isRowLocked;
+  const compactW = "w-[4.5rem]";
+  const weightKg = computeWeightKg(localItem);
+  const priceByRaw = String(localItem.inventoryItem?.commercialFamily?.priceBy || '').trim().toUpperCase();
+  const isPriceByWeight = priceByRaw === 'WEIGHT' || priceByRaw === 'PESO';
+  const lineBase = (isPriceByWeight ? weightKg : (localItem.quantity ?? 0)) * (localItem.unitPrice ?? 0);
+  const lineTotal = lineBase - (lineBase * ((localItem.discountPct ?? 0) / 100));
+  const pricePerKg = weightKg > 0 ? (lineTotal / weightKg) : 0;
 
   return (
     <>
@@ -252,7 +259,7 @@ export const SalesOrderItemRow = ({
             <>
                 <td className="p-2">{showWidthLengthGram ? (
                     <FormattedIntInput 
-                        className={`w-24 px-2 py-1 border rounded ${!canEdit ? disabledClass : ''}`}
+                        className={`${compactW} px-2 py-1 border rounded ${!canEdit ? disabledClass : ''}`}
                         disabled={!canEdit}
                         value={localItem.width} 
                         onChange={(val) => handleChange('width', val)} 
@@ -260,7 +267,7 @@ export const SalesOrderItemRow = ({
                 ) : '-'}</td>
                 <td className="p-2">{showWidthLengthGram ? (
                     <FormattedIntInput 
-                        className={`w-24 px-2 py-1 border rounded ${!canEdit ? disabledClass : ''}`}
+                        className={`${compactW} px-2 py-1 border rounded ${!canEdit ? disabledClass : ''}`}
                         disabled={!canEdit}
                         value={localItem.length} 
                         onChange={(val) => handleChange('length', val)} 
@@ -268,7 +275,7 @@ export const SalesOrderItemRow = ({
                 ) : '-'}</td>
                 <td className="p-2">{showWidthLengthGram ? (
                     <FormattedIntInput 
-                        className={`w-24 px-2 py-1 border rounded ${disabledClass}`}
+                        className={`${compactW} px-2 py-1 border rounded ${disabledClass}`}
                         disabled
                         value={localItem.grammage} 
                         onChange={(val) => handleChange('grammage', val)} 
@@ -311,7 +318,7 @@ export const SalesOrderItemRow = ({
         <td className="p-2">
             <input 
                 type="text" 
-                className={`w-24 px-2 py-1 border rounded ${!canEdit ? disabledClass : ''}`}
+                className={`${compactW} px-2 py-1 border rounded ${!canEdit ? disabledClass : ''}`}
                 disabled={!canEdit}
                 value={weightInput} 
                 onChange={(e) => handleWeightChange(e.target.value)}
@@ -325,7 +332,7 @@ export const SalesOrderItemRow = ({
         <td className="p-2">
             <input 
                 type="text" 
-                className="w-24 px-2 py-1 border rounded bg-gray-100 text-gray-600 cursor-not-allowed" 
+                className={`${compactW} px-2 py-1 border rounded bg-gray-100 text-gray-600 cursor-not-allowed`} 
                 value={(localItem.unitPrice ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} 
                 disabled 
             />
@@ -338,6 +345,14 @@ export const SalesOrderItemRow = ({
                 value={discountInput} 
                 onChange={(e) => handleDiscountChange(e.target.value)} 
             />
+        </td>
+        <td className="p-2">
+          <input
+            type="text"
+            className={`${compactW} px-2 py-1 border rounded bg-gray-100 text-gray-600 cursor-not-allowed`}
+            value={pricePerKg.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            disabled
+          />
         </td>
         <td className="p-2">
             <div className="flex items-center justify-center gap-2">
@@ -563,6 +578,12 @@ export const SalesOrderItemCard = ({
   const disabledClass = "bg-gray-100 text-gray-500";
   const lockToggleDisabled = !isOrderEditable || isSaving;
   const isEffectivelyLocked = !isOrderEditable || isRowLocked;
+  const weightKg = computeWeightKg(localItem);
+  const priceByRaw = String(localItem.inventoryItem?.commercialFamily?.priceBy || '').trim().toUpperCase();
+  const isPriceByWeight = priceByRaw === 'WEIGHT' || priceByRaw === 'PESO';
+  const lineBase = (isPriceByWeight ? weightKg : (localItem.quantity ?? 0)) * (localItem.unitPrice ?? 0);
+  const lineTotal = lineBase - (lineBase * ((localItem.discountPct ?? 0) / 100));
+  const pricePerKg = weightKg > 0 ? (lineTotal / weightKg) : 0;
 
   return (
     <div className={`p-3 ${isSaving ? 'bg-blue-50' : ''}`}>
@@ -653,6 +674,15 @@ export const SalesOrderItemCard = ({
             disabled={!canEdit}
             value={discountInput}
             onChange={(e) => handleDiscountChange(e.target.value)}
+          />
+        </div>
+        <div>
+          <div className="text-[11px] text-gray-600">Preço/KG</div>
+          <input
+            type="text"
+            className="w-full px-2 py-1 border rounded text-sm bg-gray-100 text-gray-600 cursor-not-allowed"
+            value={pricePerKg.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            disabled
           />
         </div>
         {hasSheetCol && showWidthLengthGram && (

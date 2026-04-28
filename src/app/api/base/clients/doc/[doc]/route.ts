@@ -227,6 +227,9 @@ export async function PATCH(request: Request, props: { params: Promise<{ doc: st
         },
       });
 
+      await tx.clientItem.deleteMany({ where: { clientId: row.id } });
+      await tx.userClientRep.deleteMany({ where: { clientId: row.id } });
+
       if (listProvided || singleProvided) {
         const syncIds = listProvided ? paymentTermIds : (row.paymentTermId ? [row.paymentTermId] : []);
         await tx.clientPaymentTerm.deleteMany({ where: { clientId: row.id } });
