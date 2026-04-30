@@ -247,8 +247,8 @@ export const SalesOrderItemRow = ({
     String(localItem.unit || '').trim() ||
     '-';
   const weightKg = computeWeightKg(localItem);
-  const priceByRaw = String(localItem.inventoryItem?.commercialFamily?.priceBy || '').trim().toUpperCase();
-  const isPriceByWeight = priceByRaw === 'WEIGHT' || priceByRaw === 'PESO';
+  const unitPriceUnit = String(localItem.unit || '').trim().toUpperCase();
+  const isPriceByWeight = unitPriceUnit === 'KG';
   const lineBase = (isPriceByWeight ? weightKg : (localItem.quantity ?? 0)) * (localItem.unitPrice ?? 0);
   const lineTotal = lineBase - (lineBase * ((localItem.discountPct ?? 0) / 100));
   const pricePerKg = weightKg > 0 ? (lineTotal / weightKg) : 0;
@@ -375,7 +375,7 @@ export const SalesOrderItemRow = ({
                   style={{ opacity: lockToggleDisabled ? 0.5 : 1, pointerEvents: lockToggleDisabled ? 'none' : 'auto' }}
                   onClick={() => {
                     if (lockToggleDisabled) return;
-                    if (isEffectivelyLocked && Number(localItem.unitPrice ?? 0) <= 0) {
+                    if (!isEffectivelyLocked && Number(localItem.unitPrice ?? 0) <= 0) {
                       alert('Não é permitido salvar item com preço zero.');
                       return;
                     }
@@ -604,8 +604,8 @@ export const SalesOrderItemCard = ({
     String(localItem.unit || '').trim() ||
     '-';
   const weightKg = computeWeightKg(localItem);
-  const priceByRaw = String(localItem.inventoryItem?.commercialFamily?.priceBy || '').trim().toUpperCase();
-  const isPriceByWeight = priceByRaw === 'WEIGHT' || priceByRaw === 'PESO';
+  const unitPriceUnit = String(localItem.unit || '').trim().toUpperCase();
+  const isPriceByWeight = unitPriceUnit === 'KG';
   const lineBase = (isPriceByWeight ? weightKg : (localItem.quantity ?? 0)) * (localItem.unitPrice ?? 0);
   const lineTotal = lineBase - (lineBase * ((localItem.discountPct ?? 0) / 100));
   const pricePerKg = weightKg > 0 ? (lineTotal / weightKg) : 0;
@@ -627,7 +627,7 @@ export const SalesOrderItemCard = ({
             style={{ opacity: lockToggleDisabled ? 0.5 : 1, pointerEvents: lockToggleDisabled ? 'none' : 'auto' }}
             onClick={() => {
               if (lockToggleDisabled) return;
-              if (isEffectivelyLocked && Number(localItem.unitPrice ?? 0) <= 0) {
+              if (!isEffectivelyLocked && Number(localItem.unitPrice ?? 0) <= 0) {
                 alert('Não é permitido salvar item com preço zero.');
                 return;
               }

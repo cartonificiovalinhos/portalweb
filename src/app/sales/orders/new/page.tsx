@@ -543,15 +543,11 @@ function NewSalesOrderContent() {
     return 0;
   };
 
-  const familyPriceBy = (it: OrderItem): 'UNIT' | 'WEIGHT' => {
-    const pb = String(it.inventoryItem?.commercialFamily?.priceBy || '').trim().toUpperCase();
-    return pb === 'WEIGHT' || pb === 'PESO' ? 'WEIGHT' : 'UNIT';
-  };
-
   const lineBase = (it: OrderItem): number => {
     const qty = it.quantity ?? 0;
     const price = it.unitPrice ?? 0;
-    if (familyPriceBy(it) === 'WEIGHT') return computeWeightKg(it) * price;
+    const unitPriceUnit = String(it.unit || '').trim().toUpperCase();
+    if (unitPriceUnit === 'KG') return computeWeightKg(it) * price;
     return qty * price;
   };
 

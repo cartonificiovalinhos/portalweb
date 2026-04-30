@@ -65,11 +65,11 @@ function computeWeightKgFromFields(it: { width?: number | null; length?: number 
   return 0;
 }
 
-function lineBase(it: { quantity?: number | null; unitPrice?: number | null; width?: number | null; length?: number | null; grammage?: number | null }, priceBy?: string | null): number {
+function lineBase(it: { quantity?: number | null; unitPrice?: number | null; unit?: string | null; width?: number | null; length?: number | null; grammage?: number | null }): number {
   const qty = Number(it.quantity ?? 0);
   const price = Number(it.unitPrice ?? 0);
-  const pb = String(priceBy || '').trim().toUpperCase();
-  if (pb === 'WEIGHT' || pb === 'PESO') return computeWeightKgFromFields(it) * price;
+  const unitPriceUnit = String(it.unit || '').trim().toUpperCase();
+  if (unitPriceUnit === 'KG') return computeWeightKgFromFields(it) * price;
   return qty * price;
 }
 
@@ -251,38 +251,21 @@ export async function POST(request: Request) {
       if (u?.lastEntityId) entityId = u.lastEntityId;
     }
     const rawItems = Array.isArray(items) ? items : [];
-    const invIds = rawItems
-      .map((it: any) => Number(it?.inventoryItemId))
-      .filter((n: any) => Number.isFinite(n) && n > 0);
-    const invMap = new Map<number, { priceBy?: string | null }>();
-    if (invIds.length > 0) {
-      const unique = Array.from(new Set(invIds));
-      const invItems = await prisma.inventoryItem.findMany({
-        where: { id: { in: unique } },
-        select: { id: true, commercialFamily: { select: { priceBy: true } } },
-      });
-      for (const it of invItems) {
-        const id = Number(it.id);
-        if (!Number.isFinite(id) || id <= 0) continue;
-        invMap.set(id, { priceBy: it.commercialFamily?.priceBy != null ? String(it.commercialFamily.priceBy) : null });
-      }
-    }
 
     const normalizedItems = rawItems.map((it: any) => {
       const qty = Number(it.quantity || 1);
       const price = Number(it.unitPrice || 0);
       const disc = Number(it.discountPct || 0);
       const inventoryItemId = it.inventoryItemId ? Number(it.inventoryItemId) : undefined;
-      const priceBy = inventoryItemId ? (invMap.get(inventoryItemId)?.priceBy ?? null) : null;
       const base = lineBase(
         {
           quantity: qty,
           unitPrice: price,
+          unit: it.unit || undefined,
           width: it.width ? Number(it.width) : undefined,
           length: it.length ? Number(it.length) : undefined,
           grammage: it.grammage ? Number(it.grammage) : undefined,
         },
-        priceBy
       );
       const lineTotal = base * (1 - disc / 100);
       return {
@@ -316,12 +299,10 @@ export async function POST(request: Request) {
       );
     }
     const subtotal = normalizedItems.reduce((acc: number, i: any) => {
-      const priceBy = i.inventoryItemId ? (invMap.get(i.inventoryItemId)?.priceBy ?? null) : null;
-      return acc + lineBase(i, priceBy);
+      return acc + lineBase(i);
     }, 0);
     const discountTotal = normalizedItems.reduce((acc: number, i: any) => {
-      const priceBy = i.inventoryItemId ? (invMap.get(i.inventoryItemId)?.priceBy ?? null) : null;
-      return acc + (lineBase(i, priceBy) * (Number(i.discountPct || 0) / 100));
+      return acc + (lineBase(i) * (Number(i.discountPct || 0) / 100));
     }, 0);
     const total = subtotal - discountTotal;
 
