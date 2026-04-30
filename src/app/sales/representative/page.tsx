@@ -1,11 +1,14 @@
 "use client";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useSession } from "next-auth/react";
 
-type User = { id: number; name: string; email: string };
+type User = { id: number; name: string; email: string; salesRepAdmin?: boolean; isSalesAdmin?: boolean };
 type Client = { id: number; doc?: string; name: string; cidade?: string; estado?: string };
 type BasePriceRow = { sku: string; description: string; unit: string; unitPrice: number };
 
 export default function RepresentativePage() {
+  const { data: session } = useSession();
+  const currentUserId = Number((session?.user as any)?.id);
   const [users, setUsers] = useState<User[]>([]);
   const [userQuery, setUserQuery] = useState("");
   const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
@@ -48,6 +51,16 @@ export default function RepresentativePage() {
         const arrAll = await resAll.json().catch(() => []);
         list = Array.isArray(arrAll) ? arrAll : [];
       }
+      const me = Number.isFinite(currentUserId) && currentUserId > 0
+        ? list.find((u: any) => Number(u?.id) === currentUserId)
+        : null;
+
+      if (me && !Boolean(me?.isSalesAdmin)) {
+        setUsers([me]);
+        setSelectedUserId(Number(me.id));
+        return;
+      }
+
       const reps = list.filter((u: any) => Boolean(u?.salesRepAdmin));
       const finalList = reps.length > 0 ? reps : list;
       setUsers(finalList);
@@ -55,7 +68,7 @@ export default function RepresentativePage() {
     } catch {
       setUsers([]);
     }
-  }, []);
+  }, [currentUserId]);
 
   const loadClients = useCallback(async () => {
     const res = await fetch("/api/base/clients");
