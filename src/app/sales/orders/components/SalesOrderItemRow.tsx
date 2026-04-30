@@ -236,6 +236,10 @@ export const SalesOrderItemRow = ({
   const lockToggleDisabled = !isOrderEditable || isSaving;
   const isEffectivelyLocked = !isOrderEditable || isRowLocked;
   const compactW = "w-[4.5rem]";
+  const itemUnit =
+    String(localItem.inventoryItem?.unit ?? '').trim() ||
+    String(localItem.unit || '').trim() ||
+    '-';
   const weightKg = computeWeightKg(localItem);
   const priceByRaw = String(localItem.inventoryItem?.commercialFamily?.priceBy || '').trim().toUpperCase();
   const isPriceByWeight = priceByRaw === 'WEIGHT' || priceByRaw === 'PESO';
@@ -253,7 +257,6 @@ export const SalesOrderItemRow = ({
             </div>
         </td>
         <td className="p-2">{localItem.sku || '-'}</td>
-        <td className="p-2">{localItem.unit || '-'}</td>
         
         {hasSheetCol && (
             <>
@@ -307,6 +310,7 @@ export const SalesOrderItemRow = ({
             </>
         )}
 
+        <td className="p-2">{itemUnit}</td>
         <td className="p-2">
             <FormattedIntInput 
                 className={`w-20 px-2 py-1 border rounded ${!canEdit ? disabledClass : ''}`}
@@ -329,6 +333,7 @@ export const SalesOrderItemRow = ({
                 }}
             />
         </td>
+        <td className="p-2">{String(localItem.unit || '').trim() || '-'}</td>
         <td className="p-2">
             <input 
                 type="text" 
@@ -578,6 +583,10 @@ export const SalesOrderItemCard = ({
   const disabledClass = "bg-gray-100 text-gray-500";
   const lockToggleDisabled = !isOrderEditable || isSaving;
   const isEffectivelyLocked = !isOrderEditable || isRowLocked;
+  const itemUnit =
+    String(localItem.inventoryItem?.unit ?? '').trim() ||
+    String(localItem.unit || '').trim() ||
+    '-';
   const weightKg = computeWeightKg(localItem);
   const priceByRaw = String(localItem.inventoryItem?.commercialFamily?.priceBy || '').trim().toUpperCase();
   const isPriceByWeight = priceByRaw === 'WEIGHT' || priceByRaw === 'PESO';
@@ -590,7 +599,7 @@ export const SalesOrderItemCard = ({
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="text-sm font-medium text-gray-900 truncate">{localItem.name}</div>
-          <div className="text-xs text-gray-600 truncate">{localItem.sku || '-'} • {localItem.unit || '-'}</div>
+          <div className="text-xs text-gray-600 truncate">{localItem.sku || '-'} • {itemUnit}</div>
           {isSaving && <div className="text-[10px] text-blue-600 animate-pulse">Salvando...</div>}
         </div>
         <div className="shrink-0 flex items-center gap-2">
@@ -655,6 +664,15 @@ export const SalesOrderItemCard = ({
                 setIsEditingWeight(false);
                 setWeightInput(fmtInt(computeWeightKg(localItem)));
             }}
+          />
+        </div>
+        <div>
+          <div className="text-[11px] text-gray-600">UM</div>
+          <input
+            type="text"
+            className="w-full px-2 py-1 border rounded text-sm bg-gray-100 text-gray-600 cursor-not-allowed"
+            value={String(localItem.unit || '').trim() || '-'}
+            disabled
           />
         </div>
         <div>

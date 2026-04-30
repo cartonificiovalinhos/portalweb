@@ -7,6 +7,7 @@ type InventoryItem = {
   sku?: string | null;
   name: string;
   unit?: string | null;
+  priceUnit?: string | null;
   commercialFamily?: { id: number; description?: string | null; name?: string | null; priceBy?: string | null } | null;
   unitPrice?: number | null;
   width?: number | null;
@@ -386,7 +387,7 @@ function NewSalesOrderContent() {
       id: -Date.now(), // Temp ID
       name: invItem.name,
       sku: invItem.sku,
-      unit: invItem.unit,
+      unit: invItem.priceUnit ?? invItem.unit,
       quantity: 1,
       unitPrice: Number(invItem.unitPrice ?? 0),
       discountPct: 0,
@@ -842,11 +843,12 @@ function NewSalesOrderContent() {
                   <tr className="bg-gray-50">
                     <th className="p-2 text-left">Item</th>
                     <th className="p-2 text-left">SKU</th>
-                    <th className="p-2 text-left">UM</th>
                     {(() => { const hasSheet = list.some(supportsSheetDims); return hasSheet ? (<><th className="p-2 text-left">Larg.</th><th className="p-2 text-left">Compr.</th><th className="p-2 text-left">Gram.</th></>) : null; })()}
                     {(() => { const hasCore = list.some(supportsCoreDims); return hasCore ? (<><th className="p-2 text-left">Diâmetro</th><th className="p-2 text-left">Tubete</th></>) : null; })()}
+                    <th className="p-2 text-left">UM</th>
                     <th className="p-2 text-left">Qtd</th>
                     <th className="p-2 text-left">Peso (KG)</th>
+                    <th className="p-2 text-left">UM</th>
                     <th className="p-2 text-left">Preço</th>
                     <th className="p-2 text-left">Desc (%)</th>
                     <th className="p-2 text-left">Preço/KG</th>

@@ -55,7 +55,8 @@ export async function GET(request: Request) {
       
       let items = links.map(l => ({
         ...l.inventoryItem,
-        unitPrice: l.unitPrice
+        unitPrice: l.unitPrice,
+        priceUnit: l.unit
       }));
       
       if (qParam) {
