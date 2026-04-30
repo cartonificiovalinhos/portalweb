@@ -1268,13 +1268,16 @@ export default function ClientDetailsPage() {
                         <th className="p-2 text-left">Compr.</th>
                         <th className="p-2 text-left">Gram.</th>
                         <th className="p-2 text-left">Un. Preço</th>
+                        {hasBasePrices && <th className="p-2 text-left">Preço Base R$</th>}
                       </tr>
                     </thead>
                     <tbody>
                       {unlinkedItemsFiltered.length === 0 && !loadingUnlinkedItems && (
-                        <tr><td className="p-3 text-gray-500" colSpan={7}>Sem itens</td></tr>
+                        <tr><td className="p-3 text-gray-500" colSpan={hasBasePrices ? 8 : 7}>Sem itens</td></tr>
                       )}
-                      {unlinkedItemsFiltered.map((it, i) => (
+                      {unlinkedItemsFiltered.map((it, i) => {
+                        const basePrice = hasBasePrices ? getBasePrice(it) : null;
+                        return (
                         <tr key={i} className="border-t">
                           <td className="p-2">
                             <input
@@ -1297,8 +1300,10 @@ export default function ClientDetailsPage() {
                           <td className="p-2">{it.length || '-'}</td>
                           <td className="p-2">{it.grammage || '-'}</td>
                           <td className="p-2">{it.unit || '-'}</td>
+                          {hasBasePrices && <td className="p-2">{basePrice != null ? basePrice.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : ''}</td>}
                         </tr>
-                      ))}
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
@@ -1328,6 +1333,7 @@ export default function ClientDetailsPage() {
                         <span>Compr: {it.length || '-'}</span>
                         <span>Gram: {it.grammage || '-'}</span>
                         <span>Un. Preço: {it.unit || '-'}</span>
+                        {hasBasePrices && <span>Preço Base: {(() => { const v = getBasePrice(it); return v != null ? v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : '-'; })()}</span>}
                       </div>
                         </div>
                       </div>
