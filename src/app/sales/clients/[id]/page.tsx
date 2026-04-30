@@ -393,6 +393,25 @@ export default function ClientDetailsPage() {
     return out;
   }, [basePrices]);
 
+  const basePriceFallbackUnitByItemId = useMemo(() => {
+    const byItem = new Map<number, Set<string>>();
+    for (const k of Object.keys(basePrices)) {
+      const [invIdRaw, unitRaw] = String(k).split('::');
+      const invId = Number(invIdRaw);
+      const unit = String(unitRaw || '').trim().toUpperCase();
+      if (!Number.isFinite(invId) || invId <= 0) continue;
+      if (!unit) continue;
+      const set = byItem.get(invId) || new Set<string>();
+      set.add(unit);
+      byItem.set(invId, set);
+    }
+    const out: Record<number, string> = {};
+    for (const [invId, units] of byItem.entries()) {
+      if (units.size === 1) out[invId] = Array.from(units)[0];
+    }
+    return out;
+  }, [basePrices]);
+
   const getBasePrice = useCallback((it: LinkedItem) => {
     const unit = String(it.unit || '').trim();
     if (unit) {
@@ -429,10 +448,14 @@ export default function ClientDetailsPage() {
     if (selectedUnlinkedItemIds.length === 0) return;
     setLinkingItems(true);
     try {
+      const itemsPayload = selectedUnlinkedItemIds.map((inventoryItemId) => ({
+        inventoryItemId,
+        unit: (basePriceFallbackUnitByItemId as any)[inventoryItemId] ?? null,
+      }));
       const res = await fetch(`/api/clients/${client.id}/items`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'link', inventoryItemIds: selectedUnlinkedItemIds }),
+        body: JSON.stringify({ action: 'link', inventoryItemIds: selectedUnlinkedItemIds, items: itemsPayload }),
       });
       if (!res.ok) throw new Error('Falha ao vincular item(ns)');
       await Promise.all([refreshLinkedItems(), refreshUnlinkedItems()]);
@@ -442,7 +465,7 @@ export default function ClientDetailsPage() {
     } finally {
       setLinkingItems(false);
     }
-  }, [client, refreshLinkedItems, refreshUnlinkedItems, selectedUnlinkedItemIds]);
+  }, [basePriceFallbackUnitByItemId, client, refreshLinkedItems, refreshUnlinkedItems, selectedUnlinkedItemIds]);
 
   const applyAdjustToClientItems = useCallback(async () => {
     if (!client) return;
@@ -1117,8 +1140,8 @@ export default function ClientDetailsPage() {
                               <span>Larg: {it.width || '-'}</span>
                               <span>Compr: {it.length || '-'}</span>
                               <span>Gram: {it.grammage || '-'}</span>
+                              <span>Un. Preço: {it.unit || '-'}</span>
                               {hasBasePrices && <span>Preço Base: {basePrice != null ? basePrice.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : '-'}</span>}
-                              <span>Un: {it.unit || '-'}</span>
                             </div>
                             <div className="mt-2 flex items-center">
                               <div className="text-sm font-medium text-gray-900">
@@ -1151,8 +1174,8 @@ export default function ClientDetailsPage() {
                         <th className="p-2 text-left">Larg.</th>
                         <th className="p-2 text-left">Compr.</th>
                         <th className="p-2 text-left">Gram.</th>
+                        <th className="p-2 text-left">Un. Preço</th>
                         {hasBasePrices && <th className="p-2 text-left">Preço Base R$</th>}
-                        <th className="p-2 text-left">Un.</th>
                         <th className="p-2 text-left">Preço Unit R$</th>
                         <th className="p-2 text-left">Ações</th>
                       </tr>
@@ -1185,8 +1208,8 @@ export default function ClientDetailsPage() {
                             <td className="p-2">{it.width || '-'}</td>
                             <td className="p-2">{it.length || '-'}</td>
                             <td className="p-2">{it.grammage || '-'}</td>
-                            {hasBasePrices && <td className="p-2">{basePrice != null ? basePrice.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : ''}</td>}
                             <td className="p-2">{it.unit || '-'}</td>
+                            {hasBasePrices && <td className="p-2">{basePrice != null ? basePrice.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : ''}</td>}
                             <td className="p-2">{(it.unitPrice ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
                             <td className="p-2">
                               <button className="inline-flex items-center justify-center w-8 h-8 border rounded hover:bg-gray-100" title="Adicionar ao carrinho" aria-label="Adicionar ao carrinho" onClick={() => addToCart(it.id)}>
@@ -1244,7 +1267,7 @@ export default function ClientDetailsPage() {
                         <th className="p-2 text-left">Larg.</th>
                         <th className="p-2 text-left">Compr.</th>
                         <th className="p-2 text-left">Gram.</th>
-                        <th className="p-2 text-left">Un.</th>
+                        <th className="p-2 text-left">Un. Preço</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1304,7 +1327,7 @@ export default function ClientDetailsPage() {
                         <span>Larg: {it.width || '-'}</span>
                         <span>Compr: {it.length || '-'}</span>
                         <span>Gram: {it.grammage || '-'}</span>
-                        <span>Un: {it.unit || '-'}</span>
+                        <span>Un. Preço: {it.unit || '-'}</span>
                       </div>
                         </div>
                       </div>

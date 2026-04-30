@@ -171,18 +171,48 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
 
       if (action === 'link') {
         const inventoryItemIdsRaw = (rawBody as any).inventoryItemIds;
-        const inventoryItemIds = Array.isArray(inventoryItemIdsRaw)
-          ? inventoryItemIdsRaw.map((x: any) => Number(x)).filter((x: number) => Number.isFinite(x) && x > 0)
+        const itemsRaw = (rawBody as any).items;
+        const items: { inventoryItemId: number; unit?: string | null }[] = Array.isArray(itemsRaw)
+          ? (itemsRaw as any[])
+              .map((x: any) => ({
+                inventoryItemId: Number(x?.inventoryItemId ?? x?.id ?? x?.itemId),
+                unit: x?.unit != null ? String(x.unit).trim().toUpperCase() : null,
+              }))
+              .filter((x) => Number.isFinite(x.inventoryItemId) && x.inventoryItemId > 0)
           : [];
-        if (!inventoryItemIds.length) return NextResponse.json({ error: 'inventoryItemIds é obrigatório' }, { status: 400 });
+        const inventoryItemIds = (
+          items.length > 0
+            ? items.map((x) => x.inventoryItemId)
+            : Array.isArray(inventoryItemIdsRaw)
+            ? inventoryItemIdsRaw.map((x: any) => Number(x)).filter((x: number) => Number.isFinite(x) && x > 0)
+            : []
+        ) as number[];
+        if (!inventoryItemIds.length) return NextResponse.json({ error: 'inventoryItemIds/items é obrigatório' }, { status: 400 });
+
+        const unitByInvId = new Map<number, string>();
+        for (const it of items) {
+          const u = String(it.unit || '').trim();
+          if (u) unitByInvId.set(it.inventoryItemId, u);
+        }
+
+        const invs = await prisma.inventoryItem.findMany({
+          where: { id: { in: Array.from(new Set(inventoryItemIds.map((x) => Math.trunc(x)))) } },
+          select: { id: true, unit: true },
+        });
+        const invUnitById = new Map<number, string>();
+        for (const inv of invs) {
+          const u = String(inv.unit || '').trim().toUpperCase();
+          if (u) invUnitById.set(Number(inv.id), u);
+        }
 
         let upsertedCount = 0;
         await prisma.$transaction(async (tx) => {
           for (const inventoryItemId of inventoryItemIds) {
+            const desiredUnit = unitByInvId.get(inventoryItemId) ?? invUnitById.get(inventoryItemId) ?? null;
             await tx.clientItem.upsert({
               where: { clientId_inventoryItemId: { clientId, inventoryItemId } },
-              update: { allowed: true },
-              create: { clientId, inventoryItemId, unit: null, unitPrice: 0, allowed: true },
+              update: { allowed: true, ...(desiredUnit ? { unit: desiredUnit } : {}) },
+              create: { clientId, inventoryItemId, unit: desiredUnit, unitPrice: 0, allowed: true },
             });
             upsertedCount += 1;
           }
