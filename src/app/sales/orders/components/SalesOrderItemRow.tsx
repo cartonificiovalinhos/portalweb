@@ -171,7 +171,13 @@ export const SalesOrderItemRow = ({
 
   const saveItem = async (data: Partial<OrderItem>) => {
     if (!onAutoSave) return; // Local mode only
-    
+
+    const merged = { ...localItem, ...data };
+    if (Number(merged.unitPrice ?? 0) <= 0) {
+      alert('Não é permitido salvar item com preço zero.');
+      return;
+    }
+
     setIsSaving(true);
     try {
       // Merge with current localItem to ensure full object is passed if needed, 
@@ -369,6 +375,10 @@ export const SalesOrderItemRow = ({
                   style={{ opacity: lockToggleDisabled ? 0.5 : 1, pointerEvents: lockToggleDisabled ? 'none' : 'auto' }}
                   onClick={() => {
                     if (lockToggleDisabled) return;
+                    if (isEffectivelyLocked && Number(localItem.unitPrice ?? 0) <= 0) {
+                      alert('Não é permitido salvar item com preço zero.');
+                      return;
+                    }
                     setIsRowLocked((prev) => !prev);
                   }}
                 >
@@ -523,7 +533,13 @@ export const SalesOrderItemCard = ({
 
   const saveItem = async (data: Partial<OrderItem>) => {
     if (!onAutoSave) return;
-    
+
+    const merged = { ...localItem, ...data };
+    if (Number(merged.unitPrice ?? 0) <= 0) {
+      alert('Não é permitido salvar item com preço zero.');
+      return;
+    }
+
     setIsSaving(true);
     try {
       await onAutoSave({ ...localItem, ...data });
@@ -611,6 +627,10 @@ export const SalesOrderItemCard = ({
             style={{ opacity: lockToggleDisabled ? 0.5 : 1, pointerEvents: lockToggleDisabled ? 'none' : 'auto' }}
             onClick={() => {
               if (lockToggleDisabled) return;
+              if (isEffectivelyLocked && Number(localItem.unitPrice ?? 0) <= 0) {
+                alert('Não é permitido salvar item com preço zero.');
+                return;
+              }
               setIsRowLocked((prev) => !prev);
             }}
           >

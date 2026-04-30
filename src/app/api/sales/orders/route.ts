@@ -307,6 +307,14 @@ export async function POST(request: Request) {
         lineTotal,
       };
     });
+
+    const zeroPrice = normalizedItems.find((it: any) => Number(it.unitPrice ?? 0) <= 0);
+    if (zeroPrice) {
+      return NextResponse.json(
+        { error: `Não é permitido salvar item com preço zero: ${String(zeroPrice.sku || zeroPrice.name || 'Item')}` },
+        { status: 400 }
+      );
+    }
     const subtotal = normalizedItems.reduce((acc: number, i: any) => {
       const priceBy = i.inventoryItemId ? (invMap.get(i.inventoryItemId)?.priceBy ?? null) : null;
       return acc + lineBase(i, priceBy);

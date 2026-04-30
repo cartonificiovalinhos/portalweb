@@ -430,6 +430,11 @@ function NewSalesOrderContent() {
       alert('Informe o nome do cliente');
       return;
     }
+    const bad = (order.items || []).find((it) => Number(it.unitPrice ?? 0) <= 0);
+    if (bad) {
+      alert(`Não é permitido salvar item com preço zero: ${String(bad.sku || bad.name || 'Item')}`);
+      return;
+    }
     
     setLoading(true);
     try {

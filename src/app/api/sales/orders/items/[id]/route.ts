@@ -51,6 +51,13 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
   try {
     const id = parseIdParam(params.id);
     if (!id) return NextResponse.json({ error: 'ID inválido' }, { status: 400 });
+
+    const current = await prisma.salesOrderItem.findUnique({ where: { id }, select: { unitPrice: true } });
+    if (!current) return NextResponse.json({ error: 'Item não encontrado' }, { status: 404 });
+    if (Number(current.unitPrice ?? 0) <= 0) {
+      return NextResponse.json({ error: 'Não é permitido salvar item com preço zero.' }, { status: 400 });
+    }
+
     const body = await request.json();
     const allowed: Record<string, any> = {};
     if (body.quantity !== undefined) allowed.quantity = Number(body.quantity);
