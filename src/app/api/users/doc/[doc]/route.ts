@@ -47,11 +47,27 @@ export async function PATCH(request: Request, props: { params: Promise<{ doc: st
 
     if (Object.keys(data).length === 0) return NextResponse.json({ message: 'Nada para atualizar' });
 
-    const updated = await prisma.user.update({
-      where: { doc },
-      data,
-      select: { id: true, name: true, email: true, doc: true, salesRepAdmin: true, createdAt: true, updatedAt: true },
+    const updated = await prisma.$transaction(async (tx) => {
+      const before = await tx.user.findUnique({
+        where: { doc },
+        select: { id: true, salesRepAdmin: true },
+      });
+      if (!before) return null;
+
+      const row = await tx.user.update({
+        where: { doc },
+        data,
+        select: { id: true, name: true, email: true, doc: true, salesRepAdmin: true, createdAt: true, updatedAt: true },
+      });
+
+      const isRep = Boolean(before.salesRepAdmin) || Boolean(row.salesRepAdmin);
+      if (isRep) {
+        await tx.userInventoryItemPrice.deleteMany({ where: { userId: row.id } });
+      }
+
+      return row;
     });
+    if (!updated) return NextResponse.json({ error: 'Usuário não encontrado' }, { status: 404 });
     return NextResponse.json(updated);
   } catch (err: any) {
     return NextResponse.json({ error: String(err?.message || err) }, { status: 500 });
