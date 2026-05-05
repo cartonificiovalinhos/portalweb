@@ -14,6 +14,7 @@ type SalesOrder = {
   subtotal: number;
   discountTotal: number;
   total: number;
+  totalWithTax?: number;
   items?: OrderItem[];
 };
 
@@ -137,12 +138,16 @@ export default function SalesOrdersPage() {
   const pageSliceStart = page * PAGE_SIZE;
   const pageItems = filtered.slice(pageSliceStart, pageSliceStart + PAGE_SIZE);
 
-  const calcTotal = (o: SalesOrder) => {
-    return (o.items || []).reduce((acc, item) => {
-      const total = item.quantity * item.unitPrice;
-      const discount = total * (item.discountPct / 100);
-      return acc + (total - discount);
-    }, 0);
+  const fmtCurrency = (v: any) => {
+    const n = Number(v ?? 0);
+    return (Number.isFinite(n) ? n : 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+  };
+
+  const displayTotalWithTax = (o: SalesOrder) => {
+    const n = Number((o as any)?.totalWithTax ?? 0);
+    if (Number.isFinite(n) && n > 0) return n;
+    const fallback = Number((o as any)?.total ?? 0);
+    return Number.isFinite(fallback) ? fallback : 0;
   };
 
   const IconBtn = ({ title, onClick, children, disabled = false }: any) => (
@@ -299,7 +304,7 @@ export default function SalesOrdersPage() {
 
               <div className="mt-2 flex items-center justify-between gap-3 text-xs text-gray-600">
                 <div>{o.orderDate ? new Date(o.orderDate).toLocaleDateString('pt-BR') : '-'}</div>
-                <div className="font-medium text-gray-900">{calcTotal(o).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</div>
+                <div className="font-medium text-gray-900">{fmtCurrency(displayTotalWithTax(o))}</div>
               </div>
 
               <div className="mt-2 flex items-center justify-end">
@@ -396,7 +401,7 @@ export default function SalesOrdersPage() {
                   <td className="px-3 py-2">{o.customerName || '-'}</td>
                   <td className="px-3 py-2">{o.orderDate ? new Date(o.orderDate).toLocaleDateString('pt-BR') : '-'}</td>
                   <td className="px-3 py-2 text-right">
-                    {calcTotal(o).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                    {fmtCurrency(displayTotalWithTax(o))}
                   </td>
                   <td className="px-3 py-2"><span className={`px-2 py-0.5 rounded text-xs ${statusColor(statusLabelPt(o.status))}`}>{statusLabelPt(o.status)}</span></td>
                   <td className="px-3 py-2 text-xs text-gray-700">{String((o as any)?.createdBy?.abbrevName || '-')}</td>
