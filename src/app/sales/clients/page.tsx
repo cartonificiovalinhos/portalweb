@@ -6,6 +6,7 @@ type Client = {
   id: number;
   doc?: string | null;
   name: string;
+  abbrevName?: string | null;
   cep?: string | null;
   logradouro?: string | null;
   numero?: string | null;
@@ -82,6 +83,7 @@ export default function SalesClientsPage() {
               <div className="flex items-start gap-3">
                 <div className="flex-1 min-w-0">
                   <div className="text-sm font-semibold text-gray-900 break-words">{c.name}</div>
+                  <div className="mt-1 text-xs text-gray-600">{c.abbrevName || "-"}</div>
                   <div className="mt-1 text-xs text-gray-600 font-mono">{maskDoc(c.doc) || "-"}</div>
                   <div className="mt-1 text-xs text-gray-600">
                     {(c.cidade || "-")}{c.estado ? ` • ${c.estado}` : ""}
@@ -98,6 +100,7 @@ export default function SalesClientsPage() {
               <tr>
                 <th className="text-left p-2 font-medium text-gray-600">Doc</th>
                 <th className="text-left p-2 font-medium text-gray-600">Nome</th>
+                <th className="text-left p-2 font-medium text-gray-600">Nome Abreviado</th>
                 <th className="text-left p-2 font-medium text-gray-600">Cidade</th>
                 <th className="text-left p-2 font-medium text-gray-600">Estado</th>
               </tr>
@@ -116,6 +119,7 @@ export default function SalesClientsPage() {
                 >
                   <td className="p-2 text-gray-700 font-mono text-xs">{maskDoc(c.doc)}</td>
                   <td className="p-2 text-gray-900 font-medium">{c.name}</td>
+                  <td className="p-2 text-gray-700">{c.abbrevName || "-"}</td>
                   <td className="p-2 text-gray-600">{c.cidade || "-"}</td>
                   <td className="p-2 text-gray-600">{c.estado || "-"}</td>
                 </tr>
