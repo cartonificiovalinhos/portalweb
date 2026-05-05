@@ -62,6 +62,14 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
 
     const results: any[] = [];
     await prisma.$transaction(async (tx) => {
+      const repClients = await tx.userClientRep.findMany({
+        where: { userId: repUserId },
+        select: { clientId: true },
+      });
+      const repClientIds = Array.from(
+        new Set(repClients.map((x) => Number(x.clientId)).filter((x) => Number.isFinite(x) && x > 0))
+      );
+
       for (const it of cleaned) {
         const inventoryItemId = invBySku.get(it.itemCode);
         if (!inventoryItemId) {
@@ -70,13 +78,52 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
         }
 
         try {
+          const previous = await tx.userInventoryItemPrice.findUnique({
+            where: { userId_inventoryItemId_unit: { userId: repUserId, inventoryItemId, unit: it.unit } },
+            select: { unitPrice: true },
+          });
+          const oldBasePrice = Number(previous?.unitPrice ?? 0);
+          const newBasePrice = Number(it.unitPrice ?? 0);
+
           const row = await tx.userInventoryItemPrice.upsert({
             where: { userId_inventoryItemId_unit: { userId: repUserId, inventoryItemId, unit: it.unit } },
             update: { unitPrice: it.unitPrice },
             create: { userId: repUserId, inventoryItemId, unit: it.unit, unitPrice: it.unitPrice },
             select: { id: true, userId: true, inventoryItemId: true, unit: true, unitPrice: true },
           });
+
+          let adjustedClients = 0;
+          if (repClientIds.length > 0 && oldBasePrice > 0 && newBasePrice > 0) {
+            const clientLinks = await tx.clientItem.findMany({
+              where: {
+                clientId: { in: repClientIds },
+                inventoryItemId,
+                allowed: true,
+                unit: it.unit,
+                unitPrice: { gt: 0 },
+              },
+              select: { id: true, unitPrice: true },
+            });
+
+            for (const cl of clientLinks) {
+              const currentClientPrice = Number(cl.unitPrice ?? 0);
+              if (!Number.isFinite(currentClientPrice) || currentClientPrice <= 0) continue;
+              const ratio = currentClientPrice / oldBasePrice;
+              if (!Number.isFinite(ratio) || ratio <= 0) continue;
+              const updatedClientPrice = newBasePrice * ratio;
+              if (!Number.isFinite(updatedClientPrice) || updatedClientPrice <= 0) continue;
+              await tx.clientItem.update({
+                where: { id: cl.id },
+                data: { unitPrice: updatedClientPrice },
+              });
+              adjustedClients += 1;
+            }
+          }
+
           results.push({ ...row, itemCode: it.itemCode, success: true });
+          if (adjustedClients > 0) {
+            (results[results.length - 1] as any).adjustedClients = adjustedClients;
+          }
         } catch (innerErr: any) {
           results.push({ itemCode: it.itemCode, unit: it.unit, success: false, error: String(innerErr?.message || innerErr) });
         }
@@ -90,4 +137,3 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
     return NextResponse.json({ error: String(err?.message || err) }, { status: 500 });
   }
 }
-
