@@ -7,6 +7,7 @@ type Client = {
   id: number; 
   doc?: string | null; 
   name: string; 
+  abbrevName?: string | null;
   cep?: string | null; 
   logradouro?: string | null; 
   numero?: string | null; 
@@ -599,6 +600,7 @@ export default function ClientDetailsPage() {
               <div className="flex flex-col gap-2">
                 <div className="whitespace-nowrap"><span className="text-gray-600">CPF/CNPJ:</span> <span className="font-medium ml-1">{formatDoc(client.doc)}</span></div>
                 <div className="whitespace-nowrap"><span className="text-gray-600">Nome:</span> <span className="font-medium ml-1">{client.name}</span></div>
+                <div className="whitespace-nowrap"><span className="text-gray-600">Nome Abreviado:</span> <span className="font-medium ml-1">{client.abbrevName || '-'}</span></div>
                 <div className="flex gap-4">
                   <div className="whitespace-nowrap"><span className="text-gray-600">Cidade:</span> <span className="font-medium ml-1">{client.cidade || '-'}</span></div>
                   <div className="whitespace-nowrap"><span className="text-gray-600">UF:</span> <span className="font-medium ml-1">{client.estado || '-'}</span></div>

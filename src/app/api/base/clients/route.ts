@@ -173,6 +173,7 @@ export async function GET(request: Request) {
         id: true,
         doc: true,
         name: true,
+        abbrevName: true,
         cep: true,
         logradouro: true,
         numero: true,
@@ -192,6 +193,7 @@ export async function GET(request: Request) {
       id: c.id,
       doc: c.doc,
       name: c.name,
+      abbrevName: c.abbrevName,
       cep: c.cep,
       logradouro: c.logradouro,
       numero: c.numero,
@@ -217,6 +219,13 @@ export async function POST(request: Request) {
     const body = await request.json();
     const doc = normalizeDoc(String(body?.doc || '')) || null;
     const name = String(body?.name || '').trim();
+    const abbrevCandidate =
+      body?.abbrevName ??
+      body?.shortName ??
+      body?.nomeAbreviado ??
+      body?.nome_abreviado;
+    const abbrevName =
+      abbrevCandidate === undefined ? undefined : (String(abbrevCandidate || '').trim() || null);
     const cep = String(body?.cep || '').trim() || null;
     const logradouro = String(body?.logradouro || '').trim() || null;
     const numero = String(body?.numero || '').trim() || null;
@@ -247,6 +256,10 @@ export async function POST(request: Request) {
         estado,
       };
 
+      if (abbrevName !== undefined) {
+        baseData.abbrevName = abbrevName ? String(abbrevName).slice(0, 20) : null;
+      }
+
       if (listProvided) {
         baseData.paymentTermId = paymentTermId;
       } else if (paymentTermId !== null) {
@@ -258,11 +271,11 @@ export async function POST(request: Request) {
             where: { doc },
             update: baseData,
             create: { ...baseData, doc },
-            select: { id: true, doc: true, name: true, cep: true, logradouro: true, numero: true, bairro: true, cidade: true, estado: true, paymentTermId: true },
+            select: { id: true, doc: true, name: true, abbrevName: true, cep: true, logradouro: true, numero: true, bairro: true, cidade: true, estado: true, paymentTermId: true },
           })
         : await tx.client.create({
             data: { ...baseData, doc: null },
-            select: { id: true, doc: true, name: true, cep: true, logradouro: true, numero: true, bairro: true, cidade: true, estado: true, paymentTermId: true },
+            select: { id: true, doc: true, name: true, abbrevName: true, cep: true, logradouro: true, numero: true, bairro: true, cidade: true, estado: true, paymentTermId: true },
           });
 
       if (syncPaymentTermIds !== null) {

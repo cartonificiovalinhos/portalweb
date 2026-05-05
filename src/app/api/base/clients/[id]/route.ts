@@ -121,6 +121,7 @@ export async function GET(_: Request, props: { params: Promise<{ id: string }> }
         id: true,
         doc: true,
         name: true,
+        abbrevName: true,
         cep: true,
         logradouro: true,
         numero: true,
@@ -158,6 +159,11 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
     const fields: any = {};
     if (body.doc !== undefined) fields.doc = normalizeDoc(String(body.doc || '')) || null;
     if (body.name !== undefined) fields.name = String(body.name || '').trim();
+    if (body.abbrevName !== undefined || body.shortName !== undefined || body.nomeAbreviado !== undefined || body.nome_abreviado !== undefined) {
+      const v = body.abbrevName ?? body.shortName ?? body.nomeAbreviado ?? body.nome_abreviado;
+      const s = String(v || '').trim();
+      fields.abbrevName = s ? s.slice(0, 20) : null;
+    }
     if (body.cep !== undefined) fields.cep = String(body.cep || '').trim() || null;
     if (body.logradouro !== undefined) fields.logradouro = String(body.logradouro || '').trim() || null;
     if (body.numero !== undefined) fields.numero = String(body.numero || '').trim() || null;
@@ -191,6 +197,7 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
           id: true,
           doc: true,
           name: true,
+          abbrevName: true,
           cep: true,
           logradouro: true,
           numero: true,

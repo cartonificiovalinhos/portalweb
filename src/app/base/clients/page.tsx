@@ -5,6 +5,7 @@ type Client = {
   id: number;
   doc: string;
   name: string;
+  abbrevName?: string | null;
   cep?: string;
   logradouro?: string;
   numero?: string;
@@ -37,7 +38,7 @@ export default function ClientsPage() {
   const [error, setError] = useState<string | null>(null);
   const [q, setQ] = useState("");
   const [showAdd, setShowAdd] = useState(false);
-  const [add, setAdd] = useState<Client>({ id: 0, doc: "", name: "", cep: "", logradouro: "", numero: "", bairro: "", cidade: "", estado: "", paymentTermId: null });
+  const [add, setAdd] = useState<Client>({ id: 0, doc: "", name: "", abbrevName: "", cep: "", logradouro: "", numero: "", bairro: "", cidade: "", estado: "", paymentTermId: null });
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editDraft, setEditDraft] = useState<Client | null>(null);
   const [paymentTerms, setPaymentTerms] = useState<PaymentTerm[]>([]);
@@ -166,7 +167,7 @@ export default function ClientsPage() {
       };
       const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
       if (!res.ok) throw new Error(editingId ? 'Falha ao salvar alterações' : 'Falha ao incluir cliente');
-      setAdd({ id: 0, doc: "", name: "", cep: "", logradouro: "", numero: "", bairro: "", cidade: "", estado: "", paymentTermId: null });
+      setAdd({ id: 0, doc: "", name: "", abbrevName: "", cep: "", logradouro: "", numero: "", bairro: "", cidade: "", estado: "", paymentTermId: null });
       setLinkedPaymentTerms([]);
       setEditingId(null);
       setShowAdd(false);
@@ -256,7 +257,7 @@ export default function ClientsPage() {
               const next = !s;
               if (next) {
                 setEditingId(null);
-                setAdd({ id: 0, doc: "", name: "", cep: "", logradouro: "", numero: "", bairro: "", cidade: "", estado: "", paymentTermId: null });
+                setAdd({ id: 0, doc: "", name: "", abbrevName: "", cep: "", logradouro: "", numero: "", bairro: "", cidade: "", estado: "", paymentTermId: null });
               }
               return next;
             });
@@ -284,6 +285,16 @@ export default function ClientsPage() {
             <div className="grid grid-cols-[160px_1fr] items-center gap-3">
               <label className="text-sm text-gray-700">Nome</label>
               <input value={add.name || ''} onChange={(e) => setAdd((prev) => ({ ...prev, name: e.target.value }))} className="border px-3 py-2 rounded w-full" />
+            </div>
+
+            <div className="grid grid-cols-[160px_1fr] items-center gap-3">
+              <label className="text-sm text-gray-700">Nome Abreviado</label>
+              <input
+                value={add.abbrevName || ''}
+                maxLength={20}
+                onChange={(e) => setAdd((prev) => ({ ...prev, abbrevName: e.target.value }))}
+                className="border px-3 py-2 rounded w-full"
+              />
             </div>
 
             <div className="grid grid-cols-[160px_1fr] items-center gap-3">

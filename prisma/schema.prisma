@@ -383,6 +383,7 @@ model Client {
   id         Int     @id @default(autoincrement())
   doc        String? @unique
   name       String
+  abbrevName String? @db.Char(20)
   cep        String?
   logradouro String?
   numero     String?
