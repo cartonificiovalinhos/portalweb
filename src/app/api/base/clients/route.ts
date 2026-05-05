@@ -158,6 +158,7 @@ export async function GET(request: Request) {
     if (q) {
       const or: any[] = [
         { name: { contains: q } },
+        { abbrevName: { contains: q } },
         { cidade: { contains: q } },
         { estado: { contains: q } },
       ];
