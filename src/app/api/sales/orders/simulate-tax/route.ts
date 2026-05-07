@@ -94,6 +94,7 @@ export async function POST(request: Request) {
           orderId: 0,
           sku: item.sku || item.inventoryItem?.sku || "",
           quantity: item.quantity,
+          discountPct: Number(item.discountPct ?? 0),
           diameter: item.diameter || 0,
           grammage: item.grammage || 0,
           tube: item.tube || 0,

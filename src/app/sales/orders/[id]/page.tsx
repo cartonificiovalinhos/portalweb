@@ -728,9 +728,25 @@ export default function SalesOrderMaintenancePage() {
                   <div className="flex items-center gap-2 sm:justify-end">
                     <button className={`${ICON_BTN} ${integrating || !isEditableStatus(order?.status) || isHeaderEditing ? 'opacity-50 cursor-not-allowed' : ''}`} title="Enviar para ERP" aria-label="Enviar para ERP" disabled={integrating || !isEditableStatus(order?.status) || isHeaderEditing} style={{ opacity: integrating || !isEditableStatus(order?.status) || isHeaderEditing ? 0.5 : 1, pointerEvents: integrating || !isEditableStatus(order?.status) || isHeaderEditing ? 'none' : 'auto' }} onClick={async () => {
                   if (!order) return;
-                  if (!confirm('Confirma enviar este pedido para o ERP?')) return;
-                  setIntegrating(true);
                   try {
+                    const hasDiscount = (orderItems || []).some((it) => Number((it as any)?.discountPct ?? 0) > 0);
+                    if (hasDiscount) {
+                      const ok = confirm('Pedido possui desconto e será enviado para aprovação comercial. Deseja continuar?');
+                      if (!ok) return;
+                      setIntegrating(true);
+                      const patch = await fetch(`/api/sales/orders/${order.id}`, {
+                        method: 'PATCH',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ status: 'Em Aprovação Comercial' }),
+                      });
+                      const patchBody = await patch.json().catch(() => ({} as any));
+                      if (!patch.ok) throw new Error(patchBody?.error || 'Falha ao enviar para aprovação comercial');
+                      await refreshOrder();
+                      return;
+                    }
+
+                    if (!confirm('Confirma enviar este pedido para o ERP?')) return;
+                    setIntegrating(true);
                     const res = await fetch(`/api/sales/orders/${order.id}/integrate`, {
                       method: 'POST', headers: { 'Content-Type': 'application/json' }
                     });

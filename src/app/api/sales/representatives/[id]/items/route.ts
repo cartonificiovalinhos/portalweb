@@ -78,19 +78,31 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
         }
 
         try {
-          const previous = await tx.userInventoryItemPrice.findUnique({
-            where: { userId_inventoryItemId_unit: { userId: repUserId, inventoryItemId, unit: it.unit } },
-            select: { unitPrice: true },
+          const previousRows = await tx.userInventoryItemPrice.findMany({
+            where: { userId: repUserId, inventoryItemId },
+            select: { id: true, unit: true, unitPrice: true },
           });
-          const oldBasePrice = Number(previous?.unitPrice ?? 0);
+          const previousMatches = previousRows.filter((r) => normalizeUnit(r.unit) === it.unit);
+          const previousPreferred =
+            previousMatches.find((r) => String(r.unit || '').trim().toUpperCase() === it.unit) ?? previousMatches[0] ?? null;
+          const oldBasePrice = Number(previousPreferred?.unitPrice ?? 0);
           const newBasePrice = Number(it.unitPrice ?? 0);
 
-          const row = await tx.userInventoryItemPrice.upsert({
-            where: { userId_inventoryItemId_unit: { userId: repUserId, inventoryItemId, unit: it.unit } },
-            update: { unitPrice: it.unitPrice },
-            create: { userId: repUserId, inventoryItemId, unit: it.unit, unitPrice: it.unitPrice },
-            select: { id: true, userId: true, inventoryItemId: true, unit: true, unitPrice: true },
-          });
+          const row = previousPreferred
+            ? await tx.userInventoryItemPrice.update({
+                where: { id: previousPreferred.id },
+                data: { unit: it.unit, unitPrice: it.unitPrice },
+                select: { id: true, userId: true, inventoryItemId: true, unit: true, unitPrice: true },
+              })
+            : await tx.userInventoryItemPrice.create({
+                data: { userId: repUserId, inventoryItemId, unit: it.unit, unitPrice: it.unitPrice },
+                select: { id: true, userId: true, inventoryItemId: true, unit: true, unitPrice: true },
+              });
+
+          const duplicateIds = previousMatches.map((r) => r.id).filter((id) => id !== row.id);
+          if (duplicateIds.length > 0) {
+            await tx.userInventoryItemPrice.deleteMany({ where: { id: { in: duplicateIds } } });
+          }
 
           let adjustedClients = 0;
           if (repClientIds.length > 0 && oldBasePrice > 0 && newBasePrice > 0) {
@@ -99,13 +111,14 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
                 clientId: { in: repClientIds },
                 inventoryItemId,
                 allowed: true,
-                unit: it.unit,
                 unitPrice: { gt: 0 },
               },
-              select: { id: true, unitPrice: true },
+              select: { id: true, unitPrice: true, unit: true, inventoryItem: { select: { unit: true } } },
             });
 
             for (const cl of clientLinks) {
+              const clUnit = normalizeUnit(cl.unit ?? cl.inventoryItem?.unit);
+              if (!clUnit || clUnit !== it.unit) continue;
               const currentClientPrice = Number(cl.unitPrice ?? 0);
               if (!Number.isFinite(currentClientPrice) || currentClientPrice <= 0) continue;
               const ratio = currentClientPrice / oldBasePrice;

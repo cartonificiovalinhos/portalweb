@@ -156,6 +156,60 @@ export default function SalesOrdersPage() {
     return Number.isFinite(fallback) ? fallback : 0;
   };
 
+  const hasAnyDiscount = (o: SalesOrder) => {
+    const items = Array.isArray((o as any)?.items) ? ((o as any).items as any[]) : [];
+    return items.some((it) => Number(it?.discountPct ?? 0) > 0);
+  };
+
+  const sendOrderToErp = async (o: SalesOrder) => {
+    if (hasAnyDiscount(o)) {
+      const ok = confirm('Pedido possui desconto e será enviado para aprovação comercial. Deseja continuar?');
+      if (!ok) return;
+      setIntegratingId(o.id);
+      try {
+        const res = await fetch(`/api/sales/orders/${o.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: 'Em Aprovação Comercial' }),
+        });
+        const data = await res.json().catch(() => ({} as any));
+        if (!res.ok) throw new Error(data?.error || 'Falha ao enviar para aprovação comercial');
+        await reloadOrders();
+      } catch (e: any) {
+        alert(e?.message || String(e));
+      } finally {
+        setIntegratingId(null);
+      }
+      return;
+    }
+
+    if (!confirm('Confirma enviar este pedido para o ERP?')) return;
+    setIntegratingId(o.id);
+    try {
+      const res = await fetch(`/api/sales/orders/${o.id}/integrate`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Falha ao enviar para ERP');
+      }
+      const data = await res.json();
+      
+      if (data.newStatus === 'Erro na integração') {
+        alert('Houve erros na integração. Verifique o histórico de situação.');
+      } else if (data.newStatus === 'Integrado') {
+        alert('Pedido integrado com sucesso!');
+      } else {
+        alert('Envio realizado. Verifique o status atual.');
+      }
+      await reloadOrders();
+    } catch (e: any) { 
+      alert(e?.message || String(e)); 
+    } finally {
+      setIntegratingId(null);
+    }
+  };
+
   const IconBtn = ({ title, onClick, children, disabled = false }: any) => (
     <button
       title={title}
@@ -378,33 +432,7 @@ export default function SalesOrdersPage() {
                   <IconBtn
                     title="Enviar para ERP"
                     disabled={integratingId === o.id || !['Orçamento', 'Erro na integração'].includes(statusLabelPt(o.status))}
-                    onClick={async () => {
-                      if (!confirm('Confirma enviar este pedido para o ERP?')) return;
-                      setIntegratingId(o.id);
-                      try {
-                        const res = await fetch(`/api/sales/orders/${o.id}/integrate`, {
-                            method: 'POST', headers: { 'Content-Type': 'application/json' }
-                        });
-                        if (!res.ok) {
-                            const err = await res.json();
-                            throw new Error(err.error || 'Falha ao enviar para ERP');
-                        }
-                        const data = await res.json();
-                        
-                        if (data.newStatus === 'Erro na integração') {
-                            alert('Houve erros na integração. Verifique o histórico de situação.');
-                        } else if (data.newStatus === 'Integrado') {
-                            alert('Pedido integrado com sucesso!');
-                        } else {
-                            alert('Envio realizado. Verifique o status atual.');
-                        }
-                        await reloadOrders();
-                      } catch (e: any) { 
-                          alert(e?.message || String(e)); 
-                      } finally {
-                          setIntegratingId(null);
-                      }
-                    }}
+                    onClick={() => { void sendOrderToErp(o); }}
                   >
                     {integratingId === o.id ? <SpinnerIcon /> : <SendIcon />}
                   </IconBtn>
@@ -484,33 +512,7 @@ export default function SalesOrdersPage() {
                       <IconBtn 
                         title="Enviar para ERP" 
                         disabled={integratingId === o.id || !['Orçamento', 'Erro na integração'].includes(statusLabelPt(o.status))}
-                        onClick={async () => {
-                          if (!confirm('Confirma enviar este pedido para o ERP?')) return;
-                          setIntegratingId(o.id);
-                          try {
-                            const res = await fetch(`/api/sales/orders/${o.id}/integrate`, {
-                                method: 'POST', headers: { 'Content-Type': 'application/json' }
-                            });
-                            if (!res.ok) {
-                                const err = await res.json();
-                                throw new Error(err.error || 'Falha ao enviar para ERP');
-                            }
-                            const data = await res.json();
-                            
-                            if (data.newStatus === 'Erro na integração') {
-                                alert('Houve erros na integração. Verifique o histórico de situação.');
-                            } else if (data.newStatus === 'Integrado') {
-                                alert('Pedido integrado com sucesso!');
-                            } else {
-                                alert('Envio realizado. Verifique o status atual.');
-                            }
-                            await reloadOrders();
-                          } catch (e: any) { 
-                              alert(e?.message || String(e)); 
-                          } finally {
-                              setIntegratingId(null);
-                          }
-                        }}
+                        onClick={() => { void sendOrderToErp(o); }}
                       > 
                         {integratingId === o.id ? <SpinnerIcon /> : <SendIcon />}
                       </IconBtn>

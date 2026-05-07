@@ -4,6 +4,10 @@ import { authOptions } from '../../../../../lib/auth';
 import { prisma } from '../../../../../lib/prisma';
 import { isProgramAllowed } from '../../../../../lib/isProgramAllowed';
 
+function escapeLike(v: string): string {
+  return String(v || '').replace(/[\\%_]/g, (m) => `\\${m}`);
+}
+
 export async function GET(request: Request) {
   try {
     const session = await getServerSession(authOptions);
@@ -18,23 +22,24 @@ export async function GET(request: Request) {
     const q = (url.searchParams.get('q') || '').trim();
     if (!q) return NextResponse.json({ users: [] });
 
-    const rows = await prisma.user.findMany({
-      where: {
-        OR: [
-          { name: { contains: q } },
-          { abbrevName: { contains: q } },
-          { email: { contains: q } },
-          { doc: { contains: q.replace(/\D+/g, '') } },
-        ],
-      },
-      orderBy: { name: 'asc' },
-      take: 50,
-      select: { id: true, name: true, abbrevName: true, email: true, doc: true },
-    });
+    const like = `%${escapeLike(q)}%`;
+    const docDigits = q.replace(/\D+/g, '');
+    const docLike = `%${escapeLike(docDigits)}%`;
+
+    const rows = await prisma.$queryRaw<any[]>`
+      SELECT id, name, abbrevName, email, doc
+      FROM \`user\`
+      WHERE
+        name COLLATE utf8mb4_general_ci LIKE ${like} ESCAPE '\\'
+        OR IFNULL(abbrevName, '') COLLATE utf8mb4_general_ci LIKE ${like} ESCAPE '\\'
+        OR IFNULL(email, '') COLLATE utf8mb4_general_ci LIKE ${like} ESCAPE '\\'
+        OR (${docDigits} <> '' AND IFNULL(doc, '') LIKE ${docLike} ESCAPE '\\')
+      ORDER BY name ASC
+      LIMIT 50
+    `;
 
     return NextResponse.json({ users: rows });
   } catch (err: any) {
     return NextResponse.json({ error: String(err?.message || err) }, { status: 500 });
   }
 }
-
