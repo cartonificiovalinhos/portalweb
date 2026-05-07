@@ -102,15 +102,14 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
               where: {
                 inventoryItemId,
                 allowed: true,
+                unit: it.unit,
                 unitPrice: { gt: 0 },
                 client: { reps: { some: { userId: repUserId } } },
               },
-              select: { id: true, unitPrice: true, unit: true, inventoryItem: { select: { unit: true } } },
+              select: { id: true, unitPrice: true },
             });
 
             for (const cl of clientLinks) {
-              const clUnit = normalizeUnit(cl.unit ?? cl.inventoryItem?.unit);
-              if (!clUnit || clUnit !== it.unit) continue;
               const currentClientPrice = Number(cl.unitPrice ?? 0);
               if (!Number.isFinite(currentClientPrice) || currentClientPrice <= 0) continue;
               const ratio = currentClientPrice / oldBasePrice;
