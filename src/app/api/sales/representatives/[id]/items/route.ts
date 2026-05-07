@@ -62,14 +62,6 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
 
     const results: any[] = [];
     await prisma.$transaction(async (tx) => {
-      const repClients = await tx.userClientRep.findMany({
-        where: { userId: repUserId },
-        select: { clientId: true },
-      });
-      const repClientIds = Array.from(
-        new Set(repClients.map((x) => Number(x.clientId)).filter((x) => Number.isFinite(x) && x > 0))
-      );
-
       for (const it of cleaned) {
         const inventoryItemId = invBySku.get(it.itemCode);
         if (!inventoryItemId) {
@@ -105,13 +97,13 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
           }
 
           let adjustedClients = 0;
-          if (repClientIds.length > 0 && oldBasePrice > 0 && newBasePrice > 0) {
+          if (oldBasePrice > 0 && newBasePrice > 0) {
             const clientLinks = await tx.clientItem.findMany({
               where: {
-                clientId: { in: repClientIds },
                 inventoryItemId,
                 allowed: true,
                 unitPrice: { gt: 0 },
+                client: { reps: { some: { userId: repUserId } } },
               },
               select: { id: true, unitPrice: true, unit: true, inventoryItem: { select: { unit: true } } },
             });
