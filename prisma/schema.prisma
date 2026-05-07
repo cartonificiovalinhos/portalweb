@@ -30,6 +30,7 @@ model User {
   assignedWorkOrders WorkOrder[]
   userInventoryItemPrices UserInventoryItemPrice[]
   commercialFamilyApprovalUsers CommercialFamilyApprovalUser[]
+  trustedDevices     TrustedDevice[]
 
   // Gestão FinTI Relations
   gestaoFintiCategoriasCriadas       GestaoFintiCategoria[]   @relation("GestaoFintiCategoriaCriadoPor")
@@ -490,6 +491,22 @@ model UserInventoryItemPrice {
   @@index([userId])
   @@index([inventoryItemId])
   @@map("userinventoryitemprice")
+}
+
+model TrustedDevice {
+  id         Int      @id @default(autoincrement())
+  userId     Int
+  tokenHash  String   @unique
+  userAgent  String?
+  expiresAt  DateTime?
+  lastUsedAt DateTime?
+  createdAt  DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("trusteddevice")
 }
 
 model Complaint {

@@ -4,6 +4,23 @@ import CredentialsProvider from 'next-auth/providers/credentials';
 import { prisma } from './prisma';
 import bcrypt from 'bcryptjs';
 import { authenticator } from './otp';
+import crypto from 'crypto';
+
+function sha256Hex(v: string): string {
+  return crypto.createHash('sha256').update(v).digest('hex');
+}
+
+function getCookieValue(cookieHeader: string, name: string): string | null {
+  const parts = String(cookieHeader || '').split(';');
+  for (const p of parts) {
+    const idx = p.indexOf('=');
+    if (idx <= 0) continue;
+    const k = p.slice(0, idx).trim();
+    if (k !== name) continue;
+    return decodeURIComponent(p.slice(idx + 1).trim());
+  }
+  return null;
+}
 
 export const authOptions: NextAuthOptions = {
   session: { strategy: 'jwt' },
@@ -16,7 +33,7 @@ export const authOptions: NextAuthOptions = {
         password: { label: 'Senha', type: 'password' },
         twoFactorCode: { label: '2FA Code', type: 'text' }
       },
-      async authorize(credentials) {
+      async authorize(credentials, req) {
         if (!credentials?.email || !credentials?.password) return null;
         
         const identifier = credentials.email;
@@ -48,6 +65,23 @@ export const authOptions: NextAuthOptions = {
 
         // 2FA Verification
         if (user.twoFactorRequired && user.twoFactorSecret) {
+          const cookieHeader =
+            (req as any)?.headers?.get?.('cookie') ??
+            (req as any)?.headers?.cookie ??
+            '';
+          const deviceToken = getCookieValue(String(cookieHeader), 'trusted_device');
+          if (deviceToken) {
+            const tokenHash = sha256Hex(deviceToken);
+            const trusted = await prisma.trustedDevice.findFirst({
+              where: { userId: user.id, tokenHash, OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }] },
+              select: { id: true },
+            });
+            if (trusted?.id) {
+              await prisma.trustedDevice.update({ where: { id: trusted.id }, data: { lastUsedAt: new Date() } });
+              return { id: String(user.id), name: user.name, email: user.email } as any;
+            }
+          }
+
           const code = credentials.twoFactorCode as string | undefined;
           if (!code) {
              throw new Error('2FA_REQUIRED');

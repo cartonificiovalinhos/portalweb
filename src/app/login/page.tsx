@@ -10,6 +10,7 @@ function LoginForm() {
   const callbackUrl = searchParams?.get("callbackUrl") || "/";
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
+  const [trustDevice, setTrustDevice] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -70,6 +71,15 @@ function LoginForm() {
           });
         }
       } catch {}
+      if (trustDevice) {
+        try {
+          await fetch('/api/auth/trusted-device', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'trust' }),
+          });
+        } catch {}
+      }
       window.location.href = res.url ?? "/";
     }
   };
@@ -201,6 +211,10 @@ function LoginForm() {
                     required
                     />
                 </div>
+                <label className="flex items-center gap-2 text-sm text-gray-700 select-none">
+                  <input type="checkbox" checked={trustDevice} onChange={(e) => setTrustDevice(e.target.checked)} />
+                  Confiar neste dispositivo
+                </label>
             </>
           )}
 
@@ -218,6 +232,10 @@ function LoginForm() {
                     placeholder="000000"
                     required
                 />
+                <label className="mt-2 flex items-center gap-2 text-sm text-gray-700 select-none">
+                  <input type="checkbox" checked={trustDevice} onChange={(e) => setTrustDevice(e.target.checked)} />
+                  Confiar neste dispositivo
+                </label>
              </div>
           )}
 

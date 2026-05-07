@@ -2,6 +2,23 @@ import { NextResponse } from 'next/server';
 import { prisma } from '../../../../lib/prisma';
 import bcrypt from 'bcryptjs';
 import { authenticator } from '../../../../lib/otp';
+import crypto from 'crypto';
+
+function sha256Hex(v: string): string {
+  return crypto.createHash('sha256').update(v).digest('hex');
+}
+
+function getCookieValue(cookieHeader: string, name: string): string | null {
+  const parts = String(cookieHeader || '').split(';');
+  for (const p of parts) {
+    const idx = p.indexOf('=');
+    if (idx <= 0) continue;
+    const k = p.slice(0, idx).trim();
+    if (k !== name) continue;
+    return decodeURIComponent(p.slice(idx + 1).trim());
+  }
+  return null;
+}
 
 export async function POST(req: Request) {
   try {
@@ -39,6 +56,20 @@ export async function POST(req: Request) {
     }
 
     if (user.twoFactorSecret) {
+      const cookieHeader = req.headers.get('cookie') || '';
+      const deviceToken = getCookieValue(cookieHeader, 'trusted_device');
+      if (deviceToken) {
+        const tokenHash = sha256Hex(deviceToken);
+        const trusted = await prisma.trustedDevice.findFirst({
+          where: { userId: user.id, tokenHash, OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }] },
+          select: { id: true },
+        });
+        if (trusted?.id) {
+          await prisma.trustedDevice.update({ where: { id: trusted.id }, data: { lastUsedAt: new Date() } });
+          return NextResponse.json({ required: false, trustedDevice: true });
+        }
+      }
+
       return NextResponse.json({ required: true, setup: false });
     }
 
