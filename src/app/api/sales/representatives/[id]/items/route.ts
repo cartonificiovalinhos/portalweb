@@ -73,6 +73,7 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
           const previousRows = await tx.userInventoryItemPrice.findMany({
             where: { userId: repUserId, inventoryItemId },
             select: { id: true, unit: true, unitPrice: true },
+            orderBy: [{ updatedAt: 'desc' }, { id: 'desc' }],
           });
           const previousMatches = previousRows.filter((r) => normalizeUnit(r.unit) === it.unit);
           const previousPreferred =
