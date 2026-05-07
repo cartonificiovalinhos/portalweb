@@ -851,8 +851,8 @@ function NewSalesOrderContent() {
                     <th className="p-2 text-left">Peso (KG)</th>
                     <th className="p-2 text-left">UM</th>
                     <th className="p-2 text-left">Preço</th>
-                    <th className="p-2 text-left">Desc (%)</th>
                     <th className="p-2 text-left">Preço/KG</th>
+                    <th className="p-2 text-left">Desc (%)</th>
                     <th className="p-2 text-left">Ações</th>
                   </tr>
                 </thead>

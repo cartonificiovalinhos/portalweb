@@ -251,7 +251,12 @@ export const SalesOrderItemRow = ({
   const isPriceByWeight = unitPriceUnit === 'KG';
   const lineBase = (isPriceByWeight ? weightKg : (localItem.quantity ?? 0)) * (localItem.unitPrice ?? 0);
   const lineTotal = lineBase - (lineBase * ((localItem.discountPct ?? 0) / 100));
-  const pricePerKg = weightKg > 0 ? (lineTotal / weightKg) : 0;
+  const pricePerKg =
+    isPriceByWeight
+      ? (localItem.quantity ?? 0) > 0
+        ? (weightKg / (localItem.quantity ?? 0)) * (localItem.unitPrice ?? 0)
+        : 0
+      : (localItem.unitPrice ?? 0);
 
   return (
     <>
@@ -349,6 +354,14 @@ export const SalesOrderItemRow = ({
             />
         </td>
         <td className="p-2">
+          <input
+            type="text"
+            className={`${compactW} px-2 py-1 border rounded bg-gray-100 text-gray-600 cursor-not-allowed`}
+            value={pricePerKg.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            disabled
+          />
+        </td>
+        <td className="p-2">
             <input 
                 type="text" 
                 className={`w-20 px-2 py-1 border rounded ${!canEdit ? disabledClass : ''}`}
@@ -356,14 +369,6 @@ export const SalesOrderItemRow = ({
                 value={discountInput} 
                 onChange={(e) => handleDiscountChange(e.target.value)} 
             />
-        </td>
-        <td className="p-2">
-          <input
-            type="text"
-            className={`${compactW} px-2 py-1 border rounded bg-gray-100 text-gray-600 cursor-not-allowed`}
-            value={pricePerKg.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-            disabled
-          />
         </td>
         <td className="p-2">
             <div className="flex items-center justify-center gap-2">
@@ -608,7 +613,12 @@ export const SalesOrderItemCard = ({
   const isPriceByWeight = unitPriceUnit === 'KG';
   const lineBase = (isPriceByWeight ? weightKg : (localItem.quantity ?? 0)) * (localItem.unitPrice ?? 0);
   const lineTotal = lineBase - (lineBase * ((localItem.discountPct ?? 0) / 100));
-  const pricePerKg = weightKg > 0 ? (lineTotal / weightKg) : 0;
+  const pricePerKg =
+    isPriceByWeight
+      ? (localItem.quantity ?? 0) > 0
+        ? (weightKg / (localItem.quantity ?? 0)) * (localItem.unitPrice ?? 0)
+        : 0
+      : (localItem.unitPrice ?? 0);
 
   return (
     <div className={`p-3 ${isSaving ? 'bg-blue-50' : ''}`}>
@@ -705,6 +715,15 @@ export const SalesOrderItemCard = ({
           />
         </div>
         <div>
+          <div className="text-[11px] text-gray-600">Preço/KG</div>
+          <input
+            type="text"
+            className="w-full px-2 py-1 border rounded text-sm bg-gray-100 text-gray-600 cursor-not-allowed"
+            value={pricePerKg.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            disabled
+          />
+        </div>
+        <div>
           <div className="text-[11px] text-gray-600">Desc (%)</div>
           <input
             type="text"
@@ -712,15 +731,6 @@ export const SalesOrderItemCard = ({
             disabled={!canEdit}
             value={discountInput}
             onChange={(e) => handleDiscountChange(e.target.value)}
-          />
-        </div>
-        <div>
-          <div className="text-[11px] text-gray-600">Preço/KG</div>
-          <input
-            type="text"
-            className="w-full px-2 py-1 border rounded text-sm bg-gray-100 text-gray-600 cursor-not-allowed"
-            value={pricePerKg.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-            disabled
           />
         </div>
         {hasSheetCol && showWidthLengthGram && (
