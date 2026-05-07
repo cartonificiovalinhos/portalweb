@@ -211,8 +211,8 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
             const desiredUnit = unitByInvId.get(inventoryItemId) ?? invUnitById.get(inventoryItemId) ?? null;
             await tx.clientItem.upsert({
               where: { clientId_inventoryItemId: { clientId, inventoryItemId } },
-              update: { allowed: true, ...(desiredUnit ? { unit: desiredUnit } : {}) },
-              create: { clientId, inventoryItemId, unit: desiredUnit, unitPrice: 0, allowed: true },
+              update: { allowed: true, manual: true, ...(desiredUnit ? { unit: desiredUnit } : {}) },
+              create: { clientId, inventoryItemId, unit: desiredUnit, unitPrice: 0, allowed: true, manual: true },
             });
             upsertedCount += 1;
           }
@@ -355,14 +355,14 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
           const row = await tx.clientItem.upsert({
             where: { clientId_inventoryItemId: { clientId, inventoryItemId } },
             update: { unit, unitPrice, allowed },
-            create: { clientId, inventoryItemId, unit, unitPrice, allowed },
+            create: { clientId, inventoryItemId, unit, unitPrice, allowed, manual: false },
           });
           results.push({ ...row, success: true });
         }
 
         const del = keepIds.length
-          ? await tx.clientItem.deleteMany({ where: { clientId, inventoryItemId: { notIn: keepIds } } })
-          : await tx.clientItem.deleteMany({ where: { clientId } });
+          ? await tx.clientItem.deleteMany({ where: { clientId, manual: false, inventoryItemId: { notIn: keepIds } } })
+          : await tx.clientItem.deleteMany({ where: { clientId, manual: false } });
         return del.count;
       });
 
@@ -415,7 +415,7 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
         const existing = await prisma.clientItem.findFirst({ where: { clientId, inventoryItemId } });
         const row = existing
           ? await prisma.clientItem.update({ where: { id: existing.id }, data: { unit, unitPrice, allowed } })
-          : await prisma.clientItem.create({ data: { clientId, inventoryItemId, unit, unitPrice, allowed } });
+          : await prisma.clientItem.create({ data: { clientId, inventoryItemId, unit, unitPrice, allowed, manual: false } });
         
         results.push({ ...row, success: true });
       } catch (innerErr: any) {

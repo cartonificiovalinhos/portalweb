@@ -419,6 +419,7 @@ model ClientItem {
   inventoryItemId Int
   unit            String?
   unitPrice       Float         @default(0)
+  manual          Boolean       @default(false)
   allowed         Boolean       @default(true)
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt

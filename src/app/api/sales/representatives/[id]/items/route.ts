@@ -104,7 +104,7 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
                 inventoryItemId,
                 allowed: true,
                 unit: it.unit,
-                unitPrice: { gt: 0 },
+                manual: true,
                 client: { reps: { some: { userId: repUserId } } },
               },
               select: { id: true, unitPrice: true },
@@ -112,8 +112,7 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
 
             for (const cl of clientLinks) {
               const currentClientPrice = Number(cl.unitPrice ?? 0);
-              if (!Number.isFinite(currentClientPrice) || currentClientPrice <= 0) continue;
-              const ratio = currentClientPrice / oldBasePrice;
+              const ratio = (Number.isFinite(currentClientPrice) && currentClientPrice > 0) ? (currentClientPrice / oldBasePrice) : 1;
               if (!Number.isFinite(ratio) || ratio <= 0) continue;
               const updatedClientPrice = newBasePrice * ratio;
               if (!Number.isFinite(updatedClientPrice) || updatedClientPrice <= 0) continue;
