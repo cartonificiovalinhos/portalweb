@@ -196,6 +196,8 @@ function statusChipStyle(s?: string): string {
       return 'bg-orange-100 text-orange-800 border border-orange-300';
     case 'Aguardando Integração':
       return 'bg-amber-100 text-amber-800 border border-amber-300';
+    case 'Reprovado':
+      return 'bg-red-100 text-red-800 border border-red-300';
     case 'Integrado':
       return 'bg-blue-100 text-blue-800 border border-blue-300';
     case 'Erro na integração':
@@ -214,6 +216,9 @@ function statusLabelPt(s?: string): string {
     case 'EM APROVACAO COMERCIAL':
     case 'COMMERCIAL APPROVAL':
       return 'Em Aprovação Comercial';
+    case 'REPROVADO':
+    case 'REPROVED':
+      return 'Reprovado';
     case 'AGUARDANDO INTEGRAÇÃO':
     case 'AGUARDANDO INTEGRACAO':
     case 'AWAITING INTEGRATION':

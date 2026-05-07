@@ -83,7 +83,8 @@ export async function GET(request: Request) {
         'OPEN': 'Orçamento',
         'EM APROVAÇÃO COMERCIAL': 'Em Aprovação Comercial',
         'EM APROVACAO COMERCIAL': 'Em Aprovação Comercial',
-        'AGUARDANDO INTEGRAÇÃO': 'Aguardando Integração',
+        'REPROVADO': 'Reprovado',
+        'REPROVED': 'Reprovado',
         'ERRO NA INTEGRAÇÃO': 'Erro na integração',
         'INTEGRADO': 'Integrado',
         'EM FILA PRODUÇÃO': 'Em fila produção',
@@ -148,7 +149,7 @@ export async function GET(request: Request) {
     // 4. Sales Trend (Monthly) - Sales vs Invoiced
     // We want to compare "Total Sales (Integrated+)" vs "Total Invoiced"
     // Statuses considered "Integrated or later": NOT (OPEN, AGUARDANDO, ERRO, CANCELADO)
-    const excludedStatuses = ['OPEN', 'AGUARDANDO INTEGRAÇÃO', 'ERRO NA INTEGRAÇÃO', 'CANCELADO'];
+    const excludedStatuses = ['OPEN', 'REPROVADO', 'AGUARDANDO INTEGRAÇÃO', 'ERRO NA INTEGRAÇÃO', 'CANCELADO'];
     
     const trendWhere = {
         ...whereClause,

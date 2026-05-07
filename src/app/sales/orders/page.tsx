@@ -1,6 +1,6 @@
 "use client";
 import Link from "next/link";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 
 type OrderItem = { id: number; name: string; quantity: number; unitPrice: number; discountPct: number };
 type SalesOrder = {
@@ -15,6 +15,7 @@ type SalesOrder = {
   discountTotal: number;
   total: number;
   totalWithTax?: number;
+  canApproveCommercial?: boolean;
   items?: OrderItem[];
 };
 
@@ -28,6 +29,8 @@ export default function SalesOrdersPage() {
   const [dateEnd, setDateEnd] = useState<string>("");
   const [selected, setSelected] = useState<SalesOrder | null>(null);
   const [integratingId, setIntegratingId] = useState<number | null>(null);
+  const [approvingId, setApprovingId] = useState<number | null>(null);
+  const [approvingAction, setApprovingAction] = useState<"approve" | "reject" | null>(null);
   const [page, setPage] = useState(0);
   const [helpOpen, setHelpOpen] = useState(false);
 
@@ -42,29 +45,30 @@ export default function SalesOrdersPage() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [helpOpen]);
 
-  useEffect(() => {
-    const load = async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const res = await fetch('/api/sales/orders');
-        const data = await res.json();
-        setOrders(Array.isArray(data) ? data : []);
-      } catch (err: any) {
-        setError(String(err?.message || err));
-      } finally {
-        setLoading(false);
-      }
-    };
-    load();
+  const reloadOrders = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch('/api/sales/orders', { cache: 'no-store' });
+      const data = await res.json();
+      setOrders(Array.isArray(data) ? data : []);
+    } catch (err: any) {
+      setError(String(err?.message || err));
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    void reloadOrders();
+  }, [reloadOrders]);
 
   const statusColor = (s: string) => {
     const v = (s || '').trim();
     switch (v) {
       case 'Orçamento': return 'bg-gray-100 text-gray-800';
       case 'Em Aprovação Comercial': return 'bg-orange-100 text-orange-800';
-      case 'Aguardando Integração': return 'bg-yellow-100 text-yellow-800';
+      case 'Reprovado': return 'bg-red-100 text-red-800';
       case 'Erro na integração': return 'bg-red-100 text-red-800';
       case 'Integrado': return 'bg-blue-100 text-blue-800';
       case 'Em fila produção': return 'bg-amber-100 text-amber-800';
@@ -83,6 +87,8 @@ export default function SalesOrdersPage() {
       case 'EM APROVAÇÃO COMERCIAL':
       case 'EM APROVACAO COMERCIAL':
       case 'COMMERCIAL APPROVAL': return 'Em Aprovação Comercial';
+      case 'REPROVADO':
+      case 'REPROVED': return 'Reprovado';
       case 'AGUARDANDO INTEGRAÇÃO':
       case 'AGUARDANDO INTEGRACAO':
       case 'AWAITING INTEGRATION': return 'Aguardando Integração';
@@ -187,6 +193,46 @@ export default function SalesOrdersPage() {
     </svg>
   );
 
+  const CheckIcon = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" className="w-4 h-4">
+      <path d="M20 6 9 17l-5-5" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+  const XIcon = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" className="w-4 h-4">
+      <path d="M18 6 6 18" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M6 6l12 12" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+  const SpinnerIcon = () => (
+    <svg className="animate-spin h-3 w-3 text-gray-700" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+    </svg>
+  );
+
+  const commercialApproval = async (orderId: number, action: "approve" | "reject") => {
+    const label = action === "approve" ? "aprovar" : "reprovar";
+    if (!confirm(`Confirma ${label} este pedido?`)) return;
+    setApprovingId(orderId);
+    setApprovingAction(action);
+    try {
+      const res = await fetch(`/api/sales/orders/${orderId}/commercial-approval`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action }),
+      });
+      const data = await res.json().catch(() => ({} as any));
+      if (!res.ok) throw new Error(data?.error || `Erro ${res.status}`);
+      await reloadOrders();
+    } catch (e: any) {
+      alert(e?.message || String(e));
+    } finally {
+      setApprovingId(null);
+      setApprovingAction(null);
+    }
+  };
+
   const HelpIcon = () => (
     <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
       <circle cx="12" cy="12" r="9" />
@@ -223,7 +269,7 @@ export default function SalesOrdersPage() {
             <option value="">Todas</option>
             <option value="Orçamento">Orçamento</option>
             <option value="Em Aprovação Comercial">Em Aprovação Comercial</option>
-            <option value="Aguardando Integração">Aguardando Integração</option>
+            <option value="Reprovado">Reprovado</option>
             <option value="Erro na integração">Erro na integração</option>
             <option value="Integrado">Integrado</option>
             <option value="Em fila produção">Em fila produção</option>
@@ -311,6 +357,24 @@ export default function SalesOrdersPage() {
                 <div className="inline-flex">
                   <IconBtn title="Visualizar" onClick={() => setSelected(o)}><EyeIcon /></IconBtn>
                   <IconBtn title="Detalhes" onClick={() => { window.location.href = `/sales/orders/${o.id}`; }}> <FileIcon /> </IconBtn>
+                  {Boolean((o as any)?.canApproveCommercial) && (
+                    <>
+                      <IconBtn
+                        title="Aprovar"
+                        disabled={approvingId === o.id}
+                        onClick={() => commercialApproval(o.id, "approve")}
+                      >
+                        {approvingId === o.id && approvingAction === "approve" ? <SpinnerIcon /> : <CheckIcon />}
+                      </IconBtn>
+                      <IconBtn
+                        title="Reprovar"
+                        disabled={approvingId === o.id}
+                        onClick={() => commercialApproval(o.id, "reject")}
+                      >
+                        {approvingId === o.id && approvingAction === "reject" ? <SpinnerIcon /> : <XIcon />}
+                      </IconBtn>
+                    </>
+                  )}
                   <IconBtn
                     title="Enviar para ERP"
                     disabled={integratingId === o.id || !['Orçamento', 'Erro na integração'].includes(statusLabelPt(o.status))}
@@ -334,12 +398,7 @@ export default function SalesOrdersPage() {
                         } else {
                             alert('Envio realizado. Verifique o status atual.');
                         }
-
-                        const r = await fetch('/api/sales/orders');
-                        if (r.ok) {
-                            const list = await r.json();
-                            setOrders(Array.isArray(list) ? list : []);
-                        }
+                        await reloadOrders();
                       } catch (e: any) { 
                           alert(e?.message || String(e)); 
                       } finally {
@@ -347,12 +406,7 @@ export default function SalesOrdersPage() {
                       }
                     }}
                   >
-                    {integratingId === o.id ? (
-                        <svg className="animate-spin h-3 w-3 text-gray-700" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
-                    ) : <SendIcon />}
+                    {integratingId === o.id ? <SpinnerIcon /> : <SendIcon />}
                   </IconBtn>
                   <IconBtn title="Excluir" disabled={!['Orçamento', 'Erro na integração'].includes(statusLabelPt(o.status))} onClick={async () => {
                     if (!confirm('Confirma excluir este pedido?')) return;
@@ -409,6 +463,24 @@ export default function SalesOrdersPage() {
                     <div className="inline-flex">
                       <IconBtn title="Visualizar" onClick={() => setSelected(o)}><EyeIcon /></IconBtn>
                       <IconBtn title="Detalhes" onClick={() => { window.location.href = `/sales/orders/${o.id}`; }}> <FileIcon /> </IconBtn>
+                      {Boolean((o as any)?.canApproveCommercial) && (
+                        <>
+                          <IconBtn
+                            title="Aprovar"
+                            disabled={approvingId === o.id}
+                            onClick={() => commercialApproval(o.id, "approve")}
+                          >
+                            {approvingId === o.id && approvingAction === "approve" ? <SpinnerIcon /> : <CheckIcon />}
+                          </IconBtn>
+                          <IconBtn
+                            title="Reprovar"
+                            disabled={approvingId === o.id}
+                            onClick={() => commercialApproval(o.id, "reject")}
+                          >
+                            {approvingId === o.id && approvingAction === "reject" ? <SpinnerIcon /> : <XIcon />}
+                          </IconBtn>
+                        </>
+                      )}
                       <IconBtn 
                         title="Enviar para ERP" 
                         disabled={integratingId === o.id || !['Orçamento', 'Erro na integração'].includes(statusLabelPt(o.status))}
@@ -432,13 +504,7 @@ export default function SalesOrdersPage() {
                             } else {
                                 alert('Envio realizado. Verifique o status atual.');
                             }
-
-                            // Reload
-                            const r = await fetch('/api/sales/orders');
-                            if (r.ok) {
-                                const list = await r.json();
-                                setOrders(Array.isArray(list) ? list : []);
-                            }
+                            await reloadOrders();
                           } catch (e: any) { 
                               alert(e?.message || String(e)); 
                           } finally {
@@ -446,12 +512,7 @@ export default function SalesOrdersPage() {
                           }
                         }}
                       > 
-                        {integratingId === o.id ? (
-                            <svg className="animate-spin h-3 w-3 text-gray-700" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                            </svg>
-                        ) : <SendIcon />}
+                        {integratingId === o.id ? <SpinnerIcon /> : <SendIcon />}
                       </IconBtn>
                       <IconBtn title="Excluir" disabled={!['Orçamento', 'Erro na integração'].includes(statusLabelPt(o.status))} onClick={async () => {
                         if (!confirm('Confirma excluir este pedido?')) return;

@@ -9,9 +9,10 @@ function isMissingTableError(err: any): boolean {
   return msg.includes('commercialfamilyapprovaluser') && (msg.includes('doesn\'t exist') || msg.includes('does not exist') || msg.includes('unknown table'));
 }
 
-export async function GET(_request: Request, ctx: { params: { id: string } }) {
+export async function GET(_request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
-    const familyId = Number(ctx?.params?.id);
+    const familyId = Number(params?.id);
     if (!Number.isFinite(familyId) || familyId <= 0) return NextResponse.json({ error: 'ID inválido' }, { status: 400 });
 
     const session = await getServerSession(authOptions);
@@ -41,9 +42,10 @@ export async function GET(_request: Request, ctx: { params: { id: string } }) {
   }
 }
 
-export async function POST(request: Request, ctx: { params: { id: string } }) {
+export async function POST(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
-    const familyId = Number(ctx?.params?.id);
+    const familyId = Number(params?.id);
     if (!Number.isFinite(familyId) || familyId <= 0) return NextResponse.json({ error: 'ID inválido' }, { status: 400 });
 
     const session = await getServerSession(authOptions);
@@ -89,9 +91,10 @@ export async function POST(request: Request, ctx: { params: { id: string } }) {
   }
 }
 
-export async function DELETE(request: Request, ctx: { params: { id: string } }) {
+export async function DELETE(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
-    const familyId = Number(ctx?.params?.id);
+    const familyId = Number(params?.id);
     if (!Number.isFinite(familyId) || familyId <= 0) return NextResponse.json({ error: 'ID inválido' }, { status: 400 });
 
     const session = await getServerSession(authOptions);

@@ -47,6 +47,7 @@ const statusColor = (s: string) => {
     case 'Orçamento': return 'bg-gray-100 text-gray-800';
     case 'Em Aprovação Comercial': return 'bg-orange-100 text-orange-800';
     case 'Aguardando Integração': return 'bg-yellow-100 text-yellow-800';
+    case 'Reprovado': return 'bg-red-100 text-red-800';
     case 'Erro na integração': return 'bg-red-100 text-red-800';
     case 'Integrado': return 'bg-blue-100 text-blue-800';
     case 'Em fila produção': return 'bg-amber-100 text-amber-800';
@@ -65,6 +66,8 @@ const statusLabelPt = (s?: string) => {
     case 'EM APROVAÇÃO COMERCIAL':
     case 'EM APROVACAO COMERCIAL':
     case 'COMMERCIAL APPROVAL': return 'Em Aprovação Comercial';
+    case 'REPROVADO':
+    case 'REPROVED': return 'Reprovado';
     case 'AGUARDANDO INTEGRAÇÃO':
     case 'AGUARDANDO INTEGRACAO':
     case 'AWAITING INTEGRATION': return 'Aguardando Integração';

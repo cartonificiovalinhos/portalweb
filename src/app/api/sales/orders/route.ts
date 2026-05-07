@@ -155,7 +155,55 @@ export async function GET(request: Request) {
         throw err;
       }
     }
-    return NextResponse.json(Array.isArray(data) ? data : []);
+
+    const isCommercialApprovalStatus = (status: any): boolean => {
+      const s = String(status || '').trim().toUpperCase();
+      if (!s) return false;
+      if (s === 'COMMERCIAL APPROVAL') return true;
+      return s.includes('APROVA') && s.includes('COMERCIAL');
+    };
+
+    const rows = Array.isArray(data) ? data : [];
+    const familyIdsSet = new Set<number>();
+    for (const o of rows) {
+      const items = Array.isArray((o as any)?.items) ? (o as any).items : [];
+      for (const it of items) {
+        const inv = (it as any)?.inventoryItem;
+        const fidRaw = (inv as any)?.commercialFamilyId ?? (inv as any)?.commercialFamily?.id;
+        const fid = Number(fidRaw);
+        if (Number.isFinite(fid) && fid > 0) familyIdsSet.add(Math.trunc(fid));
+      }
+    }
+
+    const eligibleFamilyIds = new Set<number>();
+    if (familyIdsSet.size > 0) {
+      const approvals = await prisma.commercialFamilyApprovalUser.findMany({
+        where: { userId: Math.trunc(userId as number), commercialFamilyId: { in: Array.from(familyIdsSet) }, canView: true },
+        select: { commercialFamilyId: true },
+      });
+      for (const a of approvals) {
+        const fid = Number((a as any)?.commercialFamilyId);
+        if (Number.isFinite(fid) && fid > 0) eligibleFamilyIds.add(Math.trunc(fid));
+      }
+    }
+
+    for (const o of rows) {
+      const inApproval = isCommercialApprovalStatus((o as any)?.status);
+      let hasEligibleFamily = false;
+      const items = Array.isArray((o as any)?.items) ? (o as any).items : [];
+      for (const it of items) {
+        const inv = (it as any)?.inventoryItem;
+        const fidRaw = (inv as any)?.commercialFamilyId ?? (inv as any)?.commercialFamily?.id;
+        const fid = Number(fidRaw);
+        if (Number.isFinite(fid) && fid > 0 && eligibleFamilyIds.has(Math.trunc(fid))) {
+          hasEligibleFamily = true;
+          break;
+        }
+      }
+      (o as any).canApproveCommercial = Boolean(inApproval && hasEligibleFamily);
+    }
+
+    return NextResponse.json(rows);
   } catch (err: any) {
     const message = err?.message || 'Erro ao listar pedidos';
     return NextResponse.json({ error: message }, { status: 500 });
