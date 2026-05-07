@@ -715,7 +715,7 @@ export const SalesOrderItemCard = ({
           />
         </div>
         <div>
-          <div className="text-[11px] text-gray-600">Preço/KG</div>
+          <div className="text-[11px] text-gray-600">Preço/PC</div>
           <input
             type="text"
             className="w-full px-2 py-1 border rounded text-sm bg-gray-100 text-gray-600 cursor-not-allowed"
