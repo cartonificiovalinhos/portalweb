@@ -237,7 +237,6 @@ export async function PATCH(request: Request, props: { params: Promise<{ doc: st
       await tx.clientItem.deleteMany({
         where: {
           clientId: row.id,
-          unitPrice: { lte: 0 },
           OR: [{ unit: null }, { unit: '' }],
         },
       });
