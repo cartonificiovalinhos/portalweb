@@ -54,6 +54,7 @@ type ClientInvoice = {
   invoiceNumber: string;
   issueDate: string;
   dueDate?: string | null;
+  status?: string | null;
   totalValue: number;
 };
 
@@ -1930,18 +1931,38 @@ export default function ClientDetailsPage() {
                     <th className="p-2 text-left">Data Emissão</th>
                     <th className="p-2 text-left">Data Vencimento</th>
                     <th className="p-2 text-right">Valor R$</th>
+                    <th className="p-2 text-left">Situação</th>
                   </tr>
                 </thead>
                 <tbody>
                   {!loadingInvoices && clientInvoices.length === 0 && (
-                    <tr><td colSpan={4} className="p-3 text-gray-500">Sem faturas</td></tr>
+                    <tr><td colSpan={5} className="p-3 text-gray-500">Sem faturas</td></tr>
                   )}
                   {clientInvoices.map((inv) => (
                     <tr key={inv.id} className="border-t">
+                      {(() => {
+                        const now = new Date();
+                        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+                        const raw = String(inv.status || '').trim().toUpperCase();
+                        const isPaid = raw === 'PAGA';
+                        const due = inv.dueDate ? new Date(inv.dueDate) : null;
+                        const isOverdue = !isPaid && due != null && due < today;
+                        const label = isPaid ? 'Paga' : (isOverdue ? 'Vencida' : 'Em Aberto');
+                        const cls = isPaid
+                          ? 'bg-green-100 text-green-800'
+                          : (isOverdue ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800');
+                        return (
+                          <>
                       <td className="p-2">{inv.invoiceNumber}</td>
                       <td className="p-2">{inv.issueDate ? new Date(inv.issueDate).toLocaleDateString('pt-BR') : '-'}</td>
                       <td className="p-2">{inv.dueDate ? new Date(inv.dueDate).toLocaleDateString('pt-BR') : '-'}</td>
                       <td className="p-2 text-right">{Number(inv.totalValue || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
+                      <td className="p-2">
+                        <span className={`inline-flex px-2 py-0.5 rounded text-xs font-medium ${cls}`}>{label}</span>
+                      </td>
+                          </>
+                        );
+                      })()}
                     </tr>
                   ))}
                 </tbody>
@@ -1952,14 +1973,33 @@ export default function ClientDetailsPage() {
               {!loadingInvoices && clientInvoices.length === 0 && <div className="p-3 text-gray-500 text-sm">Sem faturas</div>}
               {clientInvoices.map((inv) => (
                 <div key={inv.id} className="p-3">
-                  <div className="text-sm font-semibold text-gray-900">{inv.invoiceNumber}</div>
-                  <div className="mt-1 text-xs text-gray-600 flex flex-wrap gap-x-3 gap-y-1">
-                    <span>Emissão: {inv.issueDate ? new Date(inv.issueDate).toLocaleDateString('pt-BR') : '-'}</span>
-                    <span>Venc.: {inv.dueDate ? new Date(inv.dueDate).toLocaleDateString('pt-BR') : '-'}</span>
-                  </div>
-                  <div className="mt-2 text-sm font-medium text-gray-900">
-                    {Number(inv.totalValue || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                  </div>
+                  {(() => {
+                    const now = new Date();
+                    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+                    const raw = String(inv.status || '').trim().toUpperCase();
+                    const isPaid = raw === 'PAGA';
+                    const due = inv.dueDate ? new Date(inv.dueDate) : null;
+                    const isOverdue = !isPaid && due != null && due < today;
+                    const label = isPaid ? 'Paga' : (isOverdue ? 'Vencida' : 'Em Aberto');
+                    const cls = isPaid
+                      ? 'bg-green-100 text-green-800'
+                      : (isOverdue ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800');
+                    return (
+                      <>
+                        <div className="text-sm font-semibold text-gray-900">{inv.invoiceNumber}</div>
+                        <div className="mt-1 text-xs text-gray-600 flex flex-wrap gap-x-3 gap-y-1">
+                          <span>Emissão: {inv.issueDate ? new Date(inv.issueDate).toLocaleDateString('pt-BR') : '-'}</span>
+                          <span>Venc.: {inv.dueDate ? new Date(inv.dueDate).toLocaleDateString('pt-BR') : '-'}</span>
+                        </div>
+                        <div className="mt-2 flex items-center gap-2">
+                          <div className="text-sm font-medium text-gray-900">
+                            {Number(inv.totalValue || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                          </div>
+                          <span className={`ml-auto inline-flex px-2 py-0.5 rounded text-xs font-medium ${cls}`}>{label}</span>
+                        </div>
+                      </>
+                    );
+                  })()}
                 </div>
               ))}
             </div>

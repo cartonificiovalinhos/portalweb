@@ -20,8 +20,10 @@ export async function GET(request: Request, props: { params: Promise<{ id: strin
     const where: any = { order: { clientId: Math.trunc(clientId) } };
     if (filter === 'due' || filter === 'a_vencer' || filter === 'avencer') {
       where.dueDate = { gte: today };
+      where.status = { not: 'PAGA' };
     } else if (filter === 'overdue' || filter === 'vencidos' || filter === 'vencido') {
       where.dueDate = { lt: today };
+      where.status = { not: 'PAGA' };
     }
 
     const invoices = await prisma.salesOrderInvoice.findMany({
@@ -32,6 +34,7 @@ export async function GET(request: Request, props: { params: Promise<{ id: strin
         invoiceNumber: true,
         issueDate: true,
         dueDate: true,
+        status: true,
         totalValue: true,
       },
       orderBy: [{ issueDate: 'desc' }, { id: 'desc' }],

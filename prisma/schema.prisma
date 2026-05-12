@@ -313,6 +313,7 @@ model SalesOrderInvoice {
   invoiceNumber String
   issueDate     DateTime
   dueDate       DateTime?
+  status        String   @default("EM_ABERTO")
   totalValue    Float
   totalWeight   Float
   danfeFileName String?
@@ -322,6 +323,7 @@ model SalesOrderInvoice {
   order SalesOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
   @@index([orderId])
+  @@index([status])
   @@map("salesorderinvoice")
 }
 
