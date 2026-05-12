@@ -110,6 +110,32 @@ const isEditableStatus = (status?: string) => {
   return s === 'OPEN' || s === 'ORÇAMENTO' || s === 'ORCAMENTO' || s.includes('ERRO') || s.includes('ERROR');
 };
 
+const ORDER_STATUS_OPTIONS = [
+  'Orçamento',
+  'Em Aprovação Comercial',
+  'Reprovado',
+  'Erro na integração',
+  'Integrado',
+  'Em fila produção',
+  'Em produção',
+  'Produzido/Estocado',
+  'Faturado',
+  'Cancelado',
+];
+
+const phoneDigits = (value: string) => String(value || '').replace(/\D+/g, '').slice(0, 11);
+
+const formatPhoneBr = (digitsRaw: string) => {
+  const d = phoneDigits(digitsRaw);
+  if (!d) return '';
+  if (d.length <= 2) return `(${d}`;
+  const area = d.slice(0, 2);
+  const rest = d.slice(2);
+  if (rest.length <= 4) return `(${area}) ${rest}`;
+  if (rest.length <= 8) return `(${area}) ${rest.slice(0, 4)}-${rest.slice(4)}`;
+  return `(${area}) ${rest.slice(0, 5)}-${rest.slice(5, 9)}`;
+};
+
 const IconBtn = ({ title, onClick, children, disabled = false }: any) => (
   <button
     title={title}
@@ -195,11 +221,8 @@ export default function ClientDetailsPage() {
     isWhatsapp: false,
     email: '',
   });
-  const [orderStatuses, setOrderStatuses] = useState<string[]>([]);
-  const [statusModalOpen, setStatusModalOpen] = useState(false);
-  const [statusModalContact, setStatusModalContact] = useState<ClientContact | null>(null);
-  const [statusSelection, setStatusSelection] = useState<string[]>([]);
-  const [savingStatuses, setSavingStatuses] = useState(false);
+  const [expandedContactId, setExpandedContactId] = useState<number | null>(null);
+  const [savingContactStatusId, setSavingContactStatusId] = useState<number | null>(null);
 
   const [invoiceFilter, setInvoiceFilter] = useState<'due' | 'overdue' | 'all'>('all');
   const [clientInvoices, setClientInvoices] = useState<ClientInvoice[]>([]);
@@ -360,22 +383,22 @@ export default function ClientDetailsPage() {
     try {
       const r = await fetch(`/api/clients/${encodeURIComponent(String(id))}/contacts`, { cache: 'no-store' });
       const j = await r.json();
-      setContacts(Array.isArray(j) ? j : []);
+      const arr = Array.isArray(j) ? (j as any[]) : [];
+      setContacts(
+        arr.map((c) => ({
+          id: Number(c.id),
+          clientId: Number(c.clientId),
+          description: String(c.description || ''),
+          phone: c.phone != null ? phoneDigits(String(c.phone)) : null,
+          isWhatsapp: Boolean(c.isWhatsapp),
+          email: c.email != null ? String(c.email) : null,
+          statuses: Array.isArray(c.statuses) ? c.statuses.map((s: any) => String(s)) : [],
+        }))
+      );
     } catch {
       setContacts([]);
     } finally {
       setLoadingContacts(false);
-    }
-  }, [id]);
-
-  const loadOrderStatuses = useCallback(async () => {
-    if (!Number.isFinite(id) || id <= 0) return;
-    try {
-      const r = await fetch(`/api/clients/${encodeURIComponent(String(id))}/order-statuses`, { cache: 'no-store' });
-      const j = await r.json();
-      setOrderStatuses(Array.isArray(j) ? j : []);
-    } catch {
-      setOrderStatuses([]);
     }
   }, [id]);
 
@@ -396,9 +419,8 @@ export default function ClientDetailsPage() {
   useEffect(() => {
     if (activeTab === 'contacts') {
       void loadContacts();
-      void loadOrderStatuses();
     }
-  }, [activeTab, loadContacts, loadOrderStatuses]);
+  }, [activeTab, loadContacts]);
 
   useEffect(() => {
     if (activeTab === 'invoices') {
@@ -1165,7 +1187,7 @@ export default function ClientDetailsPage() {
 
             <div className="p-3 border-b">
               <div className="grid grid-cols-1 md:grid-cols-12 gap-2 items-end">
-                <div className="md:col-span-4">
+                <div className="md:col-span-3">
                   <label className="text-xs text-gray-700">Descrição Contato</label>
                   <input
                     className="w-full px-3 py-2 border rounded text-sm"
@@ -1173,13 +1195,14 @@ export default function ClientDetailsPage() {
                     onChange={(e) => setNewContact((p) => ({ ...p, description: e.target.value }))}
                   />
                 </div>
-                <div className="md:col-span-4">
+                <div className="md:col-span-3">
                   <label className="text-xs text-gray-700">Telefone</label>
                   <div className="flex items-center gap-2">
                     <input
                       className="flex-1 min-w-0 px-3 py-2 border rounded text-sm"
-                      value={newContact.phone}
-                      onChange={(e) => setNewContact((p) => ({ ...p, phone: e.target.value }))}
+                      value={formatPhoneBr(newContact.phone)}
+                      inputMode="tel"
+                      onChange={(e) => setNewContact((p) => ({ ...p, phone: phoneDigits(e.target.value) }))}
                     />
                     <label className="inline-flex items-center gap-2 text-xs text-gray-700 whitespace-nowrap">
                       <input
@@ -1191,7 +1214,7 @@ export default function ClientDetailsPage() {
                     </label>
                   </div>
                 </div>
-                <div className="md:col-span-3">
+                <div className="md:col-span-5">
                   <label className="text-xs text-gray-700">E-mail</label>
                   <input
                     className="w-full px-3 py-2 border rounded text-sm"
@@ -1233,108 +1256,161 @@ export default function ClientDetailsPage() {
             {loadingContacts && <div className="p-3 text-sm text-gray-600">Carregando…</div>}
 
             <div className="hidden sm:block overflow-x-auto">
-              <table className="w-full text-sm">
+              <table className="w-full text-sm table-fixed">
                 <thead>
                   <tr className="bg-gray-50">
-                    <th className="p-2 text-left">Descrição Contato</th>
-                    <th className="p-2 text-left">Telefone</th>
-                    <th className="p-2 text-left">E-mail</th>
+                    <th className="p-2 text-left w-[18%]">Descrição Contato</th>
+                    <th className="p-2 text-left w-[18%]">Telefone</th>
+                    <th className="p-2 text-left w-[26%]">E-mail</th>
                     <th className="p-2 text-left">Status</th>
-                    <th className="p-2 text-left">Ações</th>
+                    <th className="p-2 text-left w-[18%]">Ações</th>
                   </tr>
                 </thead>
                 <tbody>
                   {!loadingContacts && contacts.length === 0 && (
                     <tr><td colSpan={5} className="p-3 text-gray-500">Sem contatos</td></tr>
                   )}
-                  {contacts.map((c) => (
-                    <tr key={c.id} className="border-t">
-                      <td className="p-2">
-                        <input
-                          className="w-full px-2 py-1 border rounded"
-                          value={c.description}
-                          onChange={(e) => setContacts((prev) => prev.map((x) => (x.id === c.id ? { ...x, description: e.target.value } : x)))}
-                        />
-                      </td>
-                      <td className="p-2">
-                        <div className="flex items-center gap-2">
-                          <input
-                            className="flex-1 min-w-0 px-2 py-1 border rounded"
-                            value={c.phone || ''}
-                            onChange={(e) => setContacts((prev) => prev.map((x) => (x.id === c.id ? { ...x, phone: e.target.value } : x)))}
-                          />
-                          <label className="inline-flex items-center gap-2 text-xs text-gray-700 whitespace-nowrap">
+                  {contacts.flatMap((c) => {
+                    const isExpanded = expandedContactId === c.id;
+                    const chevronPath = isExpanded ? "M7 14l5-5 5 5" : "M7 10l5 5 5-5";
+                    return [
+                      (
+                        <tr key={c.id} className="border-t align-top">
+                          <td className="p-2">
                             <input
-                              type="checkbox"
-                              checked={c.isWhatsapp}
-                              onChange={(e) => setContacts((prev) => prev.map((x) => (x.id === c.id ? { ...x, isWhatsapp: e.target.checked } : x)))}
+                              className="w-full px-2 py-1 border rounded"
+                              value={c.description}
+                              onChange={(e) => setContacts((prev) => prev.map((x) => (x.id === c.id ? { ...x, description: e.target.value } : x)))}
                             />
-                            <span>É Whatsapp?</span>
-                          </label>
-                        </div>
-                      </td>
-                      <td className="p-2">
-                        <input
-                          className="w-full px-2 py-1 border rounded"
-                          value={c.email || ''}
-                          onChange={(e) => setContacts((prev) => prev.map((x) => (x.id === c.id ? { ...x, email: e.target.value } : x)))}
-                        />
-                      </td>
-                      <td className="p-2 text-xs text-gray-700">
-                        {(c.statuses || []).length ? (c.statuses || []).join(', ') : '-'}
-                      </td>
-                      <td className="p-2">
-                        <button
-                          className="px-2 py-1 text-xs border rounded bg-white hover:bg-gray-100 mr-2"
-                          onClick={() => {
-                            setStatusModalContact(c);
-                            setStatusSelection(Array.isArray(c.statuses) ? c.statuses : []);
-                            setStatusModalOpen(true);
-                          }}
-                        >
-                          Status
-                        </button>
-                        <button
-                          className="px-2 py-1 text-xs border rounded bg-white hover:bg-gray-100 mr-2"
-                          onClick={async () => {
-                            try {
-                              const res = await fetch(`/api/clients/${encodeURIComponent(String(id))}/contacts/${c.id}`, {
-                                method: 'PATCH',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({
-                                  description: c.description,
-                                  phone: c.phone,
-                                  isWhatsapp: c.isWhatsapp,
-                                  email: c.email,
-                                }),
-                              });
-                              const body = await res.json().catch(() => ({} as any));
-                              if (!res.ok) throw new Error(body?.error || 'Falha ao salvar contato');
-                              await loadContacts();
-                            } catch (e: any) {
-                              alert(e?.message || String(e));
-                            }
-                          }}
-                        >
-                          Salvar
-                        </button>
-                        <button
-                          className="px-2 py-1 text-xs border rounded bg-white hover:bg-gray-100"
-                          onClick={async () => {
-                            if (!confirm('Excluir este contato?')) return;
-                            const res = await fetch(`/api/clients/${encodeURIComponent(String(id))}/contacts/${c.id}`, { method: 'DELETE' });
-                            if (res.ok) await loadContacts();
-                            else {
-                              const body = await res.json().catch(() => ({} as any));
-                              alert(body?.error || 'Falha ao excluir contato');
-                            }
-                          }}
-                        >
-                          Excluir
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
+                          </td>
+                          <td className="p-2">
+                            <div className="flex items-center gap-2">
+                              <input
+                                className="flex-1 min-w-0 px-2 py-1 border rounded"
+                                value={formatPhoneBr(c.phone || '')}
+                                inputMode="tel"
+                                onChange={(e) => setContacts((prev) => prev.map((x) => (x.id === c.id ? { ...x, phone: phoneDigits(e.target.value) } : x)))}
+                              />
+                              <label className="inline-flex items-center gap-2 text-xs text-gray-700 whitespace-nowrap">
+                                <input
+                                  type="checkbox"
+                                  checked={c.isWhatsapp}
+                                  onChange={(e) => setContacts((prev) => prev.map((x) => (x.id === c.id ? { ...x, isWhatsapp: e.target.checked } : x)))}
+                                />
+                                <span>É Whatsapp?</span>
+                              </label>
+                            </div>
+                          </td>
+                          <td className="p-2">
+                            <input
+                              className="w-full px-2 py-1 border rounded"
+                              value={c.email || ''}
+                              onChange={(e) => setContacts((prev) => prev.map((x) => (x.id === c.id ? { ...x, email: e.target.value } : x)))}
+                            />
+                          </td>
+                          <td className="p-2 text-xs text-gray-700 break-words">
+                            {(c.statuses || []).length ? (c.statuses || []).join(', ') : '-'}
+                          </td>
+                          <td className="p-2">
+                            <button
+                              className="inline-flex items-center justify-center w-8 h-8 border rounded hover:bg-gray-100 mr-2"
+                              title="Status"
+                              aria-label="Status"
+                              onClick={() => setExpandedContactId((prev) => (prev === c.id ? null : c.id))}
+                            >
+                              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <path d={chevronPath} />
+                              </svg>
+                            </button>
+                            <button
+                              className="px-2 py-1 text-xs border rounded bg-white hover:bg-gray-100 mr-2"
+                              onClick={async () => {
+                                try {
+                                  const res = await fetch(`/api/clients/${encodeURIComponent(String(id))}/contacts/${c.id}`, {
+                                    method: 'PATCH',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({
+                                      description: c.description,
+                                      phone: c.phone,
+                                      isWhatsapp: c.isWhatsapp,
+                                      email: c.email,
+                                    }),
+                                  });
+                                  const body = await res.json().catch(() => ({} as any));
+                                  if (!res.ok) throw new Error(body?.error || 'Falha ao salvar contato');
+                                  await loadContacts();
+                                } catch (e: any) {
+                                  alert(e?.message || String(e));
+                                }
+                              }}
+                            >
+                              Salvar
+                            </button>
+                            <button
+                              className="px-2 py-1 text-xs border rounded bg-white hover:bg-gray-100"
+                              onClick={async () => {
+                                if (!confirm('Excluir este contato?')) return;
+                                const res = await fetch(`/api/clients/${encodeURIComponent(String(id))}/contacts/${c.id}`, { method: 'DELETE' });
+                                if (res.ok) await loadContacts();
+                                else {
+                                  const body = await res.json().catch(() => ({} as any));
+                                  alert(body?.error || 'Falha ao excluir contato');
+                                }
+                              }}
+                            >
+                              Excluir
+                            </button>
+                          </td>
+                        </tr>
+                      ),
+                      isExpanded ? (
+                        <tr key={`${c.id}::statuses`} className="border-t bg-gray-50">
+                          <td className="p-3" colSpan={5}>
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm">
+                              {ORDER_STATUS_OPTIONS.map((st) => {
+                                const checked = (c.statuses || []).includes(st);
+                                return (
+                                  <label key={st} className="inline-flex items-center gap-2">
+                                    <input
+                                      type="checkbox"
+                                      checked={checked}
+                                      disabled={savingContactStatusId === c.id}
+                                      onChange={async (e) => {
+                                        const isOn = e.target.checked;
+                                        const next = Array.from(
+                                          new Set([...(c.statuses || []).filter((x) => x !== st), ...(isOn ? [st] : [])])
+                                        );
+                                        setContacts((prev) => prev.map((x) => (x.id === c.id ? { ...x, statuses: next } : x)));
+                                        try {
+                                          setSavingContactStatusId(c.id);
+                                          const res = await fetch(
+                                            `/api/clients/${encodeURIComponent(String(id))}/contacts/${encodeURIComponent(String(c.id))}/statuses`,
+                                            {
+                                              method: 'PUT',
+                                              headers: { 'Content-Type': 'application/json' },
+                                              body: JSON.stringify({ statuses: next }),
+                                            }
+                                          );
+                                          const body = await res.json().catch(() => ({} as any));
+                                          if (!res.ok) throw new Error(body?.error || 'Falha ao salvar status');
+                                        } catch (err: any) {
+                                          alert(err?.message || String(err));
+                                          await loadContacts();
+                                        } finally {
+                                          setSavingContactStatusId(null);
+                                        }
+                                      }}
+                                    />
+                                    <span>{st}</span>
+                                  </label>
+                                );
+                              })}
+                            </div>
+                          </td>
+                        </tr>
+                      ) : null,
+                    ].filter(Boolean) as any;
+                  })}
                 </tbody>
               </table>
             </div>
@@ -1357,8 +1433,9 @@ export default function ClientDetailsPage() {
                       <div className="flex items-center gap-2">
                         <input
                           className="flex-1 min-w-0 px-2 py-1 border rounded"
-                          value={c.phone || ''}
-                          onChange={(e) => setContacts((prev) => prev.map((x) => (x.id === c.id ? { ...x, phone: e.target.value } : x)))}
+                          value={formatPhoneBr(c.phone || '')}
+                          inputMode="tel"
+                          onChange={(e) => setContacts((prev) => prev.map((x) => (x.id === c.id ? { ...x, phone: phoneDigits(e.target.value) } : x)))}
                         />
                         <label className="inline-flex items-center gap-2 text-xs text-gray-700 whitespace-nowrap">
                           <input
@@ -1384,14 +1461,14 @@ export default function ClientDetailsPage() {
                     </div>
                     <div className="flex flex-wrap gap-2">
                       <button
-                        className="px-3 py-2 text-xs border rounded bg-white hover:bg-gray-100"
-                        onClick={() => {
-                          setStatusModalContact(c);
-                          setStatusSelection(Array.isArray(c.statuses) ? c.statuses : []);
-                          setStatusModalOpen(true);
-                        }}
+                        className="inline-flex items-center justify-center w-9 h-9 border rounded bg-white hover:bg-gray-100"
+                        title="Status"
+                        aria-label="Status"
+                        onClick={() => setExpandedContactId((prev) => (prev === c.id ? null : c.id))}
                       >
-                        Status
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d={expandedContactId === c.id ? "M7 14l5-5 5 5" : "M7 10l5 5 5-5"} />
+                        </svg>
                       </button>
                       <button
                         className="px-3 py-2 text-xs border rounded bg-white hover:bg-gray-100"
@@ -1432,6 +1509,48 @@ export default function ClientDetailsPage() {
                         Excluir
                       </button>
                     </div>
+                    {expandedContactId === c.id && (
+                      <div className="mt-2 border rounded bg-gray-50 p-2">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
+                          {ORDER_STATUS_OPTIONS.map((st) => {
+                            const checked = (c.statuses || []).includes(st);
+                            return (
+                              <label key={st} className="inline-flex items-center gap-2">
+                                <input
+                                  type="checkbox"
+                                  checked={checked}
+                                  disabled={savingContactStatusId === c.id}
+                                  onChange={async (e) => {
+                                    const isOn = e.target.checked;
+                                    const next = Array.from(new Set([...(c.statuses || []).filter((x) => x !== st), ...(isOn ? [st] : [])]));
+                                    setContacts((prev) => prev.map((x) => (x.id === c.id ? { ...x, statuses: next } : x)));
+                                    try {
+                                      setSavingContactStatusId(c.id);
+                                      const res = await fetch(
+                                        `/api/clients/${encodeURIComponent(String(id))}/contacts/${encodeURIComponent(String(c.id))}/statuses`,
+                                        {
+                                          method: 'PUT',
+                                          headers: { 'Content-Type': 'application/json' },
+                                          body: JSON.stringify({ statuses: next }),
+                                        }
+                                      );
+                                      const body = await res.json().catch(() => ({} as any));
+                                      if (!res.ok) throw new Error(body?.error || 'Falha ao salvar status');
+                                    } catch (err: any) {
+                                      alert(err?.message || String(err));
+                                      await loadContacts();
+                                    } finally {
+                                      setSavingContactStatusId(null);
+                                    }
+                                  }}
+                                />
+                                <span>{st}</span>
+                              </label>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}
@@ -1909,77 +2028,6 @@ export default function ClientDetailsPage() {
         </div>
       )}
 
-      {statusModalOpen && statusModalContact && (
-        <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50" onClick={() => setStatusModalOpen(false)}>
-          <div className="bg-white w-full max-w-xl rounded shadow-lg" onClick={(e) => e.stopPropagation()}>
-            <div className="px-4 py-3 border-b flex items-center gap-3">
-              <div className="font-semibold">Vincular status • {statusModalContact.description}</div>
-              <button className="ml-auto text-gray-500 hover:text-black" onClick={() => setStatusModalOpen(false)} aria-label="Fechar">×</button>
-            </div>
-            <div className="p-4 space-y-3">
-              <div className="text-xs text-gray-600">Marque os status para enviar e-mail quando o pedido entrar no status selecionado.</div>
-              <div className="max-h-72 overflow-auto border rounded">
-                {(orderStatuses || []).length === 0 && (
-                  <div className="p-3 text-sm text-gray-500">Nenhum status encontrado para este cliente.</div>
-                )}
-                {(orderStatuses || []).map((st) => {
-                  const checked = statusSelection.includes(st);
-                  return (
-                    <label key={st} className="flex items-center gap-2 px-3 py-2 border-t first:border-t-0 text-sm">
-                      <input
-                        type="checkbox"
-                        checked={checked}
-                        onChange={(e) => {
-                          const isOn = e.target.checked;
-                          setStatusSelection((prev) => {
-                            const s = new Set(prev);
-                            if (isOn) s.add(st);
-                            else s.delete(st);
-                            return Array.from(s);
-                          });
-                        }}
-                      />
-                      <span>{st}</span>
-                    </label>
-                  );
-                })}
-              </div>
-              <div className="flex items-center justify-end gap-2">
-                <button className="px-3 py-2 text-sm border rounded bg-white hover:bg-gray-100" onClick={() => setStatusModalOpen(false)}>
-                  Cancelar
-                </button>
-                <button
-                  className="px-3 py-2 text-sm border rounded bg-white hover:bg-gray-100 disabled:opacity-50"
-                  disabled={savingStatuses}
-                  onClick={async () => {
-                    try {
-                      setSavingStatuses(true);
-                      const res = await fetch(
-                        `/api/clients/${encodeURIComponent(String(id))}/contacts/${encodeURIComponent(String(statusModalContact.id))}/statuses`,
-                        {
-                          method: 'PUT',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({ statuses: statusSelection }),
-                        }
-                      );
-                      const body = await res.json().catch(() => ({} as any));
-                      if (!res.ok) throw new Error(body?.error || 'Falha ao salvar status');
-                      await loadContacts();
-                      setStatusModalOpen(false);
-                    } catch (e: any) {
-                      alert(e?.message || String(e));
-                    } finally {
-                      setSavingStatuses(false);
-                    }
-                  }}
-                >
-                  Salvar
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
