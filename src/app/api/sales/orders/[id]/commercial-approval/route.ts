@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '../../../../../../lib/prisma';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '../../../../../../lib/auth';
+import { sendOrderStatusChangeNotification } from '../../../../../../lib/email';
 
 function isCommercialApprovalStatus(status: any): boolean {
   const s = String(status || '').trim().toUpperCase();
@@ -86,6 +87,7 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
           data: { status: 'Reprovado', erpOrderNumber: null },
         });
       });
+      await sendOrderStatusChangeNotification({ orderId: Math.trunc(orderId), status: 'Reprovado' });
       return NextResponse.json({ ok: true, status: 'Reprovado' });
     }
 

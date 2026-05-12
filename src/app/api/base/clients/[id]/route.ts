@@ -119,6 +119,7 @@ export async function GET(_: Request, props: { params: Promise<{ id: string }> }
       where: { id: Math.trunc(id) },
       select: {
         id: true,
+        clientCode: true,
         doc: true,
         name: true,
         abbrevName: true,
@@ -157,6 +158,26 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
       return NextResponse.json({ error: 'JSON inválido' }, { status: 400 });
     }
     const fields: any = {};
+    if (
+      body.clientCode !== undefined ||
+      body.codCliente !== undefined ||
+      body.cod_cliente !== undefined ||
+      body.codigoCliente !== undefined ||
+      body.codigo_cliente !== undefined
+    ) {
+      const v =
+        body.clientCode ??
+        body.codCliente ??
+        body.cod_cliente ??
+        body.codigoCliente ??
+        body.codigo_cliente;
+      const digits = String(v ?? '').trim().replace(/\D/g, '');
+      if (!digits) fields.clientCode = null;
+      else {
+        const n = Number(digits);
+        fields.clientCode = Number.isFinite(n) ? Math.trunc(n) : null;
+      }
+    }
     if (body.doc !== undefined) fields.doc = normalizeDoc(String(body.doc || '')) || null;
     if (body.name !== undefined) fields.name = String(body.name || '').trim();
     if (body.abbrevName !== undefined || body.shortName !== undefined || body.nomeAbreviado !== undefined || body.nome_abreviado !== undefined) {
@@ -195,6 +216,7 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
         data,
         select: {
           id: true,
+          clientCode: true,
           doc: true,
           name: true,
           abbrevName: true,

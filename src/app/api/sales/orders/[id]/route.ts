@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '../../../../../lib/prisma';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '../../../../../lib/auth';
+import { sendOrderStatusChangeNotification } from '../../../../../lib/email';
 
 function normalizeDoc(doc: string): string {
   return (doc || '').replace(/\D+/g, '');
@@ -134,8 +135,10 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
 
     const id = parsePositiveInt(params.id);
     if (!id) return NextResponse.json({ error: 'ID inválido' }, { status: 400 });
-    const orderExists = await prisma.salesOrder.findUnique({ where: { id }, select: { id: true, customerDoc: true, clientId: true } });
+    const orderExists = await prisma.salesOrder.findUnique({ where: { id }, select: { id: true, status: true, customerDoc: true, clientId: true } });
     if (!orderExists) return NextResponse.json({ error: 'Pedido não encontrado' }, { status: 404 });
+
+    const previousStatus = String(orderExists.status ?? '').trim();
 
     if (await shouldRestrictToLinkedClients(userId)) {
       const ok = await canAccessOrder(userId, orderExists);
@@ -203,6 +206,11 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
           messages: messages // Prisma handles Json type automatically
         }
       });
+
+      const nextStatus = String(allowed.status ?? '').trim();
+      if (nextStatus && nextStatus !== previousStatus) {
+        await sendOrderStatusChangeNotification({ orderId: id, status: nextStatus });
+      }
     }
     return NextResponse.json(updated);
   } catch (err: any) {

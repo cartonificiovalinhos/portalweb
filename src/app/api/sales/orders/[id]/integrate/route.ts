@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '../../../../../../lib/prisma';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '../../../../../../lib/auth';
+import { sendOrderStatusChangeNotification } from '../../../../../../lib/email';
 
 export async function POST(request: Request, props: { params: Promise<{ id: string }> }) {
     const params = await props.params;
@@ -239,6 +240,8 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
                 where: { id: order.id },
                 data: updateData
             });
+
+            await sendOrderStatusChangeNotification({ orderId: order.id, status: newStatus });
         } else {
             // Status unchanged
             const lastHistory = await prisma.salesOrderStatusHistory.findFirst({

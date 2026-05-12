@@ -312,6 +312,7 @@ model SalesOrderInvoice {
   orderId       Int
   invoiceNumber String
   issueDate     DateTime
+  dueDate       DateTime?
   totalValue    Float
   totalWeight   Float
   danfeFileName String?
@@ -382,6 +383,7 @@ model EntityModuleItem {
 
 model Client {
   id         Int     @id @default(autoincrement())
+  clientCode Int?
   doc        String? @unique
   name       String
   abbrevName String? @db.Char(20)
@@ -406,11 +408,43 @@ model Client {
   items     ClientItem[]
   cartItems ClientCartItem[]
   orders    SalesOrder[]
+  contacts  ClientContact[]
 
   @@index([name])
+  @@index([clientCode])
   @@index([cidade, estado])
   @@index([paymentTermId])
   @@map("client")
+}
+
+model ClientContact {
+  id          Int      @id @default(autoincrement())
+  clientId    Int
+  description String
+  phone       String?
+  isWhatsapp  Boolean  @default(false)
+  email       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  client   Client                @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  statuses ClientContactStatus[]
+
+  @@index([clientId])
+  @@map("clientcontact")
+}
+
+model ClientContactStatus {
+  id        Int      @id @default(autoincrement())
+  contactId Int
+  status    String
+  createdAt DateTime @default(now())
+
+  contact ClientContact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  @@unique([contactId, status])
+  @@index([status])
+  @@map("clientcontactstatus")
 }
 
 // Itens vinculados ao cliente (cadastro alimentado via ERP/API)

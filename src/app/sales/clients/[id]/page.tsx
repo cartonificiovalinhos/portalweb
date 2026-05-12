@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 
 type Client = { 
   id: number; 
+  clientCode?: number | null;
   doc?: string | null; 
   name: string; 
   abbrevName?: string | null;
@@ -38,6 +39,23 @@ type LinkedItem = { id: number; name: string; sku?: string | null; unit?: string
 type CartItem = { id: number; inventoryItemId: number; name: string; sku?: string | null; unit?: string | null; quantity: number; unitPrice: number };
 type Representative = { id: number; name: string };
 type BasePriceRow = { inventoryItemId: number; unit: string; unitPrice: number };
+type ClientContact = {
+  id: number;
+  clientId: number;
+  description: string;
+  phone?: string | null;
+  isWhatsapp: boolean;
+  email?: string | null;
+  statuses: string[];
+};
+type ClientInvoice = {
+  id: number;
+  orderId: number;
+  invoiceNumber: string;
+  issueDate: string;
+  dueDate?: string | null;
+  totalValue: number;
+};
 
 const normalizeDoc = (doc?: string | null) => String(doc || '').replace(/\D+/g, '');
 
@@ -149,7 +167,7 @@ export default function ClientDetailsPage() {
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [selected, setSelected] = useState<SalesOrder | null>(null);
   const [integratingId, setIntegratingId] = useState<number | null>(null);
-  const [activeTab, setActiveTab] = useState<"orders" | "paymentTerms" | "linkedItems">("orders");
+  const [activeTab, setActiveTab] = useState<"orders" | "paymentTerms" | "contacts" | "linkedItems" | "invoices">("orders");
   const [ordersPage, setOrdersPage] = useState(0);
   const [paymentTermsPage, setPaymentTermsPage] = useState(0);
   const [linkedItemsPage, setLinkedItemsPage] = useState(0);
@@ -168,6 +186,24 @@ export default function ClientDetailsPage() {
   const [unlinking, setUnlinking] = useState(false);
   const [linkingItems, setLinkingItems] = useState(false);
   const [applyingAdjust, setApplyingAdjust] = useState(false);
+
+  const [contacts, setContacts] = useState<ClientContact[]>([]);
+  const [loadingContacts, setLoadingContacts] = useState(false);
+  const [newContact, setNewContact] = useState<{ description: string; phone: string; isWhatsapp: boolean; email: string }>({
+    description: '',
+    phone: '',
+    isWhatsapp: false,
+    email: '',
+  });
+  const [orderStatuses, setOrderStatuses] = useState<string[]>([]);
+  const [statusModalOpen, setStatusModalOpen] = useState(false);
+  const [statusModalContact, setStatusModalContact] = useState<ClientContact | null>(null);
+  const [statusSelection, setStatusSelection] = useState<string[]>([]);
+  const [savingStatuses, setSavingStatuses] = useState(false);
+
+  const [invoiceFilter, setInvoiceFilter] = useState<'due' | 'overdue' | 'all'>('all');
+  const [clientInvoices, setClientInvoices] = useState<ClientInvoice[]>([]);
+  const [loadingInvoices, setLoadingInvoices] = useState(false);
 
   const PAGE_SIZE = 20;
 
@@ -317,6 +353,58 @@ export default function ClientDetailsPage() {
         refreshCart();
     }
   }, [client, refreshCart]);
+
+  const loadContacts = useCallback(async () => {
+    if (!Number.isFinite(id) || id <= 0) return;
+    setLoadingContacts(true);
+    try {
+      const r = await fetch(`/api/clients/${encodeURIComponent(String(id))}/contacts`, { cache: 'no-store' });
+      const j = await r.json();
+      setContacts(Array.isArray(j) ? j : []);
+    } catch {
+      setContacts([]);
+    } finally {
+      setLoadingContacts(false);
+    }
+  }, [id]);
+
+  const loadOrderStatuses = useCallback(async () => {
+    if (!Number.isFinite(id) || id <= 0) return;
+    try {
+      const r = await fetch(`/api/clients/${encodeURIComponent(String(id))}/order-statuses`, { cache: 'no-store' });
+      const j = await r.json();
+      setOrderStatuses(Array.isArray(j) ? j : []);
+    } catch {
+      setOrderStatuses([]);
+    }
+  }, [id]);
+
+  const loadClientInvoices = useCallback(async () => {
+    if (!Number.isFinite(id) || id <= 0) return;
+    setLoadingInvoices(true);
+    try {
+      const r = await fetch(`/api/clients/${encodeURIComponent(String(id))}/invoices?filter=${encodeURIComponent(invoiceFilter)}`, { cache: 'no-store' });
+      const j = await r.json();
+      setClientInvoices(Array.isArray(j) ? j : []);
+    } catch {
+      setClientInvoices([]);
+    } finally {
+      setLoadingInvoices(false);
+    }
+  }, [id, invoiceFilter]);
+
+  useEffect(() => {
+    if (activeTab === 'contacts') {
+      void loadContacts();
+      void loadOrderStatuses();
+    }
+  }, [activeTab, loadContacts, loadOrderStatuses]);
+
+  useEffect(() => {
+    if (activeTab === 'invoices') {
+      void loadClientInvoices();
+    }
+  }, [activeTab, loadClientInvoices]);
 
   useEffect(() => {
     setSelectedLinkedItemIds([]);
@@ -672,9 +760,10 @@ export default function ClientDetailsPage() {
           <div className="flex items-start justify-between gap-4">
             <div className="flex flex-col xl:flex-row justify-between gap-4 flex-1 text-sm">
               <div className="flex flex-col gap-2">
+                <div className="whitespace-nowrap"><span className="text-gray-600">Cód Cliente:</span> <span className="font-medium ml-1">{client.clientCode != null ? client.clientCode : '-'}</span></div>
+                <div className="whitespace-nowrap"><span className="text-gray-600">Nome Abreviado:</span> <span className="font-medium ml-1">{client.abbrevName || '-'}</span></div>
                 <div className="whitespace-nowrap"><span className="text-gray-600">CPF/CNPJ:</span> <span className="font-medium ml-1">{formatDoc(client.doc)}</span></div>
                 <div className="whitespace-nowrap"><span className="text-gray-600">Nome:</span> <span className="font-medium ml-1">{client.name}</span></div>
-                <div className="whitespace-nowrap"><span className="text-gray-600">Nome Abreviado:</span> <span className="font-medium ml-1">{client.abbrevName || '-'}</span></div>
                 <div className="flex gap-4">
                   <div className="whitespace-nowrap"><span className="text-gray-600">Cidade:</span> <span className="font-medium ml-1">{client.cidade || '-'}</span></div>
                   <div className="whitespace-nowrap"><span className="text-gray-600">UF:</span> <span className="font-medium ml-1">{client.estado || '-'}</span></div>
@@ -819,6 +908,19 @@ export default function ClientDetailsPage() {
             </li>
             <li className="mr-2">
               <button
+                onClick={() => setActiveTab("contacts")}
+                className={`inline-block px-3 py-2 border-b-2 border-solid rounded-t-lg transition-colors duration-200 ${
+                  activeTab === "contacts"
+                    ? "text-blue-600 border-blue-600 active group-hover:text-blue-600"
+                    : "border-transparent hover:text-gray-600 hover:border-gray-300"
+                }`}
+                aria-current={activeTab === "contacts" ? "page" : undefined}
+              >
+                Contatos
+              </button>
+            </li>
+            <li className="mr-2">
+              <button
                 onClick={() => setActiveTab("linkedItems")}
                 className={`inline-block px-3 py-2 border-b-2 border-solid rounded-t-lg transition-colors duration-200 ${
                   activeTab === "linkedItems"
@@ -828,6 +930,19 @@ export default function ClientDetailsPage() {
                 aria-current={activeTab === "linkedItems" ? "page" : undefined}
               >
                 Itens Cliente
+              </button>
+            </li>
+            <li className="mr-2">
+              <button
+                onClick={() => setActiveTab("invoices")}
+                className={`inline-block px-3 py-2 border-b-2 border-solid rounded-t-lg transition-colors duration-200 ${
+                  activeTab === "invoices"
+                    ? "text-blue-600 border-blue-600 active group-hover:text-blue-600"
+                    : "border-transparent hover:text-gray-600 hover:border-gray-300"
+                }`}
+                aria-current={activeTab === "invoices" ? "page" : undefined}
+              >
+                Faturas
               </button>
             </li>
           </ul>
@@ -1037,6 +1152,289 @@ export default function ClientDetailsPage() {
               >
                 Próxima
               </button>
+            </div>
+          </div>
+        )}
+
+        {activeTab === "contacts" && (
+          <div className="border rounded bg-white overflow-hidden">
+            <div className="px-3 py-2 border-b bg-gray-50 flex items-center">
+              <div className="text-sm text-gray-700">Contatos</div>
+              <div className="ml-auto text-xs text-gray-500">{contacts.length} registro(s)</div>
+            </div>
+
+            <div className="p-3 border-b">
+              <div className="grid grid-cols-1 md:grid-cols-12 gap-2 items-end">
+                <div className="md:col-span-4">
+                  <label className="text-xs text-gray-700">Descrição Contato</label>
+                  <input
+                    className="w-full px-3 py-2 border rounded text-sm"
+                    value={newContact.description}
+                    onChange={(e) => setNewContact((p) => ({ ...p, description: e.target.value }))}
+                  />
+                </div>
+                <div className="md:col-span-4">
+                  <label className="text-xs text-gray-700">Telefone</label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      className="flex-1 min-w-0 px-3 py-2 border rounded text-sm"
+                      value={newContact.phone}
+                      onChange={(e) => setNewContact((p) => ({ ...p, phone: e.target.value }))}
+                    />
+                    <label className="inline-flex items-center gap-2 text-xs text-gray-700 whitespace-nowrap">
+                      <input
+                        type="checkbox"
+                        checked={newContact.isWhatsapp}
+                        onChange={(e) => setNewContact((p) => ({ ...p, isWhatsapp: e.target.checked }))}
+                      />
+                      <span>É Whatsapp?</span>
+                    </label>
+                  </div>
+                </div>
+                <div className="md:col-span-3">
+                  <label className="text-xs text-gray-700">E-mail</label>
+                  <input
+                    className="w-full px-3 py-2 border rounded text-sm"
+                    value={newContact.email}
+                    onChange={(e) => setNewContact((p) => ({ ...p, email: e.target.value }))}
+                  />
+                </div>
+                <div className="md:col-span-1">
+                  <button
+                    className="w-full px-3 py-2 text-sm border rounded bg-white hover:bg-gray-100 disabled:opacity-50"
+                    disabled={!newContact.description.trim()}
+                    onClick={async () => {
+                      try {
+                        const res = await fetch(`/api/clients/${encodeURIComponent(String(id))}/contacts`, {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({
+                            description: newContact.description,
+                            phone: newContact.phone,
+                            isWhatsapp: newContact.isWhatsapp,
+                            email: newContact.email,
+                          }),
+                        });
+                        const body = await res.json().catch(() => ({} as any));
+                        if (!res.ok) throw new Error(body?.error || 'Falha ao criar contato');
+                        setNewContact({ description: '', phone: '', isWhatsapp: false, email: '' });
+                        await loadContacts();
+                      } catch (e: any) {
+                        alert(e?.message || String(e));
+                      }
+                    }}
+                  >
+                    +
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {loadingContacts && <div className="p-3 text-sm text-gray-600">Carregando…</div>}
+
+            <div className="hidden sm:block overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-gray-50">
+                    <th className="p-2 text-left">Descrição Contato</th>
+                    <th className="p-2 text-left">Telefone</th>
+                    <th className="p-2 text-left">E-mail</th>
+                    <th className="p-2 text-left">Status</th>
+                    <th className="p-2 text-left">Ações</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {!loadingContacts && contacts.length === 0 && (
+                    <tr><td colSpan={5} className="p-3 text-gray-500">Sem contatos</td></tr>
+                  )}
+                  {contacts.map((c) => (
+                    <tr key={c.id} className="border-t">
+                      <td className="p-2">
+                        <input
+                          className="w-full px-2 py-1 border rounded"
+                          value={c.description}
+                          onChange={(e) => setContacts((prev) => prev.map((x) => (x.id === c.id ? { ...x, description: e.target.value } : x)))}
+                        />
+                      </td>
+                      <td className="p-2">
+                        <div className="flex items-center gap-2">
+                          <input
+                            className="flex-1 min-w-0 px-2 py-1 border rounded"
+                            value={c.phone || ''}
+                            onChange={(e) => setContacts((prev) => prev.map((x) => (x.id === c.id ? { ...x, phone: e.target.value } : x)))}
+                          />
+                          <label className="inline-flex items-center gap-2 text-xs text-gray-700 whitespace-nowrap">
+                            <input
+                              type="checkbox"
+                              checked={c.isWhatsapp}
+                              onChange={(e) => setContacts((prev) => prev.map((x) => (x.id === c.id ? { ...x, isWhatsapp: e.target.checked } : x)))}
+                            />
+                            <span>É Whatsapp?</span>
+                          </label>
+                        </div>
+                      </td>
+                      <td className="p-2">
+                        <input
+                          className="w-full px-2 py-1 border rounded"
+                          value={c.email || ''}
+                          onChange={(e) => setContacts((prev) => prev.map((x) => (x.id === c.id ? { ...x, email: e.target.value } : x)))}
+                        />
+                      </td>
+                      <td className="p-2 text-xs text-gray-700">
+                        {(c.statuses || []).length ? (c.statuses || []).join(', ') : '-'}
+                      </td>
+                      <td className="p-2">
+                        <button
+                          className="px-2 py-1 text-xs border rounded bg-white hover:bg-gray-100 mr-2"
+                          onClick={() => {
+                            setStatusModalContact(c);
+                            setStatusSelection(Array.isArray(c.statuses) ? c.statuses : []);
+                            setStatusModalOpen(true);
+                          }}
+                        >
+                          Status
+                        </button>
+                        <button
+                          className="px-2 py-1 text-xs border rounded bg-white hover:bg-gray-100 mr-2"
+                          onClick={async () => {
+                            try {
+                              const res = await fetch(`/api/clients/${encodeURIComponent(String(id))}/contacts/${c.id}`, {
+                                method: 'PATCH',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                  description: c.description,
+                                  phone: c.phone,
+                                  isWhatsapp: c.isWhatsapp,
+                                  email: c.email,
+                                }),
+                              });
+                              const body = await res.json().catch(() => ({} as any));
+                              if (!res.ok) throw new Error(body?.error || 'Falha ao salvar contato');
+                              await loadContacts();
+                            } catch (e: any) {
+                              alert(e?.message || String(e));
+                            }
+                          }}
+                        >
+                          Salvar
+                        </button>
+                        <button
+                          className="px-2 py-1 text-xs border rounded bg-white hover:bg-gray-100"
+                          onClick={async () => {
+                            if (!confirm('Excluir este contato?')) return;
+                            const res = await fetch(`/api/clients/${encodeURIComponent(String(id))}/contacts/${c.id}`, { method: 'DELETE' });
+                            if (res.ok) await loadContacts();
+                            else {
+                              const body = await res.json().catch(() => ({} as any));
+                              alert(body?.error || 'Falha ao excluir contato');
+                            }
+                          }}
+                        >
+                          Excluir
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="sm:hidden divide-y">
+              {!loadingContacts && contacts.length === 0 && <div className="p-3 text-gray-500 text-sm">Sem contatos</div>}
+              {contacts.map((c) => (
+                <div key={c.id} className="p-3">
+                  <div className="grid grid-cols-1 gap-2">
+                    <div>
+                      <div className="text-xs text-gray-600">Descrição Contato</div>
+                      <input
+                        className="w-full px-2 py-1 border rounded"
+                        value={c.description}
+                        onChange={(e) => setContacts((prev) => prev.map((x) => (x.id === c.id ? { ...x, description: e.target.value } : x)))}
+                      />
+                    </div>
+                    <div>
+                      <div className="text-xs text-gray-600">Telefone</div>
+                      <div className="flex items-center gap-2">
+                        <input
+                          className="flex-1 min-w-0 px-2 py-1 border rounded"
+                          value={c.phone || ''}
+                          onChange={(e) => setContacts((prev) => prev.map((x) => (x.id === c.id ? { ...x, phone: e.target.value } : x)))}
+                        />
+                        <label className="inline-flex items-center gap-2 text-xs text-gray-700 whitespace-nowrap">
+                          <input
+                            type="checkbox"
+                            checked={c.isWhatsapp}
+                            onChange={(e) => setContacts((prev) => prev.map((x) => (x.id === c.id ? { ...x, isWhatsapp: e.target.checked } : x)))}
+                          />
+                          <span>É Whatsapp?</span>
+                        </label>
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-gray-600">E-mail</div>
+                      <input
+                        className="w-full px-2 py-1 border rounded"
+                        value={c.email || ''}
+                        onChange={(e) => setContacts((prev) => prev.map((x) => (x.id === c.id ? { ...x, email: e.target.value } : x)))}
+                      />
+                    </div>
+                    <div>
+                      <div className="text-xs text-gray-600">Status</div>
+                      <div className="text-xs text-gray-700">{(c.statuses || []).length ? (c.statuses || []).join(', ') : '-'}</div>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        className="px-3 py-2 text-xs border rounded bg-white hover:bg-gray-100"
+                        onClick={() => {
+                          setStatusModalContact(c);
+                          setStatusSelection(Array.isArray(c.statuses) ? c.statuses : []);
+                          setStatusModalOpen(true);
+                        }}
+                      >
+                        Status
+                      </button>
+                      <button
+                        className="px-3 py-2 text-xs border rounded bg-white hover:bg-gray-100"
+                        onClick={async () => {
+                          try {
+                            const res = await fetch(`/api/clients/${encodeURIComponent(String(id))}/contacts/${c.id}`, {
+                              method: 'PATCH',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({
+                                description: c.description,
+                                phone: c.phone,
+                                isWhatsapp: c.isWhatsapp,
+                                email: c.email,
+                              }),
+                            });
+                            const body = await res.json().catch(() => ({} as any));
+                            if (!res.ok) throw new Error(body?.error || 'Falha ao salvar contato');
+                            await loadContacts();
+                          } catch (e: any) {
+                            alert(e?.message || String(e));
+                          }
+                        }}
+                      >
+                        Salvar
+                      </button>
+                      <button
+                        className="px-3 py-2 text-xs border rounded bg-white hover:bg-gray-100"
+                        onClick={async () => {
+                          if (!confirm('Excluir este contato?')) return;
+                          const res = await fetch(`/api/clients/${encodeURIComponent(String(id))}/contacts/${c.id}`, { method: 'DELETE' });
+                          if (res.ok) await loadContacts();
+                          else {
+                            const body = await res.json().catch(() => ({} as any));
+                            alert(body?.error || 'Falha ao excluir contato');
+                          }
+                        }}
+                      >
+                        Excluir
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         )}
@@ -1374,6 +1772,80 @@ export default function ClientDetailsPage() {
             )}
           </div>
         )}
+
+        {activeTab === "invoices" && (
+          <div className="border rounded bg-white overflow-hidden">
+            <div className="px-3 py-2 border-b bg-gray-50 flex flex-wrap items-center gap-3">
+              <div className="text-sm text-gray-700">Faturas</div>
+              <div className="ml-auto text-xs text-gray-500">{clientInvoices.length} registro(s)</div>
+            </div>
+
+            <div className="px-3 py-2 border-b flex flex-wrap items-center gap-4 text-sm">
+              <label className="inline-flex items-center gap-2">
+                <input type="radio" name="invoiceFilter" checked={invoiceFilter === 'due'} onChange={() => setInvoiceFilter('due')} />
+                <span>À Vencer</span>
+              </label>
+              <label className="inline-flex items-center gap-2">
+                <input type="radio" name="invoiceFilter" checked={invoiceFilter === 'overdue'} onChange={() => setInvoiceFilter('overdue')} />
+                <span>Vencidos</span>
+              </label>
+              <label className="inline-flex items-center gap-2">
+                <input type="radio" name="invoiceFilter" checked={invoiceFilter === 'all'} onChange={() => setInvoiceFilter('all')} />
+                <span>Todos</span>
+              </label>
+              <button
+                className="ml-auto px-3 py-1.5 text-xs border rounded bg-white hover:bg-gray-100"
+                onClick={() => loadClientInvoices()}
+              >
+                Atualizar
+              </button>
+            </div>
+
+            {loadingInvoices && <div className="p-3 text-sm text-gray-600">Carregando…</div>}
+
+            <div className="hidden sm:block overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-gray-50">
+                    <th className="p-2 text-left">Num Fatura</th>
+                    <th className="p-2 text-left">Data Emissão</th>
+                    <th className="p-2 text-left">Data Vencimento</th>
+                    <th className="p-2 text-right">Valor R$</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {!loadingInvoices && clientInvoices.length === 0 && (
+                    <tr><td colSpan={4} className="p-3 text-gray-500">Sem faturas</td></tr>
+                  )}
+                  {clientInvoices.map((inv) => (
+                    <tr key={inv.id} className="border-t">
+                      <td className="p-2">{inv.invoiceNumber}</td>
+                      <td className="p-2">{inv.issueDate ? new Date(inv.issueDate).toLocaleDateString('pt-BR') : '-'}</td>
+                      <td className="p-2">{inv.dueDate ? new Date(inv.dueDate).toLocaleDateString('pt-BR') : '-'}</td>
+                      <td className="p-2 text-right">{Number(inv.totalValue || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="sm:hidden divide-y">
+              {!loadingInvoices && clientInvoices.length === 0 && <div className="p-3 text-gray-500 text-sm">Sem faturas</div>}
+              {clientInvoices.map((inv) => (
+                <div key={inv.id} className="p-3">
+                  <div className="text-sm font-semibold text-gray-900">{inv.invoiceNumber}</div>
+                  <div className="mt-1 text-xs text-gray-600 flex flex-wrap gap-x-3 gap-y-1">
+                    <span>Emissão: {inv.issueDate ? new Date(inv.issueDate).toLocaleDateString('pt-BR') : '-'}</span>
+                    <span>Venc.: {inv.dueDate ? new Date(inv.dueDate).toLocaleDateString('pt-BR') : '-'}</span>
+                  </div>
+                  <div className="mt-2 text-sm font-medium text-gray-900">
+                    {Number(inv.totalValue || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       
@@ -1432,6 +1904,78 @@ export default function ClientDetailsPage() {
             </div>
             <div className="px-4 py-3 border-t text-right">
               <button className="px-3 py-1.5 border rounded hover:bg-gray-100" onClick={() => setSelected(null)}>Fechar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {statusModalOpen && statusModalContact && (
+        <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50" onClick={() => setStatusModalOpen(false)}>
+          <div className="bg-white w-full max-w-xl rounded shadow-lg" onClick={(e) => e.stopPropagation()}>
+            <div className="px-4 py-3 border-b flex items-center gap-3">
+              <div className="font-semibold">Vincular status • {statusModalContact.description}</div>
+              <button className="ml-auto text-gray-500 hover:text-black" onClick={() => setStatusModalOpen(false)} aria-label="Fechar">×</button>
+            </div>
+            <div className="p-4 space-y-3">
+              <div className="text-xs text-gray-600">Marque os status para enviar e-mail quando o pedido entrar no status selecionado.</div>
+              <div className="max-h-72 overflow-auto border rounded">
+                {(orderStatuses || []).length === 0 && (
+                  <div className="p-3 text-sm text-gray-500">Nenhum status encontrado para este cliente.</div>
+                )}
+                {(orderStatuses || []).map((st) => {
+                  const checked = statusSelection.includes(st);
+                  return (
+                    <label key={st} className="flex items-center gap-2 px-3 py-2 border-t first:border-t-0 text-sm">
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={(e) => {
+                          const isOn = e.target.checked;
+                          setStatusSelection((prev) => {
+                            const s = new Set(prev);
+                            if (isOn) s.add(st);
+                            else s.delete(st);
+                            return Array.from(s);
+                          });
+                        }}
+                      />
+                      <span>{st}</span>
+                    </label>
+                  );
+                })}
+              </div>
+              <div className="flex items-center justify-end gap-2">
+                <button className="px-3 py-2 text-sm border rounded bg-white hover:bg-gray-100" onClick={() => setStatusModalOpen(false)}>
+                  Cancelar
+                </button>
+                <button
+                  className="px-3 py-2 text-sm border rounded bg-white hover:bg-gray-100 disabled:opacity-50"
+                  disabled={savingStatuses}
+                  onClick={async () => {
+                    try {
+                      setSavingStatuses(true);
+                      const res = await fetch(
+                        `/api/clients/${encodeURIComponent(String(id))}/contacts/${encodeURIComponent(String(statusModalContact.id))}/statuses`,
+                        {
+                          method: 'PUT',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ statuses: statusSelection }),
+                        }
+                      );
+                      const body = await res.json().catch(() => ({} as any));
+                      if (!res.ok) throw new Error(body?.error || 'Falha ao salvar status');
+                      await loadContacts();
+                      setStatusModalOpen(false);
+                    } catch (e: any) {
+                      alert(e?.message || String(e));
+                    } finally {
+                      setSavingStatuses(false);
+                    }
+                  }}
+                >
+                  Salvar
+                </button>
+              </div>
             </div>
           </div>
         </div>

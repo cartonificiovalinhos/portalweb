@@ -31,6 +31,7 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
 
     const invoiceNumber = formData.get('invoiceNumber') as string;
     const issueDateStr = formData.get('issueDate') as string;
+    const dueDateStr = formData.get('dueDate') as string;
     const totalValueStr = formData.get('totalValue') as string;
     const totalWeightStr = formData.get('totalWeight') as string;
     
@@ -67,11 +68,13 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
     }
 
     let invoice;
+    const dueDate = dueDateStr ? new Date(dueDateStr) : null;
     if (existing) {
       invoice = await prisma.salesOrderInvoice.update({
         where: { id: existing.id },
         data: {
           issueDate: new Date(issueDateStr),
+          dueDate,
           totalValue: Number(totalValueStr),
           totalWeight: Number(totalWeightStr || 0),
           danfeFileName,
@@ -84,6 +87,7 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
           orderId,
           invoiceNumber,
           issueDate: new Date(issueDateStr),
+          dueDate,
           totalValue: Number(totalValueStr),
           totalWeight: Number(totalWeightStr || 0),
           danfeFileName,

@@ -164,6 +164,7 @@ export async function GET(request: Request) {
       ];
       if (digits) or.push({ doc: { contains: digits } });
       if (idCandidate !== null) or.push({ id: idCandidate });
+      if (idCandidate !== null) or.push({ clientCode: idCandidate });
       where.OR = or;
     }
 
@@ -172,6 +173,7 @@ export async function GET(request: Request) {
       orderBy: { name: 'asc' },
       select: {
         id: true,
+        clientCode: true,
         doc: true,
         name: true,
         abbrevName: true,
@@ -192,6 +194,7 @@ export async function GET(request: Request) {
 
     const out = clients.map((c) => ({
       id: c.id,
+      clientCode: (c as any).clientCode ?? null,
       doc: c.doc,
       name: c.name,
       abbrevName: c.abbrevName,
@@ -220,6 +223,21 @@ export async function POST(request: Request) {
     const body = await request.json();
     const doc = normalizeDoc(String(body?.doc || '')) || null;
     const name = String(body?.name || '').trim();
+    const clientCodeCandidate =
+      body?.clientCode ??
+      body?.codCliente ??
+      body?.cod_cliente ??
+      body?.codigoCliente ??
+      body?.codigo_cliente;
+    const clientCode =
+      clientCodeCandidate === undefined
+        ? undefined
+        : (() => {
+            const digits = String(clientCodeCandidate ?? '').trim().replace(/\D/g, '');
+            if (!digits) return null;
+            const n = Number(digits);
+            return Number.isFinite(n) ? Math.trunc(n) : null;
+          })();
     const abbrevCandidate =
       body?.abbrevName ??
       body?.shortName ??
@@ -257,6 +275,10 @@ export async function POST(request: Request) {
         estado,
       };
 
+      if (clientCode !== undefined) {
+        baseData.clientCode = clientCode;
+      }
+
       if (abbrevName !== undefined) {
         baseData.abbrevName = abbrevName ? String(abbrevName).slice(0, 20) : null;
       }
@@ -272,11 +294,11 @@ export async function POST(request: Request) {
             where: { doc },
             update: baseData,
             create: { ...baseData, doc },
-            select: { id: true, doc: true, name: true, abbrevName: true, cep: true, logradouro: true, numero: true, bairro: true, cidade: true, estado: true, paymentTermId: true },
+            select: { id: true, clientCode: true, doc: true, name: true, abbrevName: true, cep: true, logradouro: true, numero: true, bairro: true, cidade: true, estado: true, paymentTermId: true },
           })
         : await tx.client.create({
             data: { ...baseData, doc: null },
-            select: { id: true, doc: true, name: true, abbrevName: true, cep: true, logradouro: true, numero: true, bairro: true, cidade: true, estado: true, paymentTermId: true },
+            select: { id: true, clientCode: true, doc: true, name: true, abbrevName: true, cep: true, logradouro: true, numero: true, bairro: true, cidade: true, estado: true, paymentTermId: true },
           });
 
       if (syncPaymentTermIds !== null) {
