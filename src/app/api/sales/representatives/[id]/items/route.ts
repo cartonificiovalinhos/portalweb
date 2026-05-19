@@ -66,6 +66,14 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
         itemCode: normalizeSku(it?.itemCode ?? it?.sku ?? it?.item ?? it?.code),
         unit: normalizeUnit(it?.unit ?? it?.un),
         unitPrice: normalizeUnitPrice(it?.unitPrice ?? it?.price ?? it?.preco),
+        oldBasePrice: normalizeUnitPrice(
+          it?.oldBasePrice ??
+            it?.oldUnitPrice ??
+            it?.previousBasePrice ??
+            it?.previousUnitPrice ??
+            it?.oldPrice ??
+            it?.previousPrice
+        ),
       }))
       .filter((it: any) => Boolean(it.itemCode) && Boolean(it.unit));
 
@@ -102,7 +110,10 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
           const previousPreferred =
             previousMatches.find((r) => String(r.unit || '').trim().toUpperCase() === it.unit) ?? previousMatches[0] ?? null;
           const previousForOldBase = previousMatches.find((r) => Number(r.unitPrice ?? 0) > 0) ?? previousPreferred ?? null;
-          const oldBasePrice = Number(previousForOldBase?.unitPrice ?? 0);
+          const oldBasePrice =
+            Number.isFinite(Number(it.oldBasePrice)) && Number(it.oldBasePrice) > 0
+              ? Number(it.oldBasePrice)
+              : Number(previousForOldBase?.unitPrice ?? 0);
           const newBasePrice = Number(it.unitPrice ?? 0);
 
           const row = previousPreferred
@@ -172,6 +183,7 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
               inventoryItemId,
               oldBasePrice,
               newBasePrice,
+              oldBasePriceOverride: Number.isFinite(Number(it.oldBasePrice)) && Number(it.oldBasePrice) > 0 ? Number(it.oldBasePrice) : null,
               foundClients,
               adjustedClients,
               skippedUnitMismatch,
