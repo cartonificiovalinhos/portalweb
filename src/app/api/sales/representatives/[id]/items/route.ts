@@ -21,6 +21,10 @@ function normalizeUnitPrice(v: any): number {
 export async function POST(request: Request, props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
   try {
+    const url = new URL(request.url);
+    const debugParam = String(url.searchParams.get('debug') || '').trim().toLowerCase();
+    const debug = debugParam === '1' || debugParam === 'true' || debugParam === 'yes';
+
     const repUserId = Number(params.id);
     if (!Number.isFinite(repUserId) || repUserId <= 0) {
       return NextResponse.json({ error: 'id inválido' }, { status: 400 });
@@ -78,7 +82,8 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
           const previousMatches = previousRows.filter((r) => normalizeUnit(r.unit) === it.unit);
           const previousPreferred =
             previousMatches.find((r) => String(r.unit || '').trim().toUpperCase() === it.unit) ?? previousMatches[0] ?? null;
-          const oldBasePrice = Number(previousPreferred?.unitPrice ?? 0);
+          const previousForOldBase = previousMatches.find((r) => Number(r.unitPrice ?? 0) > 0) ?? previousPreferred ?? null;
+          const oldBasePrice = Number(previousForOldBase?.unitPrice ?? 0);
           const newBasePrice = Number(it.unitPrice ?? 0);
 
           const row = previousPreferred
@@ -98,6 +103,10 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
           }
 
           let adjustedClients = 0;
+          let foundClients = 0;
+          let skippedUnitMismatch = 0;
+          let skippedInvalidRatio = 0;
+          let skippedInvalidUpdatedPrice = 0;
           if (oldBasePrice > 0 && newBasePrice > 0) {
             const clientLinks = await tx.clientItem.findMany({
               where: {
@@ -105,20 +114,31 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
                 allowed: true,
                 manual: true,
                 client: { reps: { some: { userId: repUserId } } },
-                OR: [{ unit: it.unit }, { unit: null }, { unit: '' }],
               },
               select: { id: true, unitPrice: true, unit: true },
             });
+            foundClients = clientLinks.length;
 
             for (const cl of clientLinks) {
+              const clientUnitNorm = normalizeUnit(cl.unit);
+              if (clientUnitNorm && clientUnitNorm !== it.unit) {
+                skippedUnitMismatch += 1;
+                continue;
+              }
               const currentClientPrice = Number(cl.unitPrice ?? 0);
               const ratio = (Number.isFinite(currentClientPrice) && currentClientPrice > 0) ? (currentClientPrice / oldBasePrice) : 1;
-              if (!Number.isFinite(ratio) || ratio <= 0) continue;
+              if (!Number.isFinite(ratio) || ratio <= 0) {
+                skippedInvalidRatio += 1;
+                continue;
+              }
               const updatedClientPrice = newBasePrice * ratio;
-              if (!Number.isFinite(updatedClientPrice) || updatedClientPrice <= 0) continue;
+              if (!Number.isFinite(updatedClientPrice) || updatedClientPrice <= 0) {
+                skippedInvalidUpdatedPrice += 1;
+                continue;
+              }
               await tx.clientItem.update({
                 where: { id: cl.id },
-                data: { unitPrice: updatedClientPrice, ...(cl.unit ? {} : { unit: it.unit }) },
+                data: { unitPrice: updatedClientPrice, ...(clientUnitNorm ? {} : { unit: it.unit }) },
               });
               adjustedClients += 1;
             }
@@ -127,6 +147,18 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
           results.push({ ...row, itemCode: it.itemCode, success: true });
           if (adjustedClients > 0) {
             (results[results.length - 1] as any).adjustedClients = adjustedClients;
+          }
+          if (debug) {
+            (results[results.length - 1] as any).debug = {
+              inventoryItemId,
+              oldBasePrice,
+              newBasePrice,
+              foundClients,
+              adjustedClients,
+              skippedUnitMismatch,
+              skippedInvalidRatio,
+              skippedInvalidUpdatedPrice,
+            };
           }
         } catch (innerErr: any) {
           results.push({ itemCode: it.itemCode, unit: it.unit, success: false, error: String(innerErr?.message || innerErr) });
