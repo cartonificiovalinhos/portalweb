@@ -109,12 +109,20 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
           const previousMatches = previousRows.filter((r) => normalizeUnit(r.unit) === it.unit);
           const previousPreferred =
             previousMatches.find((r) => String(r.unit || '').trim().toUpperCase() === it.unit) ?? previousMatches[0] ?? null;
-          const previousForOldBase = previousMatches.find((r) => Number(r.unitPrice ?? 0) > 0) ?? previousPreferred ?? null;
-          const oldBasePrice =
-            Number.isFinite(Number(it.oldBasePrice)) && Number(it.oldBasePrice) > 0
-              ? Number(it.oldBasePrice)
-              : Number(previousForOldBase?.unitPrice ?? 0);
           const newBasePrice = Number(it.unitPrice ?? 0);
+          const oldBaseCandidates = previousMatches
+            .map((r) => ({ id: r.id, price: Number(r.unitPrice ?? 0) }))
+            .filter((x) => Number.isFinite(x.price) && x.price > 0);
+
+          const oldBaseOverride = Number(it.oldBasePrice ?? 0);
+          const oldBasePick = oldBaseCandidates.find((c) => c.price !== newBasePrice) ?? oldBaseCandidates[0] ?? null;
+          const preferredOld = Number(previousPreferred?.unitPrice ?? 0);
+          const oldBasePrice =
+            Number.isFinite(oldBaseOverride) && oldBaseOverride > 0
+              ? oldBaseOverride
+              : Number.isFinite(preferredOld) && preferredOld > 0 && preferredOld !== newBasePrice
+              ? preferredOld
+              : Number(oldBasePick?.price ?? 0);
 
           const row = previousPreferred
             ? await tx.userInventoryItemPrice.update({
@@ -184,6 +192,8 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
               oldBasePrice,
               newBasePrice,
               oldBasePriceOverride: Number.isFinite(Number(it.oldBasePrice)) && Number(it.oldBasePrice) > 0 ? Number(it.oldBasePrice) : null,
+              oldBasePreferred: Number.isFinite(preferredOld) && preferredOld > 0 ? preferredOld : null,
+              oldBasePick: oldBasePick ? { id: oldBasePick.id, price: oldBasePick.price } : null,
               foundClients,
               adjustedClients,
               skippedUnitMismatch,
