@@ -17,7 +17,7 @@ export async function GET(request: Request, props: { params: Promise<{ id: strin
     const filter = String(url.searchParams.get('filter') || 'all').trim().toLowerCase();
     const today = startOfToday();
 
-    const where: any = { order: { clientId: Math.trunc(clientId) } };
+    const where: any = { clientId: Math.trunc(clientId) };
     if (filter === 'due' || filter === 'a_vencer' || filter === 'avencer') {
       where.dueDate = { gte: today };
       where.status = { not: 'PAGA' };
@@ -26,11 +26,11 @@ export async function GET(request: Request, props: { params: Promise<{ id: strin
       where.status = { not: 'PAGA' };
     }
 
-    const invoices = await prisma.salesOrderInvoice.findMany({
+    const invoices = await prisma.clientInvoice.findMany({
       where,
       select: {
         id: true,
-        orderId: true,
+        clientId: true,
         invoiceNumber: true,
         issueDate: true,
         dueDate: true,

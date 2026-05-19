@@ -50,7 +50,7 @@ type ClientContact = {
 };
 type ClientInvoice = {
   id: number;
-  orderId: number;
+  clientId?: number;
   invoiceNumber: string;
   issueDate: string;
   dueDate?: string | null;

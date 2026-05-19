@@ -5,6 +5,42 @@ function normalizeDoc(doc: string): string {
   return (doc || '').replace(/\D+/g, '');
 }
 
+function parseIsoOrBrDate(raw: any): Date | null {
+  if (raw === null || raw === undefined) return null;
+  const s = String(raw).trim();
+  if (!s) return null;
+  const iso = new Date(s);
+  if (Number.isFinite(iso.getTime())) return iso;
+
+  const m = s.match(/^(\d{2})[\/-](\d{2})[\/-](\d{4})$/);
+  if (m) {
+    const dd = Number(m[1]);
+    const mm = Number(m[2]);
+    const yyyy = Number(m[3]);
+    if (dd >= 1 && dd <= 31 && mm >= 1 && mm <= 12 && yyyy >= 1900 && yyyy <= 3000) {
+      const d = new Date(yyyy, mm - 1, dd);
+      if (Number.isFinite(d.getTime())) return d;
+    }
+  }
+
+  return null;
+}
+
+function parseAmount(raw: any): number {
+  if (raw === null || raw === undefined) return 0;
+  if (typeof raw === 'number') return Number.isFinite(raw) ? raw : 0;
+  const s = String(raw).trim();
+  if (!s) return 0;
+  const normalized = s.replace(/\./g, '').replace(',', '.');
+  const n = Number(normalized);
+  return Number.isFinite(n) ? n : 0;
+}
+
+function parseInvoiceStatus(raw: any): 'EM_ABERTO' | 'PAGA' {
+  const s = String(raw || '').trim().toUpperCase();
+  return s === 'PAGA' ? 'PAGA' : 'EM_ABERTO';
+}
+
 async function ensurePaymentTermByCode(code: number): Promise<number | null> {
   const c = Number(code);
   if (!Number.isFinite(c) || c <= 0) return null;
@@ -179,6 +215,23 @@ export async function PATCH(request: Request, props: { params: Promise<{ doc: st
     if (!body || typeof body !== 'object') {
       return NextResponse.json({ error: 'JSON inválido' }, { status: 400 });
     }
+
+    const rawInvoices = Array.isArray((body as any)?.invoices) ? ((body as any).invoices as any[]) : null;
+    const invoiceRows = rawInvoices
+      ? rawInvoices
+          .map((it: any) => {
+            const invoiceNumber = String(it?.invoiceNumber ?? it?.numFatura ?? it?.numero ?? it?.num ?? '').trim();
+            if (!invoiceNumber) return null;
+            const issueDate = parseIsoOrBrDate(it?.issueDate ?? it?.dataEmissao ?? it?.emissao);
+            if (!issueDate) return null;
+            const dueDate = parseIsoOrBrDate(it?.dueDate ?? it?.dataVencimento ?? it?.vencimento);
+            const totalValue = parseAmount(it?.totalValue ?? it?.valor ?? it?.valorTotal ?? it?.valorR$);
+            const status = parseInvoiceStatus(it?.status ?? it?.situacao);
+            return { invoiceNumber, issueDate, dueDate, totalValue, status };
+          })
+          .filter(Boolean)
+      : null;
+
     const fields: any = {};
     if (
       body.clientCode !== undefined ||
@@ -228,33 +281,75 @@ export async function PATCH(request: Request, props: { params: Promise<{ doc: st
       fields.paymentTermId = await resolvePaymentTermId(body);
     }
     const setCols = Object.keys(fields);
-    if (setCols.length === 0) return NextResponse.json({ message: 'Nada para atualizar' }, { status: 400 });
+    if (setCols.length === 0 && !invoiceRows) return NextResponse.json({ message: 'Nada para atualizar' }, { status: 400 });
     const data: any = {};
     for (const k of setCols) data[k] = (fields as any)[k];
     const updated = await prisma.$transaction(async (tx) => {
-      const row = await tx.client.update({
-        where: { doc },
-        data,
-        select: {
-          id: true,
-          clientCode: true,
-          doc: true,
-          name: true,
-          abbrevName: true,
-          cep: true,
-          logradouro: true,
-          numero: true,
-          bairro: true,
-          cidade: true,
-          estado: true,
-          creditLimit: true,
-          availableLimit: true,
-          titlesDue: true,
-          titlesOverdue: true,
-          paymentTermId: true,
-          paymentTerm: { select: { code: true, description: true } },
-        },
-      });
+      const row = setCols.length
+        ? await tx.client.update({
+            where: { doc },
+            data,
+            select: {
+              id: true,
+              clientCode: true,
+              doc: true,
+              name: true,
+              abbrevName: true,
+              cep: true,
+              logradouro: true,
+              numero: true,
+              bairro: true,
+              cidade: true,
+              estado: true,
+              creditLimit: true,
+              availableLimit: true,
+              titlesDue: true,
+              titlesOverdue: true,
+              paymentTermId: true,
+              paymentTerm: { select: { code: true, description: true } },
+            },
+          })
+        : await tx.client.findFirstOrThrow({
+            where: { doc },
+            select: {
+              id: true,
+              clientCode: true,
+              doc: true,
+              name: true,
+              abbrevName: true,
+              cep: true,
+              logradouro: true,
+              numero: true,
+              bairro: true,
+              cidade: true,
+              estado: true,
+              creditLimit: true,
+              availableLimit: true,
+              titlesDue: true,
+              titlesOverdue: true,
+              paymentTermId: true,
+              paymentTerm: { select: { code: true, description: true } },
+            },
+          });
+
+      if (invoiceRows) {
+        await tx.clientInvoice.deleteMany({ where: { clientId: row.id } });
+        if (invoiceRows.length > 0) {
+          await tx.clientInvoice.createMany({
+            data: invoiceRows.map((inv: any) => ({
+              clientId: row.id,
+              invoiceNumber: inv.invoiceNumber,
+              issueDate: inv.issueDate,
+              dueDate: inv.dueDate,
+              totalValue: inv.totalValue,
+              status: inv.status,
+            })),
+            skipDuplicates: true,
+          });
+        }
+      }
+
+      if (!setCols.length) return row;
 
       await tx.clientItem.deleteMany({
         where: {
