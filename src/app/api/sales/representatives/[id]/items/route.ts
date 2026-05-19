@@ -18,6 +18,25 @@ function normalizeUnitPrice(v: any): number {
   return Number.isFinite(n) ? n : 0;
 }
 
+export async function GET(request: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
+  const repUserId = Number((params as any)?.id);
+  const url = new URL(request.url);
+  const debugParam = String(url.searchParams.get('debug') || '').trim().toLowerCase();
+  const debug = debugParam === '1' || debugParam === 'true' || debugParam === 'yes';
+
+  return NextResponse.json(
+    {
+      ok: false,
+      error: 'Use POST para atualizar preços-base e reajustar preços do cliente.',
+      repUserId: Number.isFinite(repUserId) ? repUserId : null,
+      debug,
+      exampleBody: [{ itemCode: 'CMC-B S', unit: 'KG', unitPrice: 12.8 }],
+    },
+    { status: 200 }
+  );
+}
+
 export async function POST(request: Request, props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
   try {
