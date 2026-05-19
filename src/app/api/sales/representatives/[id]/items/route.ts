@@ -154,43 +154,42 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
             if (repClientIds.length === 0) {
               foundClients = 0;
             } else {
-            const clientLinks = await tx.clientItem.findMany({
-              where: {
-                inventoryItemId,
-                allowed: true,
-                manual: true,
-                clientId: { in: repClientIds },
-              },
-              select: { id: true, unitPrice: true, unit: true, lastBasePrice: true },
-            });
-            foundClients = clientLinks.length;
-
-            for (const cl of clientLinks) {
-              const clientUnitNorm = normalizeUnit(cl.unit);
-              if (clientUnitNorm && clientUnitNorm !== it.unit) {
-                skippedUnitMismatch += 1;
-                continue;
-              }
-              const currentClientPrice = Number(cl.unitPrice ?? 0);
-              const clientLastBase = Number((cl as any).lastBasePrice ?? 0);
-              const baseForRatio = Number.isFinite(clientLastBase) && clientLastBase > 0 ? clientLastBase : oldBasePrice;
-              const ratio = (Number.isFinite(currentClientPrice) && currentClientPrice > 0) ? (currentClientPrice / baseForRatio) : 1;
-              if (!Number.isFinite(ratio) || ratio <= 0) {
-                skippedInvalidRatio += 1;
-                continue;
-              }
-              const updatedClientPrice = newBasePrice * ratio;
-              if (!Number.isFinite(updatedClientPrice) || updatedClientPrice <= 0) {
-                skippedInvalidUpdatedPrice += 1;
-                continue;
-              }
-              await tx.clientItem.update({
-                where: { id: cl.id },
-                data: { unitPrice: updatedClientPrice, lastBasePrice: newBasePrice, ...(clientUnitNorm ? {} : { unit: it.unit }) },
+              const clientLinks = await tx.clientItem.findMany({
+                where: {
+                  inventoryItemId,
+                  allowed: true,
+                  manual: true,
+                  clientId: { in: repClientIds },
+                },
+                select: { id: true, unitPrice: true, unit: true, lastBasePrice: true },
               });
-              adjustedClients += 1;
-            }
-            }
+              foundClients = clientLinks.length;
+
+              for (const cl of clientLinks) {
+                const clientUnitNorm = normalizeUnit(cl.unit);
+                if (clientUnitNorm && clientUnitNorm !== it.unit) {
+                  skippedUnitMismatch += 1;
+                  continue;
+                }
+                const currentClientPrice = Number(cl.unitPrice ?? 0);
+                const clientLastBase = Number((cl as any).lastBasePrice ?? 0);
+                const baseForRatio = Number.isFinite(clientLastBase) && clientLastBase > 0 ? clientLastBase : oldBasePrice;
+                const ratio = (Number.isFinite(currentClientPrice) && currentClientPrice > 0) ? (currentClientPrice / baseForRatio) : 1;
+                if (!Number.isFinite(ratio) || ratio <= 0) {
+                  skippedInvalidRatio += 1;
+                  continue;
+                }
+                const updatedClientPrice = newBasePrice * ratio;
+                if (!Number.isFinite(updatedClientPrice) || updatedClientPrice <= 0) {
+                  skippedInvalidUpdatedPrice += 1;
+                  continue;
+                }
+                await tx.clientItem.update({
+                  where: { id: cl.id },
+                  data: { unitPrice: updatedClientPrice, lastBasePrice: newBasePrice, ...(clientUnitNorm ? {} : { unit: it.unit }) },
+                });
+                adjustedClients += 1;
+              }
             }
           }
 
