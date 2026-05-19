@@ -290,6 +290,9 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
               where: { id: row.id },
               data: {
                 unitPrice: Math.max(0, adjustType === 'value' ? base + amount : base * multiplier),
+                lastBasePrice: base,
+                lastAdjustType: adjustType === 'value' ? 'VALUE' : 'PERCENT',
+                lastAdjustValue: amount,
               },
             });
             updatedCount += 1;

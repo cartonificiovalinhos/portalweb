@@ -477,6 +477,9 @@ model ClientItem {
   inventoryItemId Int
   unit            String?
   unitPrice       Float         @default(0)
+  lastBasePrice   Float?
+  lastAdjustType  String?
+  lastAdjustValue Float?
   manual          Boolean       @default(false)
   allowed         Boolean       @default(true)
   createdAt       DateTime      @default(now())

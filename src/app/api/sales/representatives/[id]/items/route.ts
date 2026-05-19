@@ -153,7 +153,7 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
                 manual: true,
                 client: { reps: { some: { userId: repUserId } } },
               },
-              select: { id: true, unitPrice: true, unit: true },
+              select: { id: true, unitPrice: true, unit: true, lastBasePrice: true },
             });
             foundClients = clientLinks.length;
 
@@ -164,7 +164,9 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
                 continue;
               }
               const currentClientPrice = Number(cl.unitPrice ?? 0);
-              const ratio = (Number.isFinite(currentClientPrice) && currentClientPrice > 0) ? (currentClientPrice / oldBasePrice) : 1;
+              const clientLastBase = Number((cl as any).lastBasePrice ?? 0);
+              const baseForRatio = Number.isFinite(clientLastBase) && clientLastBase > 0 ? clientLastBase : oldBasePrice;
+              const ratio = (Number.isFinite(currentClientPrice) && currentClientPrice > 0) ? (currentClientPrice / baseForRatio) : 1;
               if (!Number.isFinite(ratio) || ratio <= 0) {
                 skippedInvalidRatio += 1;
                 continue;
@@ -176,7 +178,7 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
               }
               await tx.clientItem.update({
                 where: { id: cl.id },
-                data: { unitPrice: updatedClientPrice, ...(clientUnitNorm ? {} : { unit: it.unit }) },
+                data: { unitPrice: updatedClientPrice, lastBasePrice: newBasePrice, ...(clientUnitNorm ? {} : { unit: it.unit }) },
               });
               adjustedClients += 1;
             }
