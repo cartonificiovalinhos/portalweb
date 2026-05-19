@@ -142,6 +142,8 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
 
           let adjustedClients = 0;
           let foundClients = 0;
+          let foundFallbackClients = 0;
+          let adjustedFallbackClients = 0;
           let skippedUnitMismatch = 0;
           let skippedInvalidRatio = 0;
           let skippedInvalidUpdatedPrice = 0;
@@ -156,6 +158,19 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
               select: { id: true, unitPrice: true, unit: true, lastBasePrice: true },
             });
             foundClients = clientLinks.length;
+
+            const fallbackCandidates = await tx.clientItem.findMany({
+              where: {
+                inventoryItemId,
+                allowed: true,
+                manual: true,
+                lastBasePrice: { not: null },
+              },
+              select: { id: true, unitPrice: true, unit: true, lastBasePrice: true },
+            });
+            const linkedIds = new Set(clientLinks.map((x) => x.id));
+            const fallbackLinks = fallbackCandidates.filter((x) => !linkedIds.has(x.id));
+            foundFallbackClients = fallbackLinks.length;
 
             for (const cl of clientLinks) {
               const clientUnitNorm = normalizeUnit(cl.unit);
@@ -182,6 +197,28 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
               });
               adjustedClients += 1;
             }
+
+            const toCents = (n: number) => Math.round(n * 100);
+            for (const cl of fallbackLinks) {
+              const clientLastBase = Number(cl.lastBasePrice ?? 0);
+              if (!Number.isFinite(clientLastBase) || clientLastBase <= 0) continue;
+              if (toCents(clientLastBase) !== toCents(oldBasePrice)) continue;
+
+              const clientUnitNorm = normalizeUnit(cl.unit);
+              if (clientUnitNorm && clientUnitNorm !== it.unit) continue;
+
+              const currentClientPrice = Number(cl.unitPrice ?? 0);
+              const ratio = (Number.isFinite(currentClientPrice) && currentClientPrice > 0) ? (currentClientPrice / clientLastBase) : 1;
+              if (!Number.isFinite(ratio) || ratio <= 0) continue;
+              const updatedClientPrice = newBasePrice * ratio;
+              if (!Number.isFinite(updatedClientPrice) || updatedClientPrice <= 0) continue;
+
+              await tx.clientItem.update({
+                where: { id: cl.id },
+                data: { unitPrice: updatedClientPrice, lastBasePrice: newBasePrice, ...(clientUnitNorm ? {} : { unit: it.unit }) },
+              });
+              adjustedFallbackClients += 1;
+            }
           }
 
           results.push({ ...row, itemCode: it.itemCode, success: true });
@@ -197,7 +234,9 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
               oldBasePreferred: Number.isFinite(preferredOld) && preferredOld > 0 ? preferredOld : null,
               oldBasePick: oldBasePick ? { id: oldBasePick.id, price: oldBasePick.price } : null,
               foundClients,
+              foundFallbackClients,
               adjustedClients,
+              adjustedFallbackClients,
               skippedUnitMismatch,
               skippedInvalidRatio,
               skippedInvalidUpdatedPrice,
