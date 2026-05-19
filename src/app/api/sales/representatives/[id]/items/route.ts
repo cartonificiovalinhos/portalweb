@@ -103,11 +103,11 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
               where: {
                 inventoryItemId,
                 allowed: true,
-                unit: it.unit,
                 manual: true,
                 client: { reps: { some: { userId: repUserId } } },
+                OR: [{ unit: it.unit }, { unit: null }, { unit: '' }],
               },
-              select: { id: true, unitPrice: true },
+              select: { id: true, unitPrice: true, unit: true },
             });
 
             for (const cl of clientLinks) {
@@ -118,7 +118,7 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
               if (!Number.isFinite(updatedClientPrice) || updatedClientPrice <= 0) continue;
               await tx.clientItem.update({
                 where: { id: cl.id },
-                data: { unitPrice: updatedClientPrice },
+                data: { unitPrice: updatedClientPrice, ...(cl.unit ? {} : { unit: it.unit }) },
               });
               adjustedClients += 1;
             }
