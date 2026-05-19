@@ -93,6 +93,11 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
 
     const results: any[] = [];
     await prisma.$transaction(async (tx) => {
+      const repLinks = await tx.userClientRep.findMany({ where: { userId: repUserId }, select: { clientId: true } });
+      const repClientIds = Array.from(
+        new Set(repLinks.map((x) => Number(x.clientId)).filter((x) => Number.isFinite(x) && x > 0))
+      );
+
       for (const it of cleaned) {
         const inventoryItemId = invBySku.get(it.itemCode);
         if (!inventoryItemId) {
@@ -142,35 +147,23 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
 
           let adjustedClients = 0;
           let foundClients = 0;
-          let foundFallbackClients = 0;
-          let adjustedFallbackClients = 0;
           let skippedUnitMismatch = 0;
           let skippedInvalidRatio = 0;
           let skippedInvalidUpdatedPrice = 0;
           if (oldBasePrice > 0 && newBasePrice > 0) {
+            if (repClientIds.length === 0) {
+              foundClients = 0;
+            } else {
             const clientLinks = await tx.clientItem.findMany({
               where: {
                 inventoryItemId,
                 allowed: true,
                 manual: true,
-                client: { reps: { some: { userId: repUserId } } },
+                clientId: { in: repClientIds },
               },
               select: { id: true, unitPrice: true, unit: true, lastBasePrice: true },
             });
             foundClients = clientLinks.length;
-
-            const fallbackCandidates = await tx.clientItem.findMany({
-              where: {
-                inventoryItemId,
-                allowed: true,
-                manual: true,
-                lastBasePrice: { not: null },
-              },
-              select: { id: true, unitPrice: true, unit: true, lastBasePrice: true },
-            });
-            const linkedIds = new Set(clientLinks.map((x) => x.id));
-            const fallbackLinks = fallbackCandidates.filter((x) => !linkedIds.has(x.id));
-            foundFallbackClients = fallbackLinks.length;
 
             for (const cl of clientLinks) {
               const clientUnitNorm = normalizeUnit(cl.unit);
@@ -197,27 +190,7 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
               });
               adjustedClients += 1;
             }
-
-            const toCents = (n: number) => Math.round(n * 100);
-            for (const cl of fallbackLinks) {
-              const clientLastBase = Number(cl.lastBasePrice ?? 0);
-              if (!Number.isFinite(clientLastBase) || clientLastBase <= 0) continue;
-              if (toCents(clientLastBase) !== toCents(oldBasePrice)) continue;
-
-              const clientUnitNorm = normalizeUnit(cl.unit);
-              if (clientUnitNorm && clientUnitNorm !== it.unit) continue;
-
-              const currentClientPrice = Number(cl.unitPrice ?? 0);
-              const ratio = (Number.isFinite(currentClientPrice) && currentClientPrice > 0) ? (currentClientPrice / clientLastBase) : 1;
-              if (!Number.isFinite(ratio) || ratio <= 0) continue;
-              const updatedClientPrice = newBasePrice * ratio;
-              if (!Number.isFinite(updatedClientPrice) || updatedClientPrice <= 0) continue;
-
-              await tx.clientItem.update({
-                where: { id: cl.id },
-                data: { unitPrice: updatedClientPrice, lastBasePrice: newBasePrice, ...(clientUnitNorm ? {} : { unit: it.unit }) },
-              });
-              adjustedFallbackClients += 1;
+            }
             }
           }
 
@@ -233,10 +206,9 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
               oldBasePriceOverride: Number.isFinite(Number(it.oldBasePrice)) && Number(it.oldBasePrice) > 0 ? Number(it.oldBasePrice) : null,
               oldBasePreferred: Number.isFinite(preferredOld) && preferredOld > 0 ? preferredOld : null,
               oldBasePick: oldBasePick ? { id: oldBasePick.id, price: oldBasePick.price } : null,
+              repLinkedClients: repClientIds.length,
               foundClients,
-              foundFallbackClients,
               adjustedClients,
-              adjustedFallbackClients,
               skippedUnitMismatch,
               skippedInvalidRatio,
               skippedInvalidUpdatedPrice,
