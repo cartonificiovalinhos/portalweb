@@ -225,7 +225,7 @@ export default function ClientDetailsPage() {
   const [expandedContactId, setExpandedContactId] = useState<number | null>(null);
   const [savingContactStatusId, setSavingContactStatusId] = useState<number | null>(null);
 
-  const [invoiceFilter, setInvoiceFilter] = useState<'due' | 'overdue' | 'all'>('all');
+  const [invoiceFilter, setInvoiceFilter] = useState<'due' | 'overdue' | 'all'>('due');
   const [clientInvoices, setClientInvoices] = useState<ClientInvoice[]>([]);
   const [loadingInvoices, setLoadingInvoices] = useState(false);
 
@@ -407,7 +407,7 @@ export default function ClientDetailsPage() {
     if (!Number.isFinite(id) || id <= 0) return;
     setLoadingInvoices(true);
     try {
-      const r = await fetch(`/api/clients/${encodeURIComponent(String(id))}/invoices?filter=${encodeURIComponent(invoiceFilter)}`, { cache: 'no-store' });
+      const r = await fetch(`/api/clients/${encodeURIComponent(String(id))}/invoices?filter=all`, { cache: 'no-store' });
       const j = await r.json();
       setClientInvoices(Array.isArray(j) ? j : []);
     } catch {
@@ -415,7 +415,7 @@ export default function ClientDetailsPage() {
     } finally {
       setLoadingInvoices(false);
     }
-  }, [id, invoiceFilter]);
+  }, [id]);
 
   useEffect(() => {
     if (activeTab === 'contacts') {
@@ -428,6 +428,33 @@ export default function ClientDetailsPage() {
       void loadClientInvoices();
     }
   }, [activeTab, loadClientInvoices]);
+
+  const invoicesView = useMemo(() => {
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+    const isPaid = (inv: ClientInvoice) => String(inv.status || '').trim().toUpperCase() === 'PAGA';
+    const dueDate = (inv: ClientInvoice) => (inv.dueDate ? new Date(inv.dueDate) : null);
+    const isOverdue = (inv: ClientInvoice) => {
+      const d = dueDate(inv);
+      return !isPaid(inv) && d != null && d < today;
+    };
+
+    if (invoiceFilter === 'due') {
+      return clientInvoices.filter((inv) => {
+        if (isPaid(inv)) return false;
+        const d = dueDate(inv);
+        if (!d) return false;
+        return d >= today;
+      });
+    }
+
+    if (invoiceFilter === 'overdue') {
+      return clientInvoices.filter((inv) => isOverdue(inv));
+    }
+
+    return clientInvoices;
+  }, [clientInvoices, invoiceFilter]);
 
   useEffect(() => {
     setSelectedLinkedItemIds([]);
@@ -1897,7 +1924,7 @@ export default function ClientDetailsPage() {
           <div className="border rounded bg-white overflow-hidden">
             <div className="px-3 py-2 border-b bg-gray-50 flex flex-wrap items-center gap-3">
               <div className="text-sm text-gray-700">Faturas</div>
-              <div className="ml-auto text-xs text-gray-500">{clientInvoices.length} registro(s)</div>
+              <div className="ml-auto text-xs text-gray-500">{invoicesView.length} registro(s)</div>
             </div>
 
             <div className="px-3 py-2 border-b flex flex-wrap items-center gap-4 text-sm">
@@ -1935,10 +1962,10 @@ export default function ClientDetailsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {!loadingInvoices && clientInvoices.length === 0 && (
+                  {!loadingInvoices && invoicesView.length === 0 && (
                     <tr><td colSpan={5} className="p-3 text-gray-500">Sem faturas</td></tr>
                   )}
-                  {clientInvoices.map((inv) => (
+                  {invoicesView.map((inv) => (
                     <tr key={inv.id} className="border-t">
                       {(() => {
                         const now = new Date();
@@ -1970,8 +1997,8 @@ export default function ClientDetailsPage() {
             </div>
 
             <div className="sm:hidden divide-y">
-              {!loadingInvoices && clientInvoices.length === 0 && <div className="p-3 text-gray-500 text-sm">Sem faturas</div>}
-              {clientInvoices.map((inv) => (
+              {!loadingInvoices && invoicesView.length === 0 && <div className="p-3 text-gray-500 text-sm">Sem faturas</div>}
+              {invoicesView.map((inv) => (
                 <div key={inv.id} className="p-3">
                   {(() => {
                     const now = new Date();
