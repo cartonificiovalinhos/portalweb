@@ -339,6 +339,54 @@ export async function POST(request: Request) {
       };
     });
 
+    if (clientId) {
+      const invIds = Array.from(
+        new Set(
+          normalizedItems
+            .map((i: any) => Number(i.inventoryItemId))
+            .filter((n: number) => Number.isFinite(n) && n > 0)
+            .map((n: number) => Math.trunc(n))
+        )
+      );
+      if (invIds.length > 0) {
+        const links = await prisma.clientItem.findMany({
+          where: { clientId: Math.trunc(clientId), inventoryItemId: { in: invIds }, allowed: true },
+          select: { inventoryItemId: true, unitPrice: true, manual: true },
+        });
+        const byInvId = new Map<number, { unitPrice: number; manual: boolean }>();
+        for (const l of links) {
+          byInvId.set(Math.trunc(Number(l.inventoryItemId)), { unitPrice: Number(l.unitPrice ?? 0), manual: Boolean(l.manual) });
+        }
+
+        const cents = (n: number) => Math.round(Number(n || 0) * 100);
+
+        for (const it of normalizedItems) {
+          const invId = it.inventoryItemId ? Math.trunc(Number(it.inventoryItemId)) : null;
+          if (!invId) continue;
+          const link = byInvId.get(invId);
+          if (!link) continue;
+          const reqCents = cents(it.unitPrice);
+          const baseCents = cents(link.unitPrice);
+
+          if (!link.manual) {
+            if (reqCents !== baseCents) {
+              return NextResponse.json(
+                { error: `Preço não pode ser alterado para item não manual: ${String(it.sku || it.name || 'Item')}` },
+                { status: 400 }
+              );
+            }
+          } else {
+            if (reqCents < baseCents) {
+              return NextResponse.json(
+                { error: `Preço não pode ser inferior ao valor carregado: ${String(it.sku || it.name || 'Item')}` },
+                { status: 400 }
+              );
+            }
+          }
+        }
+      }
+    }
+
     const zeroPrice = normalizedItems.find((it: any) => Number(it.unitPrice ?? 0) <= 0);
     if (zeroPrice) {
       return NextResponse.json(

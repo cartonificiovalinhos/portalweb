@@ -120,6 +120,41 @@ export async function GET(_: Request, props: { params: Promise<{ id: string }> }
       history = base.map((h) => ({ ...h, messages: [] }));
     }
 
+    const clientId = order?.clientId != null ? Number((order as any).clientId) : null;
+    if (clientId && Number.isFinite(clientId) && clientId > 0) {
+      const itemRows: any[] = Array.isArray((order as any).items) ? (order as any).items : [];
+      const invIds = Array.from(
+        new Set(
+          itemRows
+            .map((it) => Number(it?.inventoryItemId))
+            .filter((n) => Number.isFinite(n) && n > 0)
+            .map((n) => Math.trunc(n))
+        )
+      );
+      if (invIds.length > 0) {
+        const links = await prisma.clientItem.findMany({
+          where: { clientId: Math.trunc(clientId), inventoryItemId: { in: invIds }, allowed: true },
+          select: { inventoryItemId: true, unitPrice: true, manual: true },
+        });
+        const byInvId = new Map<number, { unitPrice: number; manual: boolean }>();
+        for (const l of links) {
+          byInvId.set(Math.trunc(Number(l.inventoryItemId)), { unitPrice: Number(l.unitPrice ?? 0), manual: Boolean(l.manual) });
+        }
+
+        for (const it of itemRows) {
+          const invId = it?.inventoryItemId != null ? Math.trunc(Number(it.inventoryItemId)) : null;
+          if (!invId) continue;
+          const link = byInvId.get(invId);
+          if (!link) continue;
+          it.minUnitPrice = link.unitPrice;
+          it.clientItemManual = link.manual;
+          if (it.inventoryItem) {
+            it.inventoryItem.clientItemManual = link.manual;
+          }
+        }
+      }
+    }
+
     return NextResponse.json({ ...order, statusHistory: history });
   } catch (err: any) {
     return NextResponse.json({ error: String(err?.message || err) }, { status: 500 });

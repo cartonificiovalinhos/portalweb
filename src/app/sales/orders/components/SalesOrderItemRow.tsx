@@ -8,6 +8,8 @@ export type OrderItem = {
   unit?: string | null;
   quantity: number;
   unitPrice: number;
+  minUnitPrice?: number | null;
+  clientItemManual?: boolean | null;
   discountPct: number;
   width?: number | null;
   length?: number | null;
@@ -109,6 +111,61 @@ const FormattedIntInput = ({
   );
 };
 
+const FormattedMoneyInput = ({
+  value,
+  onChange,
+  disabled,
+  className,
+  placeholder,
+}: {
+  value?: number | null;
+  onChange: (val: number | null) => void;
+  disabled?: boolean;
+  className?: string;
+  placeholder?: string;
+}) => {
+  const formatMoney = (n: number) => n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const [str, setStr] = useState(value !== undefined && value !== null ? formatMoney(value) : '');
+
+  useEffect(() => {
+    if (value === undefined || value === null) {
+      if (str !== '') setStr('');
+      return;
+    }
+    const normalized = Number(value);
+    if (!Number.isFinite(normalized)) return;
+    const formatted = formatMoney(normalized);
+    if (str !== formatted) setStr(formatted);
+  }, [value, str]);
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = e.target.value;
+    const digits = raw.replace(/\D/g, '');
+    if (digits === '') {
+      setStr('');
+      onChange(null);
+      return;
+    }
+    const cents = parseInt(digits, 10);
+    const money = cents / 100;
+    const formatted = formatMoney(money);
+    setStr(formatted);
+    onChange(money);
+  };
+
+  return (
+    <input
+      type="text"
+      className={className}
+      disabled={disabled}
+      placeholder={placeholder}
+      value={str}
+      onChange={handleChange}
+      inputMode="decimal"
+    />
+  );
+};
+
 interface SalesOrderItemRowProps {
   item: OrderItem;
   isOrderEditable: boolean;
@@ -144,10 +201,17 @@ export const SalesOrderItemRow = ({
   const [discountInput, setDiscountInput] = useState(
     item.discountPct.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
   );
+  const minUnitPriceRef = useRef<number>(Number((item as any)?.minUnitPrice ?? item.unitPrice ?? 0));
+  const minUnitPriceItemIdRef = useRef<number>(item.id);
   const [isSaving, setIsSaving] = useState(false);
   const [weightInput, setWeightInput] = useState('');
   const [isEditingWeight, setIsEditingWeight] = useState(false);
   const [isRowLocked, setIsRowLocked] = useState(false);
+
+  if (minUnitPriceItemIdRef.current !== item.id) {
+    minUnitPriceItemIdRef.current = item.id;
+    minUnitPriceRef.current = Number((item as any)?.minUnitPrice ?? item.unitPrice ?? 0);
+  }
 
   useEffect(() => {
     setLocalItem(prev => {
@@ -242,6 +306,8 @@ export const SalesOrderItemRow = ({
   const lockToggleDisabled = !isOrderEditable || isSaving;
   const isEffectivelyLocked = !isOrderEditable || isRowLocked;
   const compactW = "w-[4.5rem]";
+  const isClientItemManual = Boolean((localItem as any)?.clientItemManual ?? (localItem as any)?.inventoryItem?.clientItemManual);
+  const canEditPrice = canEdit && isClientItemManual;
   const itemUnit =
     String(localItem.inventoryItem?.unit ?? '').trim() ||
     String(localItem.unit || '').trim() ||
@@ -346,11 +412,15 @@ export const SalesOrderItemRow = ({
         </td>
         <td className="p-2">{String(localItem.unit || '').trim() || '-'}</td>
         <td className="p-2">
-            <input 
-                type="text" 
-                className={`${compactW} px-2 py-1 border rounded bg-gray-100 text-gray-600 cursor-not-allowed`} 
-                value={(localItem.unitPrice ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} 
-                disabled 
+            <FormattedMoneyInput
+              className={`${compactW} px-2 py-1 border rounded ${!canEditPrice ? 'bg-gray-100 text-gray-600 cursor-not-allowed' : ''}`}
+              disabled={!canEditPrice}
+              value={localItem.unitPrice}
+              onChange={(val) => {
+                const base = Number(minUnitPriceRef.current ?? 0);
+                const next = Math.max(Number(val ?? base), base);
+                handleChange('unitPrice', next);
+              }}
             />
         </td>
         <td className="p-2">
@@ -512,10 +582,17 @@ export const SalesOrderItemCard = ({
   const [discountInput, setDiscountInput] = useState(
     item.discountPct.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
   );
+  const minUnitPriceRef = useRef<number>(Number((item as any)?.minUnitPrice ?? item.unitPrice ?? 0));
+  const minUnitPriceItemIdRef = useRef<number>(item.id);
   const [isSaving, setIsSaving] = useState(false);
   const [weightInput, setWeightInput] = useState('');
   const [isEditingWeight, setIsEditingWeight] = useState(false);
   const [isRowLocked, setIsRowLocked] = useState(false);
+
+  if (minUnitPriceItemIdRef.current !== item.id) {
+    minUnitPriceItemIdRef.current = item.id;
+    minUnitPriceRef.current = Number((item as any)?.minUnitPrice ?? item.unitPrice ?? 0);
+  }
 
   useEffect(() => {
     setLocalItem(prev => {
@@ -604,6 +681,8 @@ export const SalesOrderItemCard = ({
   const disabledClass = "bg-gray-100 text-gray-500";
   const lockToggleDisabled = !isOrderEditable || isSaving;
   const isEffectivelyLocked = !isOrderEditable || isRowLocked;
+  const isClientItemManual = Boolean((localItem as any)?.clientItemManual ?? (localItem as any)?.inventoryItem?.clientItemManual);
+  const canEditPrice = canEdit && isClientItemManual;
   const itemUnit =
     String(localItem.inventoryItem?.unit ?? '').trim() ||
     String(localItem.unit || '').trim() ||
@@ -707,11 +786,15 @@ export const SalesOrderItemCard = ({
         </div>
         <div>
           <div className="text-[11px] text-gray-600">Preço</div>
-          <input
-            type="text"
-            className="w-full px-2 py-1 border rounded text-sm bg-gray-100 text-gray-600 cursor-not-allowed"
-            value={(localItem.unitPrice ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-            disabled
+          <FormattedMoneyInput
+            className={`w-full px-2 py-1 border rounded text-sm ${!canEditPrice ? 'bg-gray-100 text-gray-600 cursor-not-allowed' : ''}`}
+            disabled={!canEditPrice}
+            value={localItem.unitPrice}
+            onChange={(val) => {
+              const base = Number(minUnitPriceRef.current ?? 0);
+              const next = Math.max(Number(val ?? base), base);
+              handleChange('unitPrice', next);
+            }}
           />
         </div>
         <div>

@@ -10,6 +10,7 @@ type InventoryItem = {
   priceUnit?: string | null;
   commercialFamily?: { id: number; description?: string | null; name?: string | null; priceBy?: string | null } | null;
   unitPrice?: number | null;
+  clientItemManual?: boolean | null;
   width?: number | null;
   length?: number | null;
   grammage?: number | null;
@@ -23,6 +24,7 @@ type OrderItem = {
   quantity: number;
   unitPrice: number;
   discountPct: number;
+  minUnitPrice?: number | null;
   width?: number | null;
   length?: number | null;
   grammage?: number | null;
@@ -383,14 +385,16 @@ function NewSalesOrderContent() {
   };
 
   const addItemToOrder = (invItem: InventoryItem) => {
+    const basePrice = Number(invItem.unitPrice ?? 0);
     const newItem: OrderItem = {
       id: -Date.now(), // Temp ID
       name: invItem.name,
       sku: invItem.sku,
       unit: invItem.priceUnit ?? invItem.unit,
       quantity: 1,
-      unitPrice: Number(invItem.unitPrice ?? 0),
+      unitPrice: basePrice,
       discountPct: 0,
+      minUnitPrice: basePrice,
       inventoryItem: invItem,
       width: invItem.width,
       length: invItem.length,

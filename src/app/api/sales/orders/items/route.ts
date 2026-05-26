@@ -31,6 +31,46 @@ export async function POST(request: Request) {
       }
     }
 
+    if (!Number.isFinite(payload.unitPrice) || Number(payload.unitPrice) <= 0) {
+      return NextResponse.json({ error: 'Não é permitido salvar item com preço zero.' }, { status: 400 });
+    }
+
+    const order = await prisma.salesOrder.findUnique({
+      where: { id: Math.trunc(orderId) },
+      select: { clientId: true }
+    });
+
+    const clientId = order?.clientId != null ? Number(order.clientId) : null;
+    const invId = payload.inventoryItemId != null ? Number(payload.inventoryItemId) : null;
+    if (clientId && Number.isFinite(clientId) && clientId > 0 && invId && Number.isFinite(invId) && invId > 0) {
+      const link = await prisma.clientItem.findFirst({
+        where: { clientId: Math.trunc(clientId), inventoryItemId: Math.trunc(invId), allowed: true },
+        select: { unitPrice: true, manual: true },
+      });
+
+      if (link) {
+        const cents = (n: number) => Math.round(Number(n || 0) * 100);
+        const reqCents = cents(Number(payload.unitPrice ?? 0));
+        const baseCents = cents(Number(link.unitPrice ?? 0));
+
+        if (!link.manual) {
+          if (reqCents !== baseCents) {
+            return NextResponse.json(
+              { error: `Preço não pode ser alterado para item não manual: ${String(payload.sku || payload.name || 'Item')}` },
+              { status: 400 }
+            );
+          }
+        } else {
+          if (reqCents < baseCents) {
+            return NextResponse.json(
+              { error: `Preço não pode ser inferior ao valor carregado: ${String(payload.sku || payload.name || 'Item')}` },
+              { status: 400 }
+            );
+          }
+        }
+      }
+    }
+
     const created = await prisma.salesOrderItem.create({
       data: {
         orderId,

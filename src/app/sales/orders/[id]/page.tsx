@@ -11,6 +11,7 @@ type InventoryItem = {
   unit?: string | null;
   commercialFamily?: { id: number; description?: string | null; name?: string | null; priceBy?: string | null } | null;
   unitPrice?: number | null;
+  clientItemManual?: boolean | null;
   width?: number | null;
   length?: number | null;
   grammage?: number | null;
@@ -24,6 +25,8 @@ type OrderItem = {
   quantity: number;
   unitPrice: number;
   discountPct: number;
+  minUnitPrice?: number | null;
+  clientItemManual?: boolean | null;
   width?: number | null;
   length?: number | null;
   grammage?: number | null;

@@ -52,11 +52,18 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
     const id = parseIdParam(params.id);
     if (!id) return NextResponse.json({ error: 'ID inválido' }, { status: 400 });
 
-    const current = await prisma.salesOrderItem.findUnique({ where: { id }, select: { unitPrice: true } });
+    const current = await prisma.salesOrderItem.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        sku: true,
+        name: true,
+        unitPrice: true,
+        inventoryItemId: true,
+        order: { select: { clientId: true } },
+      }
+    });
     if (!current) return NextResponse.json({ error: 'Item não encontrado' }, { status: 404 });
-    if (Number(current.unitPrice ?? 0) <= 0) {
-      return NextResponse.json({ error: 'Não é permitido salvar item com preço zero.' }, { status: 400 });
-    }
 
     const body = await request.json();
     const allowed: Record<string, any> = {};
@@ -66,6 +73,47 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
     if (body.grammage !== undefined) allowed.grammage = Number(body.grammage);
     if (body.diameter !== undefined) allowed.diameter = Number(body.diameter);
     if (body.tube !== undefined) allowed.tube = Number(body.tube);
+    if (body.unitPrice !== undefined) {
+      const nextPrice = Number(body.unitPrice);
+      if (!Number.isFinite(nextPrice) || nextPrice <= 0) {
+        return NextResponse.json({ error: 'Não é permitido salvar item com preço zero.' }, { status: 400 });
+      }
+
+      const cents = (n: number) => Math.round(Number(n || 0) * 100);
+      const currCents = cents(Number(current.unitPrice ?? 0));
+      const nextCents = cents(nextPrice);
+
+      const clientId = current.order?.clientId != null ? Number(current.order.clientId) : null;
+      const invId = current.inventoryItemId != null ? Number(current.inventoryItemId) : null;
+
+      if (clientId && Number.isFinite(clientId) && clientId > 0 && invId && Number.isFinite(invId) && invId > 0) {
+        const link = await prisma.clientItem.findFirst({
+          where: { clientId: Math.trunc(clientId), inventoryItemId: Math.trunc(invId), allowed: true },
+          select: { unitPrice: true, manual: true },
+        });
+
+        if (link) {
+          if (!link.manual) {
+            if (nextCents !== currCents) {
+              return NextResponse.json(
+                { error: `Preço não pode ser alterado para item não manual: ${String(current.sku || current.name || 'Item')}` },
+                { status: 400 }
+              );
+            }
+          } else {
+            const baseCents = cents(Number(link.unitPrice ?? 0));
+            if (nextCents < baseCents) {
+              return NextResponse.json(
+                { error: `Preço não pode ser inferior ao valor carregado: ${String(current.sku || current.name || 'Item')}` },
+                { status: 400 }
+              );
+            }
+          }
+        }
+      }
+
+      allowed.unitPrice = nextPrice;
+    }
     if (body.discountPct !== undefined) allowed.discountPct = Number(body.discountPct);
     if (body.clientOrderNumber !== undefined) allowed.clientOrderNumber = String(body.clientOrderNumber);
     if (body.clientOrderItemNumber !== undefined) allowed.clientOrderItemNumber = Number(body.clientOrderItemNumber);
