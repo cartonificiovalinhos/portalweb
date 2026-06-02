@@ -108,12 +108,12 @@ async function renderPdf(order: any): Promise<Buffer> {
   const labelW = 90;
   const rowH = 16;
   const infoX = left;
-  const valueX = left + labelW;
+  const infoValueX = left + labelW;
   const infoWidth = right - left;
 
   const infoRow = (label: string, value: string) => {
     doc.font('Helvetica-Bold').fontSize(9).fillColor('#000000').text(label, infoX, infoY, { width: labelW });
-    doc.font('Helvetica').fontSize(9).fillColor('#000000').text(value || '-', valueX, infoY, { width: infoWidth - labelW });
+    doc.font('Helvetica').fontSize(9).fillColor('#000000').text(value || '-', infoValueX, infoY, { width: infoWidth - labelW });
     infoY += rowH;
   };
 
@@ -259,12 +259,12 @@ async function renderPdf(order: any): Promise<Buffer> {
   doc.moveTo(tableX, totalsY).lineTo(tableX + tableW, totalsY).lineWidth(1).strokeColor('#D0D0D0').stroke();
 
   const labelX = tableX + tableW - 260;
-  const valueX = tableX + tableW - 10;
+  const totalsValueX = tableX + tableW - 10;
   let ty = totalsY + 10;
 
   const totalsRow = (label: string, value: string) => {
     doc.font('Helvetica-Bold').fontSize(10).fillColor('#111827').text(label, labelX, ty, { width: 180, align: 'right' });
-    doc.font('Helvetica').fontSize(10).fillColor('#111827').text(value, valueX - 70, ty, { width: 70, align: 'right' });
+    doc.font('Helvetica').fontSize(10).fillColor('#111827').text(value, totalsValueX - 70, ty, { width: 70, align: 'right' });
     ty += 14;
   };
 
