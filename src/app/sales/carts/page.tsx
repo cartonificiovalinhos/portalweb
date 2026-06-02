@@ -82,6 +82,7 @@ export default function SalesCartsPage() {
                 throw new Error(d?.error || 'Erro ao limpar carrinhos');
             }
             await loadCarts();
+            window.dispatchEvent(new Event('cart-count-refresh'));
         } catch (e: any) {
             alert(e?.message || String(e));
         } finally {

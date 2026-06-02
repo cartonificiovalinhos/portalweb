@@ -34,6 +34,17 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const [pwError, setPwError] = useState<string | null>(null);
   const activeEntityId = (perms?.activeEntityId ?? null);
 
+  const refreshCartCount = useCallback(async () => {
+    if (status !== 'authenticated' || isLogin) return;
+    try {
+      const res = await fetch('/api/sales/representative/cart-count', { cache: 'no-store' });
+      if (res.ok) {
+        const data = await res.json();
+        setCartCount(data.count || 0);
+      }
+    } catch {}
+  }, [status, isLogin]);
+
   useEffect(() => {
     if (status === "unauthenticated" && !isLogin) {
        window.location.href = "/login";
@@ -81,22 +92,17 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   }, [status, isLogin, perms, autoSelected, onChangeEntity]);
 
   useEffect(() => {
-    const fetchCount = async () => {
-        try {
-            const res = await fetch('/api/sales/representative/cart-count', { cache: 'no-store' });
-            if (res.ok) {
-                const data = await res.json();
-                setCartCount(data.count || 0);
-            }
-        } catch {}
-    };
     if (status === 'authenticated' && !isLogin) {
-        fetchCount();
-        // Update count periodically (30s)
-        const interval = setInterval(fetchCount, 30000); 
-        return () => clearInterval(interval);
+        refreshCartCount();
+        const interval = setInterval(refreshCartCount, 30000);
+        const onRefreshEvent = () => refreshCartCount();
+        window.addEventListener('cart-count-refresh', onRefreshEvent as any);
+        return () => {
+          clearInterval(interval);
+          window.removeEventListener('cart-count-refresh', onRefreshEvent as any);
+        };
     }
-  }, [status, isLogin]);
+  }, [status, isLogin, refreshCartCount]);
 
   if (isLogin) {
     return <main className="min-h-screen">{children}</main>;

@@ -5,6 +5,9 @@ import PDFDocument from 'pdfkit';
 import { PassThrough } from 'stream';
 import path from 'path';
 
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+
 function normalizeDoc(doc: string): string {
   return (doc || '').replace(/\D+/g, '');
 }
@@ -278,38 +281,43 @@ async function renderPdf(order: any): Promise<Buffer> {
 }
 
 export async function GET(_: Request, props: { params: Promise<{ id: string }> }) {
-  const params = await props.params;
-  const session = await getServerSession(authOptions);
-  if (!session?.user) return new Response('Unauthorized', { status: 401 });
+  try {
+    const params = await props.params;
+    const session = await getServerSession(authOptions);
+    if (!session?.user) return new Response('Unauthorized', { status: 401 });
 
-  const id = Number(params.id);
-  if (!Number.isFinite(id) || id <= 0) return new Response('ID inválido', { status: 400 });
+    const id = Number(params.id);
+    if (!Number.isFinite(id) || id <= 0) return new Response('ID inválido', { status: 400 });
 
-  const order = await prisma.salesOrder.findUnique({
-    where: { id: Math.trunc(id) },
-    include: {
-      entity: true,
-      client: true,
-      items: {
-        include: {
-          inventoryItem: { include: { commercialFamily: true } }
-        },
-        orderBy: { id: 'asc' }
+    const order = await prisma.salesOrder.findUnique({
+      where: { id: Math.trunc(id) },
+      include: {
+        entity: true,
+        client: true,
+        items: {
+          include: {
+            inventoryItem: { include: { commercialFamily: true } }
+          },
+          orderBy: { id: 'asc' }
+        }
       }
-    }
-  });
-  if (!order) return new Response('Pedido não encontrado', { status: 404 });
+    });
+    if (!order) return new Response('Pedido não encontrado', { status: 404 });
 
-  const pdf = await renderPdf(order);
-  const code = String((order as any)?.code || (order as any)?.id || 'pedido');
-  const safeName = code.replace(/[^A-Za-z0-9_-]+/g, '_');
+    const pdf = await renderPdf(order);
+    const code = String((order as any)?.code || (order as any)?.id || 'pedido');
+    const safeName = code.replace(/[^A-Za-z0-9_-]+/g, '_');
 
-  return new Response(pdf, {
-    status: 200,
-    headers: {
-      'Content-Type': 'application/pdf',
-      'Content-Disposition': `inline; filename="espelho_${safeName}.pdf"`,
-      'Cache-Control': 'no-store',
-    }
-  });
+    return new Response(pdf, {
+      status: 200,
+      headers: {
+        'Content-Type': 'application/pdf',
+        'Content-Disposition': `inline; filename="espelho_${safeName}.pdf"`,
+        'Cache-Control': 'no-store',
+      }
+    });
+  } catch (err: any) {
+    console.error('mirror-pdf error', err);
+    return new Response(String(err?.message || err || 'Erro ao gerar PDF'), { status: 500 });
+  }
 }
