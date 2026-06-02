@@ -3,6 +3,7 @@ const nextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
+  serverExternalPackages: ['pdfkit'],
   cleanDistDir: false,
   webpack: (config) => {
     config.resolve.alias['@'] = path.resolve(__dirname, 'src');
