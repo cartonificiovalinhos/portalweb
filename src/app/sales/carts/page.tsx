@@ -27,6 +27,7 @@ type ClientWithCart = {
 export default function SalesCartsPage() {
     const [clients, setClients] = useState<ClientWithCart[]>([]);
     const [loading, setLoading] = useState(true);
+    const [clearing, setClearing] = useState(false);
     const router = useRouter();
 
     const loadCarts = async () => {
@@ -71,11 +72,33 @@ export default function SalesCartsPage() {
         }
     };
 
+    const clearAllCarts = async () => {
+        if (!confirm('Confirma limpar todos os carrinhos?')) return;
+        setClearing(true);
+        try {
+            const res = await fetch('/api/sales/representative/carts', { method: 'DELETE' });
+            if (!res.ok) {
+                const d = await res.json().catch(() => ({} as any));
+                throw new Error(d?.error || 'Erro ao limpar carrinhos');
+            }
+            await loadCarts();
+        } catch (e: any) {
+            alert(e?.message || String(e));
+        } finally {
+            setClearing(false);
+        }
+    };
+
     return (
         <div className="space-y-6">
             <div className="flex items-center justify-between">
                 <h1 className="text-xl font-semibold">Vendas • Carrinhos dos Clientes</h1>
-                <button className="px-3 py-2 border rounded" onClick={() => router.back()}>Voltar</button>
+                <div className="flex items-center gap-2">
+                    <button className="px-3 py-2 border rounded bg-white hover:bg-gray-50 disabled:opacity-50" disabled={loading || clearing} onClick={clearAllCarts}>
+                        {clearing ? 'Limpando...' : 'Limpar Carrinho'}
+                    </button>
+                    <button className="px-3 py-2 border rounded" onClick={() => router.back()}>Voltar</button>
+                </div>
             </div>
 
             {loading && <div className="text-gray-600">Carregando...</div>}

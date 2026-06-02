@@ -38,3 +38,25 @@ export async function GET() {
     return NextResponse.json({ error: e.message }, { status: 500 });
   }
 }
+
+export async function DELETE() {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const userId = Number((session.user as any).id);
+
+    const clientReps = await prisma.userClientRep.findMany({
+      where: { userId },
+      select: { clientId: true }
+    });
+    const clientIds = clientReps.map(r => r.clientId);
+    if (clientIds.length === 0) return NextResponse.json({ ok: true, deleted: 0 });
+
+    const result = await prisma.clientCartItem.deleteMany({
+      where: { clientId: { in: clientIds } }
+    });
+    return NextResponse.json({ ok: true, deleted: result.count });
+  } catch (e: any) {
+    return NextResponse.json({ error: e.message }, { status: 500 });
+  }
+}

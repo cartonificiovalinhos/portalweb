@@ -210,6 +210,11 @@ export default function SalesOrdersPage() {
     }
   };
 
+  const openMirrorPdf = (o: SalesOrder) => {
+    if (!o?.id) return;
+    window.open(`/api/sales/orders/${o.id}/mirror-pdf`, "_blank", "noopener,noreferrer");
+  };
+
   const IconBtn = ({ title, onClick, children, disabled = false }: any) => (
     <button
       title={title}
@@ -409,7 +414,7 @@ export default function SalesOrdersPage() {
 
               <div className="mt-2 flex items-center justify-end">
                 <div className="inline-flex">
-                  <IconBtn title="Visualizar" onClick={() => setSelected(o)}><EyeIcon /></IconBtn>
+                  <IconBtn title="Espelho PDF" onClick={() => openMirrorPdf(o)}><EyeIcon /></IconBtn>
                   <IconBtn title="Detalhes" onClick={() => { window.location.href = `/sales/orders/${o.id}`; }}> <FileIcon /> </IconBtn>
                   {Boolean((o as any)?.canApproveCommercial) && (
                     <>
@@ -489,7 +494,7 @@ export default function SalesOrdersPage() {
                   <td className="px-3 py-2 text-xs text-gray-700">{String((o as any)?.createdBy?.abbrevName || '-')}</td>
                   <td className="px-3 py-2 text-center">
                     <div className="inline-flex">
-                      <IconBtn title="Visualizar" onClick={() => setSelected(o)}><EyeIcon /></IconBtn>
+                      <IconBtn title="Espelho PDF" onClick={() => openMirrorPdf(o)}><EyeIcon /></IconBtn>
                       <IconBtn title="Detalhes" onClick={() => { window.location.href = `/sales/orders/${o.id}`; }}> <FileIcon /> </IconBtn>
                       {Boolean((o as any)?.canApproveCommercial) && (
                         <>
