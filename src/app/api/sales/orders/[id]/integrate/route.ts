@@ -115,6 +115,7 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
               orderId: order.id,
               sku: item.sku || item.inventoryItem?.sku || "",
               quantity: item.quantity,
+              unitPrice: Number((item as any).unitPrice ?? 0),
               discountPct: Number((item as any).discountPct ?? 0),
               diameter: item.diameter || 0,
               grammage: item.grammage || 0,
