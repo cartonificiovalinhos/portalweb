@@ -32,7 +32,8 @@ type SalesOrder = {
   orderDate: string; 
   customerName: string; 
   customerDoc?: string | null; 
-  total: number; 
+  total: number;
+  totalWithTax?: number | null;
   items?: OrderItem[];
 };
 type LinkedItem = { id: number; name: string; sku?: string | null; unit?: string | null; unitPrice?: number; width?: number; length?: number; grammage?: number };
@@ -765,12 +766,12 @@ export default function ClientDetailsPage() {
 
   const cartCount = cartItems.length;
 
-  const orderTotal = (o: SalesOrder) =>
-    (o.items || []).reduce((acc, item) => {
-      const total = item.quantity * item.unitPrice;
-      const discount = total * (item.discountPct / 100);
-      return acc + (total - discount);
-    }, 0);
+  const orderTotal = (o: SalesOrder) => {
+    const withTax = Number(o?.totalWithTax ?? 0);
+    if (Number.isFinite(withTax) && withTax > 0) return withTax;
+    const fallback = Number(o?.total ?? 0);
+    return Number.isFinite(fallback) ? fallback : 0;
+  };
 
   const ordersTotalPages = Math.max(1, Math.ceil(orders.length / PAGE_SIZE));
   const paymentTermsTotalPages = Math.max(1, Math.ceil(paymentTerms.length / PAGE_SIZE));
