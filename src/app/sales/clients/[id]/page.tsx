@@ -810,14 +810,30 @@ export default function ClientDetailsPage() {
         <div className="border rounded bg-white p-4">
           <div className="flex items-start justify-between gap-4">
             <div className="flex flex-col xl:flex-row justify-between gap-4 flex-1 text-sm">
-              <div className="flex flex-col gap-2">
-                <div className="whitespace-nowrap"><span className="text-gray-600">Cód Cliente:</span> <span className="font-medium ml-1">{client.clientCode != null ? client.clientCode : '-'}</span></div>
-                <div className="whitespace-nowrap"><span className="text-gray-600">Nome Abreviado:</span> <span className="font-medium ml-1">{client.abbrevName || '-'}</span></div>
-                <div className="whitespace-nowrap"><span className="text-gray-600">CPF/CNPJ:</span> <span className="font-medium ml-1">{formatDoc(client.doc)}</span></div>
-                <div className="whitespace-nowrap"><span className="text-gray-600">Nome:</span> <span className="font-medium ml-1">{client.name}</span></div>
-                <div className="flex gap-4">
-                  <div className="whitespace-nowrap"><span className="text-gray-600">Cidade:</span> <span className="font-medium ml-1">{client.cidade || '-'}</span></div>
-                  <div className="whitespace-nowrap"><span className="text-gray-600">UF:</span> <span className="font-medium ml-1">{client.estado || '-'}</span></div>
+              <div className="grid gap-y-2">
+                <div className="grid grid-cols-[130px_minmax(0,1fr)] items-baseline gap-x-2">
+                  <span className="text-gray-600 whitespace-nowrap">Cód Cliente:</span>
+                  <span className="font-medium">{client.clientCode != null ? client.clientCode : '-'}</span>
+                </div>
+                <div className="grid grid-cols-[130px_minmax(0,1fr)] items-baseline gap-x-2">
+                  <span className="text-gray-600 whitespace-nowrap">Nome Abreviado:</span>
+                  <span className="font-medium">{client.abbrevName || '-'}</span>
+                </div>
+                <div className="grid grid-cols-[130px_minmax(0,1fr)] items-baseline gap-x-2">
+                  <span className="text-gray-600 whitespace-nowrap">CPF/CNPJ:</span>
+                  <span className="font-medium">{formatDoc(client.doc)}</span>
+                </div>
+                <div className="grid grid-cols-[130px_minmax(0,1fr)] items-baseline gap-x-2">
+                  <span className="text-gray-600 whitespace-nowrap">Nome:</span>
+                  <span className="font-medium">{client.name}</span>
+                </div>
+                <div className="grid grid-cols-[130px_minmax(0,1fr)] items-baseline gap-x-2">
+                  <span className="text-gray-600 whitespace-nowrap">Cidade:</span>
+                  <div className="flex items-baseline gap-4">
+                    <span className="font-medium">{client.cidade || '-'}</span>
+                    <span className="text-gray-600 whitespace-nowrap">UF:</span>
+                    <span className="font-medium">{client.estado || '-'}</span>
+                  </div>
                 </div>
               </div>
               
