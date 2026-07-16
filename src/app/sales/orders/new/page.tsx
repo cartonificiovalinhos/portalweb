@@ -355,6 +355,7 @@ function NewSalesOrderContent() {
   const [searchResults, setSearchResults] = useState<InventoryItem[]>([]);
   const [searchLoading, setSearchLoading] = useState(false);
   const [totalWithTax, setTotalWithTax] = useState(0);
+  const [generatingPdf, setGeneratingPdf] = useState(false);
 
     const searchClientItems = async (term: string) => {
     if (!order.customerId) {
@@ -531,6 +532,59 @@ function NewSalesOrderContent() {
     }
   };
 
+  const handlePreviewPdf = async () => {
+    const previewWindow = window.open('', '_blank');
+    if (previewWindow) {
+      previewWindow.document.write('<html><body style="font-family:Arial,Helvetica,sans-serif;padding:16px">Gerando PDF...</body></html>');
+      previewWindow.document.close();
+    }
+
+    setGeneratingPdf(true);
+    try {
+      const payload = {
+        ...order,
+        code: order.code || 'RASCUNHO',
+        status: order.status || 'Novo',
+        orderDate: order.orderDate || new Date().toISOString(),
+        entity: sessionEntity ? { name: sessionEntity.name, cnpj: sessionEntity.cnpj } : undefined,
+        items: (order.items || []).map((it) => ({
+          ...it,
+          inventoryItem: it.inventoryItem
+            ? {
+                ...it.inventoryItem,
+                commercialFamily: it.inventoryItem.commercialFamily || undefined,
+              }
+            : undefined,
+        })),
+      };
+
+      const res = await fetch('/api/sales/orders/preview-pdf', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        const message = await res.text().catch(() => 'Falha ao gerar PDF');
+        throw new Error(message || 'Falha ao gerar PDF');
+      }
+
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      if (previewWindow) {
+        previewWindow.location.href = url;
+      } else {
+        window.open(url, '_blank', 'noopener,noreferrer');
+      }
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+    } catch (e: any) {
+      if (previewWindow) previewWindow.close();
+      alert(e?.message || String(e));
+    } finally {
+      setGeneratingPdf(false);
+    }
+  };
+
   const computeWeightKg = (it: OrderItem): number => {
     const hasDims = supportsSheetDims(it);
     if (hasDims) {
@@ -657,6 +711,26 @@ function NewSalesOrderContent() {
                 </div>
 
                 <div className="flex items-center gap-2 sm:justify-end">
+                  <button
+                    className={`${ICON_BTN} ${generatingPdf ? 'opacity-50 cursor-wait' : ''}`}
+                    title="Imprimir pedido"
+                    aria-label="Imprimir pedido"
+                    onClick={handlePreviewPdf}
+                    disabled={generatingPdf}
+                  >
+                    {generatingPdf ? (
+                      <svg className="animate-spin h-4 w-4 text-gray-700" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                    ) : (
+                      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M6 9V3h12v6"></path>
+                        <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
+                        <rect x="6" y="14" width="12" height="8"></rect>
+                      </svg>
+                    )}
+                  </button>
                   <button className={`${ICON_BTN} opacity-50 cursor-not-allowed`} title="Enviar para ERP (Desabilitado)" disabled>
                     <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
                   </button>

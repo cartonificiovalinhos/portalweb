@@ -355,6 +355,11 @@ export default function SalesOrderMaintenancePage() {
     }
   };
 
+  const openMirrorPdf = () => {
+    if (!order?.id) return;
+    window.open(`/api/sales/orders/${order.id}/mirror-pdf`, "_blank", "noopener,noreferrer");
+  };
+
   const handleSimulateTaxes = async () => {
     if (!order) return;
     setSimulating(true);
@@ -729,6 +734,18 @@ export default function SalesOrderMaintenancePage() {
                   </div>
 
                   <div className="flex items-center gap-2 sm:justify-end">
+                    <button
+                      className={ICON_BTN}
+                      title="Imprimir pedido"
+                      aria-label="Imprimir pedido"
+                      onClick={openMirrorPdf}
+                    >
+                      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M6 9V3h12v6"></path>
+                        <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
+                        <rect x="6" y="14" width="12" height="8"></rect>
+                      </svg>
+                    </button>
                     <button className={`${ICON_BTN} ${integrating || !isEditableStatus(order?.status) || isHeaderEditing ? 'opacity-50 cursor-not-allowed' : ''}`} title="Enviar para ERP" aria-label="Enviar para ERP" disabled={integrating || !isEditableStatus(order?.status) || isHeaderEditing} style={{ opacity: integrating || !isEditableStatus(order?.status) || isHeaderEditing ? 0.5 : 1, pointerEvents: integrating || !isEditableStatus(order?.status) || isHeaderEditing ? 'none' : 'auto' }} onClick={async () => {
                   if (!order) return;
                   try {
