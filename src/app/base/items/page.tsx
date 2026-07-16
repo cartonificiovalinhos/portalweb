@@ -6,6 +6,9 @@ type Item = {
   name: string;
   sku?: string | null;
   unit?: string | null;
+  width?: number | null;
+  length?: number | null;
+  grammage?: number | null;
   commercialFamilyId?: number | null;
   commercialFamily?: { id: number; description: string } | null;
 };
@@ -23,7 +26,7 @@ export default function BaseItemMaintenancePage() {
   // Formulário unificado (inclusão/alteração)
   const [formOpen, setFormOpen] = useState<boolean>(false);
   const [editingId, setEditingId] = useState<number | null>(null);
-  const [form, setForm] = useState<{ sku: string; name: string; unit: string; commercialFamilyId: number | null }>({ sku: "", name: "", unit: "", commercialFamilyId: null });
+  const [form, setForm] = useState<{ sku: string; name: string; unit: string; width: string; length: string; grammage: string; commercialFamilyId: number | null }>({ sku: "", name: "", unit: "", width: "", length: "", grammage: "", commercialFamilyId: null });
   const [saving, setSaving] = useState<boolean>(false);
   const [saveMsg, setSaveMsg] = useState<string>("");
   // Busca de família comercial
@@ -101,7 +104,7 @@ export default function BaseItemMaintenancePage() {
 
   const openAddForm = () => {
     setEditingId(null);
-    setForm({ sku: "", name: "", unit: "", commercialFamilyId: null });
+    setForm({ sku: "", name: "", unit: "", width: "", length: "", grammage: "", commercialFamilyId: null });
     setFamilyQuery("");
     setFamilySug([]);
     setShowFamilySug(false);
@@ -110,9 +113,31 @@ export default function BaseItemMaintenancePage() {
     setFormOpen(true);
   };
 
-  const openEditForm = (item: Item) => {
+  const openEditForm = async (item: Item) => {
     setEditingId(item.id);
-    setForm({ sku: item.sku || "", name: item.name || "", unit: item.unit || "", commercialFamilyId: item.commercialFamilyId ?? null });
+    try {
+      const r = await fetch(`/api/items/${item.id}`, { cache: 'no-store' });
+      const full = r.ok ? await r.json() : item;
+      setForm({
+        sku: full?.sku || "",
+        name: full?.name || "",
+        unit: full?.unit || "",
+        width: full?.width != null ? String(full.width) : "",
+        length: full?.length != null ? String(full.length) : "",
+        grammage: full?.grammage != null ? String(full.grammage) : "",
+        commercialFamilyId: full?.commercialFamilyId ?? item.commercialFamilyId ?? null
+      });
+    } catch {
+      setForm({
+        sku: item.sku || "",
+        name: item.name || "",
+        unit: item.unit || "",
+        width: item.width != null ? String(item.width) : "",
+        length: item.length != null ? String(item.length) : "",
+        grammage: item.grammage != null ? String(item.grammage) : "",
+        commercialFamilyId: item.commercialFamilyId ?? null
+      });
+    }
     setFamilyQuery(item.commercialFamily?.description || "");
     setShowFamilySug(false);
     // Carregar disponibilidade
@@ -126,7 +151,7 @@ export default function BaseItemMaintenancePage() {
   const cancelForm = () => {
     setFormOpen(false);
     setEditingId(null);
-    setForm({ sku: "", name: "", unit: "", commercialFamilyId: null });
+    setForm({ sku: "", name: "", unit: "", width: "", length: "", grammage: "", commercialFamilyId: null });
     setFamilyQuery("");
     setFamilySug([]);
     setShowFamilySug(false);
@@ -138,7 +163,15 @@ export default function BaseItemMaintenancePage() {
     if (saving) return;
     setSaveMsg("");
     setSaving(true);
-    const payload = { sku: form.sku.trim(), name: form.name.trim(), unit: form.unit.trim(), commercialFamilyId: form.commercialFamilyId };
+    const payload = {
+      sku: form.sku.trim(),
+      name: form.name.trim(),
+      unit: form.unit.trim(),
+      width: form.width.trim() === '' ? null : Number(form.width),
+      length: form.length.trim() === '' ? null : Number(form.length),
+      grammage: form.grammage.trim() === '' ? null : Number(form.grammage),
+      commercialFamilyId: form.commercialFamilyId
+    };
     try {
       if (editingId) {
         const res = await fetch(`/api/items/${editingId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
@@ -233,6 +266,18 @@ export default function BaseItemMaintenancePage() {
                 <div>
                   <label className="text-xs text-gray-600">Unidade de medida</label>
                   <input value={form.unit} onChange={(e)=>setForm((f)=>({ ...f, unit: e.target.value }))} className="w-full border rounded px-2 py-1 text-sm" />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-600">Largura</label>
+                  <input value={form.width} onChange={(e)=>setForm((f)=>({ ...f, width: e.target.value }))} className="w-full border rounded px-2 py-1 text-sm" />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-600">Comprimento</label>
+                  <input value={form.length} onChange={(e)=>setForm((f)=>({ ...f, length: e.target.value }))} className="w-full border rounded px-2 py-1 text-sm" />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-600">Gramatura</label>
+                  <input value={form.grammage} onChange={(e)=>setForm((f)=>({ ...f, grammage: e.target.value }))} className="w-full border rounded px-2 py-1 text-sm" />
                 </div>
                 <div className="md:col-span-2">
                   <label className="text-xs text-gray-600">Família Comercial</label>

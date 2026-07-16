@@ -21,6 +21,9 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
     if (body.name !== undefined) data.name = String(body.name || '').trim();
     if (body.sku !== undefined) data.sku = String(body.sku || '').trim();
     if (body.unit !== undefined) data.unit = String(body.unit || '').trim();
+    if (body.width !== undefined) data.width = body.width === null || body.width === '' ? null : Number(body.width);
+    if (body.length !== undefined) data.length = body.length === null || body.length === '' ? null : Number(body.length);
+    if (body.grammage !== undefined) data.grammage = body.grammage === null || body.grammage === '' ? null : Number(body.grammage);
     if (body.commercialFamilyId !== undefined) {
       const cfid = Number(body.commercialFamilyId);
       if (Number.isFinite(cfid) && cfid > 0) {
