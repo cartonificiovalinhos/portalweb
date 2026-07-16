@@ -49,6 +49,13 @@ function fmtInt(n: any): string {
   return Math.round(safe).toLocaleString('pt-BR');
 }
 
+function fmtDate(n: any): string {
+  if (!n) return '';
+  const d = n instanceof Date ? n : new Date(n);
+  if (isNaN(d.getTime())) return '';
+  return d.toLocaleDateString('pt-BR');
+}
+
 export function salesOrderPdfFileName(order: any): string {
   const code = String(order?.code || order?.id || 'pedido');
   const safeName = code.replace(/[^A-Za-z0-9_-]+/g, '_');
@@ -127,18 +134,19 @@ export async function renderSalesOrderPdf(order: any): Promise<Buffer> {
   const tableX = left;
   const tableW = right - left;
   const colDefs = [
-    { key: 'name', label: 'Item', w: 220, align: 'left' as const },
-    { key: 'sku', label: 'SKU', w: 70, align: 'left' as const },
-    { key: 'width', label: 'Larg.', w: 45, align: 'right' as const },
-    { key: 'length', label: 'Compr.', w: 55, align: 'right' as const },
-    { key: 'grammage', label: 'Gram.', w: 45, align: 'right' as const },
-    { key: 'itemUnit', label: 'UM', w: 35, align: 'left' as const },
-    { key: 'quantity', label: 'Qtd', w: 45, align: 'right' as const },
-    { key: 'weightKg', label: 'Peso (KG)', w: 60, align: 'right' as const },
-    { key: 'priceUnit', label: 'UM', w: 35, align: 'left' as const },
-    { key: 'unitPrice', label: 'Preço', w: 55, align: 'right' as const },
-    { key: 'pricePerPc', label: 'Preço/PC', w: 65, align: 'right' as const },
-    { key: 'discountPct', label: 'Desc (%)', w: 55, align: 'right' as const },
+    { key: 'name', label: 'Item', w: 255, align: 'left' as const },
+    { key: 'sku', label: 'SKU', w: 48, align: 'left' as const },
+    { key: 'itemDeliveryDate', label: 'Dt Entrega', w: 62, align: 'left' as const },
+    { key: 'width', label: 'Larg.', w: 38, align: 'right' as const },
+    { key: 'length', label: 'Compr.', w: 42, align: 'right' as const },
+    { key: 'grammage', label: 'Gram.', w: 38, align: 'right' as const },
+    { key: 'itemUnit', label: 'UM', w: 22, align: 'left' as const },
+    { key: 'quantity', label: 'Qtd', w: 40, align: 'right' as const },
+    { key: 'weightKg', label: 'Peso (KG)', w: 54, align: 'right' as const },
+    { key: 'priceUnit', label: 'UM', w: 22, align: 'left' as const },
+    { key: 'unitPrice', label: 'Preço', w: 48, align: 'right' as const },
+    { key: 'pricePerPc', label: 'Preço/PC', w: 50, align: 'right' as const },
+    { key: 'discountPct', label: 'Desc (%)', w: 40, align: 'right' as const },
   ];
 
   const fixedW = colDefs.reduce((s, c) => s + c.w, 0);
@@ -150,10 +158,10 @@ export async function renderSalesOrderPdf(order: any): Promise<Buffer> {
   const drawHeader = (y: number) => {
     doc.save();
     doc.rect(tableX, y, tableW, 20).fill('#F3F4F6');
-    doc.fillColor('#111827').font('Helvetica-Bold').fontSize(9);
+    doc.fillColor('#111827').font('Helvetica-Bold').fontSize(8.5);
     let x = tableX;
     for (const c of colDefs) {
-      doc.text(c.label, x + 4, y + 6, { width: c.w - 8, align: c.align });
+      doc.text(c.label, x + 2, y + 6, { width: c.w - 4, align: c.align });
       x += c.w;
     }
     doc.restore();
@@ -171,12 +179,12 @@ export async function renderSalesOrderPdf(order: any): Promise<Buffer> {
   const drawRow = (y: number, row: any) => {
     doc.save();
     doc.rect(tableX, y, tableW, 18).fill('#FFFFFF');
-    doc.fillColor('#111827').font('Helvetica').fontSize(9);
+    doc.fillColor('#111827').font('Helvetica').fontSize(8.2);
     let x = tableX;
     for (const c of colDefs) {
       const v = row[c.key];
       const txt = v == null ? '' : String(v);
-      doc.text(txt, x + 4, y + 5, { width: c.w - 8, align: c.align, ellipsis: true });
+      doc.text(txt, x + 2, y + 5, { width: c.w - 4, align: c.align, ellipsis: true });
       x += c.w;
     }
     doc.restore();
@@ -236,6 +244,7 @@ export async function renderSalesOrderPdf(order: any): Promise<Buffer> {
       drawRow(y, {
         name: String(it?.name || ''),
         sku: String(it?.sku || it?.inventoryItem?.sku || ''),
+        itemDeliveryDate: fmtDate(it?.itemDeliveryDate),
         width: it?.width ? fmtInt(it.width) : '',
         length: it?.length ? fmtInt(it.length) : '',
         grammage: it?.grammage ? fmtInt(it.grammage) : '',
