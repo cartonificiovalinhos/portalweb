@@ -150,25 +150,29 @@ export default function SalesClientsPage() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-xl font-semibold">Força de Vendas • Clientes</h1>
+      <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+        <div className="space-y-4 xl:max-w-md xl:flex-1">
+          <h1 className="text-xl font-semibold">Força de Vendas • Clientes</h1>
 
-      <div className="flex gap-2 items-center">
-        <input
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          placeholder="Buscar por nome, cidade, UF, doc ou ID"
-          className="border px-3 py-2 rounded w-full max-w-md shadow-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
-        />
-      </div>
-
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:max-w-2xl xl:ml-auto">
-        <div className="rounded-lg border bg-white px-4 py-3 shadow-sm">
-          <div className="text-xs font-medium uppercase tracking-wide text-gray-500">Títulos a Vencer</div>
-          <div className="mt-1 text-2xl font-semibold text-gray-900">{fmtCurrency(totals.titlesDue)}</div>
+          <div className="flex gap-2 items-center">
+            <input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Buscar por nome, cidade, UF, doc ou ID"
+              className="border px-3 py-2 rounded w-full shadow-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
+            />
+          </div>
         </div>
-        <div className="rounded-lg border bg-white px-4 py-3 shadow-sm">
-          <div className="text-xs font-medium uppercase tracking-wide text-gray-500">Títulos Vencidos</div>
-          <div className="mt-1 text-2xl font-semibold text-red-600">{fmtCurrency(totals.titlesOverdue)}</div>
+
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:w-full xl:max-w-2xl xl:self-start">
+          <div className="rounded-lg border bg-white px-4 py-3 shadow-sm">
+            <div className="text-xs font-medium uppercase tracking-wide text-gray-500">Títulos a Vencer</div>
+            <div className="mt-1 text-2xl font-semibold text-gray-900">{fmtCurrency(totals.titlesDue)}</div>
+          </div>
+          <div className="rounded-lg border bg-white px-4 py-3 shadow-sm">
+            <div className="text-xs font-medium uppercase tracking-wide text-gray-500">Títulos Vencidos</div>
+            <div className="mt-1 text-2xl font-semibold text-red-600">{fmtCurrency(totals.titlesOverdue)}</div>
+          </div>
         </div>
       </div>
 
