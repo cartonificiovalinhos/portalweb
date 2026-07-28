@@ -79,6 +79,17 @@ export default function SalesClientsPage() {
     return sorted;
   }, [items, sortDirection, sortKey]);
 
+  const totals = useMemo(() => {
+    return items.reduce(
+      (acc, client) => {
+        acc.titlesDue += Number(client.titlesDue ?? 0);
+        acc.titlesOverdue += Number(client.titlesOverdue ?? 0);
+        return acc;
+      },
+      { titlesDue: 0, titlesOverdue: 0 }
+    );
+  }, [items]);
+
   const toggleSort = (key: SortKey) => {
     if (sortKey === key) {
       setSortDirection((prev) => (prev === "asc" ? "desc" : "asc"));
@@ -148,6 +159,17 @@ export default function SalesClientsPage() {
           placeholder="Buscar por nome, cidade, UF, doc ou ID"
           className="border px-3 py-2 rounded w-full max-w-md shadow-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
         />
+      </div>
+
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:max-w-2xl xl:ml-auto">
+        <div className="rounded-lg border bg-white px-4 py-3 shadow-sm">
+          <div className="text-xs font-medium uppercase tracking-wide text-gray-500">Títulos a Vencer</div>
+          <div className="mt-1 text-2xl font-semibold text-gray-900">{fmtCurrency(totals.titlesDue)}</div>
+        </div>
+        <div className="rounded-lg border bg-white px-4 py-3 shadow-sm">
+          <div className="text-xs font-medium uppercase tracking-wide text-gray-500">Títulos Vencidos</div>
+          <div className="mt-1 text-2xl font-semibold text-red-600">{fmtCurrency(totals.titlesOverdue)}</div>
+        </div>
       </div>
 
       <div className="border rounded bg-white shadow-sm overflow-hidden">
