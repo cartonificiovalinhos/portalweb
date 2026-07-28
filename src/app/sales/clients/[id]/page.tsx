@@ -1954,6 +1954,7 @@ export default function ClientDetailsPage() {
 
             <div className="px-3 py-2 border-b flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
               <div className="flex flex-wrap items-center gap-4">
+                <span className="text-gray-600 font-medium">Status Vencto.:</span>
                 <label className="inline-flex items-center gap-2">
                   <input type="radio" name="invoiceFilter" checked={invoiceFilter === 'due'} onChange={() => setInvoiceFilter('due')} />
                   <span>À Vencer</span>
@@ -1968,6 +1969,7 @@ export default function ClientDetailsPage() {
                 </label>
               </div>
               <div className="flex flex-wrap items-center gap-4">
+                <span className="text-gray-600 font-medium">Status Pagto.:</span>
                 <label className="inline-flex items-center gap-2">
                   <input type="radio" name="invoiceStatusFilter" checked={invoiceStatusFilter === 'paid'} onChange={() => setInvoiceStatusFilter('paid')} />
                   <span>Pago</span>
