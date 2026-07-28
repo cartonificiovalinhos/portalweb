@@ -5,6 +5,39 @@ function normalizeDoc(doc: string): string {
   return (doc || '').replace(/\D+/g, '');
 }
 
+async function computeInvoiceTotals(clientId: number) {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const invoices = await prisma.clientInvoice.findMany({
+    where: { clientId: Math.trunc(clientId) },
+    select: {
+      dueDate: true,
+      status: true,
+      totalValue: true,
+    },
+  });
+
+  let titlesDue = 0;
+  let titlesOverdue = 0;
+
+  for (const inv of invoices) {
+    const status = String(inv.status || '').trim().toUpperCase();
+    if (status === 'PAGA') continue;
+    if (!inv.dueDate) continue;
+
+    const due = new Date(inv.dueDate);
+    due.setHours(0, 0, 0, 0);
+    const amount = Number(inv.totalValue || 0);
+    if (!Number.isFinite(amount)) continue;
+
+    if (due < today) titlesOverdue += amount;
+    else titlesDue += amount;
+  }
+
+  return { titlesDue, titlesOverdue };
+}
+
 async function ensurePaymentTermByCode(code: number): Promise<number | null> {
   const c = Number(code);
   if (!Number.isFinite(c) || c <= 0) return null;
@@ -138,8 +171,11 @@ export async function GET(_: Request, props: { params: Promise<{ id: string }> }
       },
     });
     if (!client) return NextResponse.json({ error: 'Cliente não encontrado' }, { status: 404 });
+    const totals = await computeInvoiceTotals(client.id);
     return NextResponse.json({
       ...client,
+      titlesDue: totals.titlesDue,
+      titlesOverdue: totals.titlesOverdue,
       paymentTermCode: client.paymentTerm?.code ?? null,
       paymentTermDescription: client.paymentTerm?.description ?? null,
     });
@@ -253,8 +289,11 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
       return row;
     });
 
+    const totals = await computeInvoiceTotals(updated.id);
     return NextResponse.json({
       ...updated,
+      titlesDue: totals.titlesDue,
+      titlesOverdue: totals.titlesOverdue,
       paymentTermCode: updated.paymentTerm?.code ?? null,
       paymentTermDescription: updated.paymentTerm?.description ?? null,
     });

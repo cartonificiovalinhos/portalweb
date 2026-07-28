@@ -81,6 +81,26 @@ const formatCalendarDateBr = (value?: string | null) => {
   return parsed ? parsed.toLocaleDateString('pt-BR') : '-';
 };
 
+const summarizeInvoiceTotals = (invoices: ClientInvoice[]) => {
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  let titlesDue = 0;
+  let titlesOverdue = 0;
+
+  for (const inv of invoices) {
+    const status = String(inv.status || '').trim().toUpperCase();
+    if (status === 'PAGA') continue;
+    const due = parseCalendarDate(inv.dueDate);
+    if (!due) continue;
+    const amount = Number(inv.totalValue || 0);
+    if (!Number.isFinite(amount)) continue;
+    if (due < today) titlesOverdue += amount;
+    else titlesDue += amount;
+  }
+
+  return { titlesDue, titlesOverdue };
+};
+
 const statusColor = (s: string) => {
   const v = (s || '').trim();
   switch (v) {
@@ -359,10 +379,9 @@ export default function ClientDetailsPage() {
     const load = async () => {
       setLoading(true); setError(null);
       try {
-        const res = await fetch(`/api/base/clients?q=${encodeURIComponent(String(id))}`, { cache: 'no-store' });
+        const res = await fetch(`/api/base/clients/${encodeURIComponent(String(id))}`, { cache: 'no-store' });
         if (!res.ok) throw new Error('Falha ao carregar cliente');
-        const arr: Client[] = await res.json();
-        const c = (arr || []).find((x) => Number(x.id) === id) || null;
+        const c: Client | null = await res.json();
         setClient(c);
         try {
           const ptRes = await fetch(`/api/base/payment-terms?clientId=${encodeURIComponent(String(id))}`, { cache: 'no-store' });
@@ -431,7 +450,10 @@ export default function ClientDetailsPage() {
     try {
       const r = await fetch(`/api/clients/${encodeURIComponent(String(id))}/invoices?filter=all`, { cache: 'no-store' });
       const j = await r.json();
-      setClientInvoices(Array.isArray(j) ? j : []);
+      const invoices = Array.isArray(j) ? j : [];
+      setClientInvoices(invoices);
+      const totals = summarizeInvoiceTotals(invoices);
+      setClient((prev) => prev ? { ...prev, titlesDue: totals.titlesDue, titlesOverdue: totals.titlesOverdue } : prev);
     } catch {
       setClientInvoices([]);
     } finally {
