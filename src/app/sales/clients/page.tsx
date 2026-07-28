@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
 type Client = {
@@ -17,6 +17,9 @@ type Client = {
   titlesOverdue?: number;
 };
 
+type SortKey = "doc" | "abbrevName" | "name" | "titlesDue" | "titlesOverdue" | "cidade" | "estado";
+type SortDirection = "asc" | "desc";
+
 function maskDoc(doc?: string | null): string {
   const d = String(doc || "").replace(/\D+/g, "");
   if (d.length === 14) return d.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, "$1.$2.$3/$4-$5");
@@ -28,15 +31,89 @@ function fmtCurrency(value?: number | null): string {
   return Number(value ?? 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
+function normalizeText(value?: string | null): string {
+  return String(value || "").trim().toLocaleLowerCase("pt-BR");
+}
+
 export default function SalesClientsPage() {
   const router = useRouter();
   const [items, setItems] = useState<Client[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [q, setQ] = useState("");
+  const [sortKey, setSortKey] = useState<SortKey>("name");
+  const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
   const openClient = (id: number) => {
     router.push(`/sales/clients/${id}`);
   };
+
+  const sortedItems = useMemo(() => {
+    const sorted = [...items];
+    sorted.sort((a, b) => {
+      let compare = 0;
+      switch (sortKey) {
+        case "doc":
+          compare = normalizeText(a.doc).localeCompare(normalizeText(b.doc), "pt-BR", { numeric: true });
+          break;
+        case "abbrevName":
+          compare = normalizeText(a.abbrevName).localeCompare(normalizeText(b.abbrevName), "pt-BR", { numeric: true });
+          break;
+        case "name":
+          compare = normalizeText(a.name).localeCompare(normalizeText(b.name), "pt-BR", { numeric: true });
+          break;
+        case "titlesDue":
+          compare = Number(a.titlesDue ?? 0) - Number(b.titlesDue ?? 0);
+          break;
+        case "titlesOverdue":
+          compare = Number(a.titlesOverdue ?? 0) - Number(b.titlesOverdue ?? 0);
+          break;
+        case "cidade":
+          compare = normalizeText(a.cidade).localeCompare(normalizeText(b.cidade), "pt-BR", { numeric: true });
+          break;
+        case "estado":
+          compare = normalizeText(a.estado).localeCompare(normalizeText(b.estado), "pt-BR", { numeric: true });
+          break;
+      }
+      return sortDirection === "asc" ? compare : -compare;
+    });
+    return sorted;
+  }, [items, sortDirection, sortKey]);
+
+  const toggleSort = (key: SortKey) => {
+    if (sortKey === key) {
+      setSortDirection((prev) => (prev === "asc" ? "desc" : "asc"));
+      return;
+    }
+    setSortKey(key);
+    setSortDirection("asc");
+  };
+
+  const SortArrow = ({ column }: { column: SortKey }) => {
+    const isActive = sortKey === column;
+    const arrow = !isActive ? "↕" : sortDirection === "asc" ? "↑" : "↓";
+    return <span className={`text-xs ${isActive ? "text-blue-600" : "text-gray-400"}`}>{arrow}</span>;
+  };
+
+  const SortHeader = ({
+    column,
+    label,
+    align = "left",
+  }: {
+    column: SortKey;
+    label: string;
+    align?: "left" | "right";
+  }) => (
+    <th className={`p-2 font-medium text-gray-600 ${align === "right" ? "text-right" : "text-left"}`}>
+      <button
+        type="button"
+        className={`inline-flex items-center gap-1 hover:text-blue-600 ${align === "right" ? "justify-end w-full" : ""}`}
+        onClick={() => toggleSort(column)}
+      >
+        <span>{label}</span>
+        <SortArrow column={column} />
+      </button>
+    </th>
+  );
 
   const load = async (query: string) => {
     setLoading(true);
@@ -75,7 +152,7 @@ export default function SalesClientsPage() {
 
       <div className="border rounded bg-white shadow-sm overflow-hidden">
         <div className="sm:hidden divide-y">
-          {items.map((c) => (
+          {sortedItems.map((c) => (
             <div
               key={c.id}
               className="p-2 cursor-pointer hover:bg-blue-50 transition-colors"
@@ -110,17 +187,17 @@ export default function SalesClientsPage() {
           <table className="min-w-full text-sm">
             <thead className="bg-gray-50 border-b">
               <tr>
-                <th className="text-left p-2 font-medium text-gray-600">Doc</th>
-                <th className="text-left p-2 font-medium text-gray-600">Nome Abreviado</th>
-                <th className="text-left p-2 font-medium text-gray-600">Nome</th>
-                <th className="text-right p-2 font-medium text-gray-600">Títulos a Vencer</th>
-                <th className="text-right p-2 font-medium text-gray-600">Títulos Vencidos</th>
-                <th className="text-left p-2 font-medium text-gray-600">Cidade</th>
-                <th className="text-left p-2 font-medium text-gray-600">Estado</th>
+                <SortHeader column="doc" label="Doc" />
+                <SortHeader column="abbrevName" label="Nome Abreviado" />
+                <SortHeader column="name" label="Nome" />
+                <SortHeader column="titlesDue" label="Títulos a Vencer" align="right" />
+                <SortHeader column="titlesOverdue" label="Títulos Vencidos" align="right" />
+                <SortHeader column="cidade" label="Cidade" />
+                <SortHeader column="estado" label="Estado" />
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {items.map((c) => (
+              {sortedItems.map((c) => (
                 <tr
                   key={c.id}
                   className="cursor-pointer hover:bg-blue-50 transition-colors"
