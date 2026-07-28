@@ -227,6 +227,7 @@ export default function ClientDetailsPage() {
   const [savingContactStatusId, setSavingContactStatusId] = useState<number | null>(null);
 
   const [invoiceFilter, setInvoiceFilter] = useState<'due' | 'overdue' | 'all'>('due');
+  const [invoiceStatusFilter, setInvoiceStatusFilter] = useState<'paid' | 'open' | 'all'>('all');
   const [clientInvoices, setClientInvoices] = useState<ClientInvoice[]>([]);
   const [loadingInvoices, setLoadingInvoices] = useState(false);
 
@@ -441,21 +442,28 @@ export default function ClientDetailsPage() {
       return !isPaid(inv) && d != null && d < today;
     };
 
+    let filtered = clientInvoices;
+
     if (invoiceFilter === 'due') {
-      return clientInvoices.filter((inv) => {
+      filtered = filtered.filter((inv) => {
         if (isPaid(inv)) return false;
         const d = dueDate(inv);
         if (!d) return false;
         return d >= today;
       });
     }
-
-    if (invoiceFilter === 'overdue') {
-      return clientInvoices.filter((inv) => isOverdue(inv));
+    else if (invoiceFilter === 'overdue') {
+      filtered = filtered.filter((inv) => isOverdue(inv));
     }
 
-    return clientInvoices;
-  }, [clientInvoices, invoiceFilter]);
+    if (invoiceStatusFilter === 'paid') {
+      filtered = filtered.filter((inv) => isPaid(inv));
+    } else if (invoiceStatusFilter === 'open') {
+      filtered = filtered.filter((inv) => !isPaid(inv));
+    }
+
+    return filtered;
+  }, [clientInvoices, invoiceFilter, invoiceStatusFilter]);
 
   useEffect(() => {
     setSelectedLinkedItemIds([]);
@@ -1944,19 +1952,35 @@ export default function ClientDetailsPage() {
               <div className="ml-auto text-xs text-gray-500">{invoicesView.length} registro(s)</div>
             </div>
 
-            <div className="px-3 py-2 border-b flex flex-wrap items-center gap-4 text-sm">
-              <label className="inline-flex items-center gap-2">
-                <input type="radio" name="invoiceFilter" checked={invoiceFilter === 'due'} onChange={() => setInvoiceFilter('due')} />
-                <span>À Vencer</span>
-              </label>
-              <label className="inline-flex items-center gap-2">
-                <input type="radio" name="invoiceFilter" checked={invoiceFilter === 'overdue'} onChange={() => setInvoiceFilter('overdue')} />
-                <span>Vencidos</span>
-              </label>
-              <label className="inline-flex items-center gap-2">
-                <input type="radio" name="invoiceFilter" checked={invoiceFilter === 'all'} onChange={() => setInvoiceFilter('all')} />
-                <span>Todos</span>
-              </label>
+            <div className="px-3 py-2 border-b flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
+              <div className="flex flex-wrap items-center gap-4">
+                <label className="inline-flex items-center gap-2">
+                  <input type="radio" name="invoiceFilter" checked={invoiceFilter === 'due'} onChange={() => setInvoiceFilter('due')} />
+                  <span>À Vencer</span>
+                </label>
+                <label className="inline-flex items-center gap-2">
+                  <input type="radio" name="invoiceFilter" checked={invoiceFilter === 'overdue'} onChange={() => setInvoiceFilter('overdue')} />
+                  <span>Vencidos</span>
+                </label>
+                <label className="inline-flex items-center gap-2">
+                  <input type="radio" name="invoiceFilter" checked={invoiceFilter === 'all'} onChange={() => setInvoiceFilter('all')} />
+                  <span>Todos</span>
+                </label>
+              </div>
+              <div className="flex flex-wrap items-center gap-4">
+                <label className="inline-flex items-center gap-2">
+                  <input type="radio" name="invoiceStatusFilter" checked={invoiceStatusFilter === 'paid'} onChange={() => setInvoiceStatusFilter('paid')} />
+                  <span>Pago</span>
+                </label>
+                <label className="inline-flex items-center gap-2">
+                  <input type="radio" name="invoiceStatusFilter" checked={invoiceStatusFilter === 'open'} onChange={() => setInvoiceStatusFilter('open')} />
+                  <span>Em Aberto</span>
+                </label>
+                <label className="inline-flex items-center gap-2">
+                  <input type="radio" name="invoiceStatusFilter" checked={invoiceStatusFilter === 'all'} onChange={() => setInvoiceStatusFilter('all')} />
+                  <span>Todos</span>
+                </label>
+              </div>
               <button
                 className="ml-auto px-3 py-1.5 text-xs border rounded bg-white hover:bg-gray-100"
                 onClick={() => loadClientInvoices()}

@@ -31,7 +31,24 @@ function parseAmount(raw: any): number {
   if (typeof raw === 'number') return Number.isFinite(raw) ? raw : 0;
   const s = String(raw).trim();
   if (!s) return 0;
-  const normalized = s.replace(/\./g, '').replace(',', '.');
+  const hasDot = s.includes('.');
+  const hasComma = s.includes(',');
+  let normalized = s;
+
+  if (hasDot && hasComma) {
+    // Usa o ultimo separador como decimal e remove o outro como milhar.
+    normalized = s.lastIndexOf(',') > s.lastIndexOf('.')
+      ? s.replace(/\./g, '').replace(',', '.')
+      : s.replace(/,/g, '');
+  } else if (hasComma) {
+    normalized = s.replace(/\./g, '').replace(',', '.');
+  } else if (hasDot) {
+    const parts = s.split('.');
+    normalized = parts.length === 2 && parts[1].length <= 2
+      ? s
+      : s.replace(/\./g, '');
+  }
+
   const n = Number(normalized);
   return Number.isFinite(n) ? n : 0;
 }
