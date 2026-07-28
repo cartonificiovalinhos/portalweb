@@ -75,6 +75,26 @@ type SalesOrderInvoice = {
   xmlFileName?: string | null;
 };
 
+const parseCalendarDate = (value?: string | null) => {
+  if (!value) return null;
+  const raw = String(value).trim();
+  if (!raw) return null;
+  const match = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (match) {
+    const year = Number(match[1]);
+    const month = Number(match[2]);
+    const day = Number(match[3]);
+    return new Date(year, month - 1, day);
+  }
+  const parsed = new Date(raw);
+  return Number.isFinite(parsed.getTime()) ? parsed : null;
+};
+
+const formatCalendarDateBr = (value?: string | null) => {
+  const parsed = parseCalendarDate(value);
+  return parsed ? parsed.toLocaleDateString('pt-BR') : '-';
+};
+
 const ICON_BTN = "inline-flex items-center justify-center w-8 h-8 bg-white border border-gray-300 rounded shadow-sm hover:bg-gray-50 text-gray-700";
 
 const isDeletableStatus = (status?: string) => {
@@ -1157,7 +1177,7 @@ export default function SalesOrderMaintenancePage() {
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
                           <div className="text-sm font-medium text-gray-900 truncate">{inv.invoiceNumber}</div>
-                          <div className="text-xs text-gray-600">{new Date(inv.issueDate).toLocaleDateString('pt-BR')}</div>
+                          <div className="text-xs text-gray-600">{formatCalendarDateBr(inv.issueDate)}</div>
                         </div>
                         <div className="text-right shrink-0">
                           <div className="text-xs text-gray-600">{fmtNumber(inv.totalWeight)} Kg</div>
@@ -1204,7 +1224,7 @@ export default function SalesOrderMaintenancePage() {
                       {!loadingInvoices && invoices.map((inv) => (
                         <tr key={inv.id} className="border-t hover:bg-gray-50">
                           <td className="px-3 py-2">{inv.invoiceNumber}</td>
-                          <td className="px-3 py-2">{new Date(inv.issueDate).toLocaleDateString('pt-BR')}</td>
+                          <td className="px-3 py-2">{formatCalendarDateBr(inv.issueDate)}</td>
                           <td className="px-3 py-2 text-right">{fmtCurrency(inv.totalValue)}</td>
                           <td className="px-3 py-2 text-right">{fmtNumber(inv.totalWeight)}</td>
                           <td className="px-3 py-2 text-center">

@@ -61,6 +61,26 @@ type ClientInvoice = {
 
 const normalizeDoc = (doc?: string | null) => String(doc || '').replace(/\D+/g, '');
 
+const parseCalendarDate = (value?: string | null) => {
+  if (!value) return null;
+  const raw = String(value).trim();
+  if (!raw) return null;
+  const match = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (match) {
+    const year = Number(match[1]);
+    const month = Number(match[2]);
+    const day = Number(match[3]);
+    return new Date(year, month - 1, day);
+  }
+  const parsed = new Date(raw);
+  return Number.isFinite(parsed.getTime()) ? parsed : null;
+};
+
+const formatCalendarDateBr = (value?: string | null) => {
+  const parsed = parseCalendarDate(value);
+  return parsed ? parsed.toLocaleDateString('pt-BR') : '-';
+};
+
 const statusColor = (s: string) => {
   const v = (s || '').trim();
   switch (v) {
@@ -436,7 +456,7 @@ export default function ClientDetailsPage() {
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
     const isPaid = (inv: ClientInvoice) => String(inv.status || '').trim().toUpperCase() === 'PAGA';
-    const dueDate = (inv: ClientInvoice) => (inv.dueDate ? new Date(inv.dueDate) : null);
+    const dueDate = (inv: ClientInvoice) => parseCalendarDate(inv.dueDate);
     const isOverdue = (inv: ClientInvoice) => {
       const d = dueDate(inv);
       return !isPaid(inv) && d != null && d < today;
@@ -2015,7 +2035,7 @@ export default function ClientDetailsPage() {
                         const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
                         const raw = String(inv.status || '').trim().toUpperCase();
                         const isPaid = raw === 'PAGA';
-                        const due = inv.dueDate ? new Date(inv.dueDate) : null;
+                        const due = parseCalendarDate(inv.dueDate);
                         const isOverdue = !isPaid && due != null && due < today;
                         const label = isPaid ? 'Paga' : (isOverdue ? 'Vencida' : 'Em Aberto');
                         const cls = isPaid
@@ -2024,8 +2044,8 @@ export default function ClientDetailsPage() {
                         return (
                           <>
                       <td className="p-2">{inv.invoiceNumber}</td>
-                      <td className="p-2">{inv.issueDate ? new Date(inv.issueDate).toLocaleDateString('pt-BR') : '-'}</td>
-                      <td className="p-2">{inv.dueDate ? new Date(inv.dueDate).toLocaleDateString('pt-BR') : '-'}</td>
+                      <td className="p-2">{formatCalendarDateBr(inv.issueDate)}</td>
+                      <td className="p-2">{formatCalendarDateBr(inv.dueDate)}</td>
                       <td className="p-2 text-right">{Number(inv.totalValue || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
                       <td className="p-2">
                         <span className={`inline-flex px-2 py-0.5 rounded text-xs font-medium ${cls}`}>{label}</span>
@@ -2048,7 +2068,7 @@ export default function ClientDetailsPage() {
                     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
                     const raw = String(inv.status || '').trim().toUpperCase();
                     const isPaid = raw === 'PAGA';
-                    const due = inv.dueDate ? new Date(inv.dueDate) : null;
+                    const due = parseCalendarDate(inv.dueDate);
                     const isOverdue = !isPaid && due != null && due < today;
                     const label = isPaid ? 'Paga' : (isOverdue ? 'Vencida' : 'Em Aberto');
                     const cls = isPaid
@@ -2058,8 +2078,8 @@ export default function ClientDetailsPage() {
                       <>
                         <div className="text-sm font-semibold text-gray-900">{inv.invoiceNumber}</div>
                         <div className="mt-1 text-xs text-gray-600 flex flex-wrap gap-x-3 gap-y-1">
-                          <span>Emissão: {inv.issueDate ? new Date(inv.issueDate).toLocaleDateString('pt-BR') : '-'}</span>
-                          <span>Venc.: {inv.dueDate ? new Date(inv.dueDate).toLocaleDateString('pt-BR') : '-'}</span>
+                          <span>Emissão: {formatCalendarDateBr(inv.issueDate)}</span>
+                          <span>Venc.: {formatCalendarDateBr(inv.dueDate)}</span>
                         </div>
                         <div className="mt-2 flex items-center gap-2">
                           <div className="text-sm font-medium text-gray-900">
