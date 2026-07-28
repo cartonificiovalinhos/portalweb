@@ -7,6 +7,12 @@ function normalizeDoc(doc: string): string {
   return (doc || '').replace(/\D+/g, '');
 }
 
+function startOfToday() {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return today;
+}
+
 async function ensurePaymentTermByCode(code: number): Promise<number | null> {
   const c = Number(code);
   if (!Number.isFinite(c) || c <= 0) return null;
@@ -192,6 +198,33 @@ export async function GET(request: Request) {
       },
     });
 
+    const clientIds = clients.map((c) => c.id);
+    const totalsByClient = new Map<number, { titlesDue: number; titlesOverdue: number }>();
+    if (clientIds.length > 0) {
+      const invoices = await prisma.clientInvoice.findMany({
+        where: { clientId: { in: clientIds } },
+        select: {
+          clientId: true,
+          dueDate: true,
+          totalValue: true,
+          status: true,
+        },
+      });
+      const today = startOfToday();
+      for (const inv of invoices) {
+        const status = String(inv.status || '').trim().toUpperCase();
+        if (status === 'PAGA' || !inv.dueDate) continue;
+        const amount = Number(inv.totalValue || 0);
+        if (!Number.isFinite(amount)) continue;
+        const due = new Date(inv.dueDate);
+        due.setHours(0, 0, 0, 0);
+        const acc = totalsByClient.get(inv.clientId) ?? { titlesDue: 0, titlesOverdue: 0 };
+        if (due < today) acc.titlesOverdue += amount;
+        else acc.titlesDue += amount;
+        totalsByClient.set(inv.clientId, acc);
+      }
+    }
+
     const out = clients.map((c) => ({
       id: c.id,
       clientCode: (c as any).clientCode ?? null,
@@ -206,8 +239,8 @@ export async function GET(request: Request) {
       estado: c.estado,
       creditLimit: c.creditLimit,
       availableLimit: c.availableLimit,
-      titlesDue: c.titlesDue,
-      titlesOverdue: c.titlesOverdue,
+      titlesDue: totalsByClient.get(c.id)?.titlesDue ?? 0,
+      titlesOverdue: totalsByClient.get(c.id)?.titlesOverdue ?? 0,
       paymentTermId: c.paymentTermId,
       paymentTermCode: c.paymentTerm?.code ?? null,
       paymentTermDescription: c.paymentTerm?.description ?? null,

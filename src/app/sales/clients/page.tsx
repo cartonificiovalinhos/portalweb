@@ -13,6 +13,8 @@ type Client = {
   bairro?: string | null;
   cidade?: string | null;
   estado?: string | null;
+  titlesDue?: number;
+  titlesOverdue?: number;
 };
 
 function maskDoc(doc?: string | null): string {
@@ -20,6 +22,10 @@ function maskDoc(doc?: string | null): string {
   if (d.length === 14) return d.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, "$1.$2.$3/$4-$5");
   if (d.length === 11) return d.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4");
   return d;
+}
+
+function fmtCurrency(value?: number | null): string {
+  return Number(value ?? 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
 export default function SalesClientsPage() {
@@ -90,6 +96,10 @@ export default function SalesClientsPage() {
                   <div className="mt-1 text-xs text-gray-600">
                     {(c.cidade || "-")}{c.estado ? ` • ${c.estado}` : ""}
                   </div>
+                  <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-xs text-gray-600">
+                    <span>Tít. a Vencer: {fmtCurrency(c.titlesDue)}</span>
+                    <span>Tít. Vencidos: {fmtCurrency(c.titlesOverdue)}</span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -103,6 +113,8 @@ export default function SalesClientsPage() {
                 <th className="text-left p-2 font-medium text-gray-600">Doc</th>
                 <th className="text-left p-2 font-medium text-gray-600">Nome Abreviado</th>
                 <th className="text-left p-2 font-medium text-gray-600">Nome</th>
+                <th className="text-right p-2 font-medium text-gray-600">Títulos a Vencer</th>
+                <th className="text-right p-2 font-medium text-gray-600">Títulos Vencidos</th>
                 <th className="text-left p-2 font-medium text-gray-600">Cidade</th>
                 <th className="text-left p-2 font-medium text-gray-600">Estado</th>
               </tr>
@@ -122,6 +134,8 @@ export default function SalesClientsPage() {
                   <td className="p-2 text-gray-700 font-mono text-xs">{maskDoc(c.doc)}</td>
                   <td className="p-2 text-gray-700">{c.abbrevName || "-"}</td>
                   <td className="p-2 text-gray-900 font-medium">{c.name}</td>
+                  <td className="p-2 text-right text-gray-700 whitespace-nowrap">{fmtCurrency(c.titlesDue)}</td>
+                  <td className="p-2 text-right text-red-600 whitespace-nowrap">{fmtCurrency(c.titlesOverdue)}</td>
                   <td className="p-2 text-gray-600">{c.cidade || "-"}</td>
                   <td className="p-2 text-gray-600">{c.estado || "-"}</td>
                 </tr>
