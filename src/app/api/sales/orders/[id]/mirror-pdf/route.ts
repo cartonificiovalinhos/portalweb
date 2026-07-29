@@ -6,7 +6,7 @@ import { makeSalesOrderPublicMirrorCode } from '../../../../../../lib/sales-orde
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-export async function GET(request: Request, props: { params: Promise<{ id: string }> }) {
+export async function GET(_: Request, props: { params: Promise<{ id: string }> }) {
   try {
     const params = await props.params;
     const session = await getServerSession(authOptions);
@@ -22,8 +22,13 @@ export async function GET(request: Request, props: { params: Promise<{ id: strin
     if (!exists) return new Response('Pedido não encontrado', { status: 404 });
 
     const publicCode = makeSalesOrderPublicMirrorCode(Math.trunc(id));
-    const url = new URL(`/${publicCode}`, request.url);
-    return Response.redirect(url, 302);
+    return new Response(null, {
+      status: 302,
+      headers: {
+        Location: `/${publicCode}`,
+        'Cache-Control': 'no-store',
+      },
+    });
   } catch (err: any) {
     console.error('mirror-pdf error', err);
     return new Response(String(err?.message || err || 'Erro ao gerar PDF'), { status: 500 });
