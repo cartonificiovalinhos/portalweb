@@ -1,12 +1,12 @@
 import { getServerSession } from 'next-auth';
 import { authOptions } from '../../../../../../lib/auth';
 import { prisma } from '../../../../../../lib/prisma';
-import { renderSalesOrderPdf, salesOrderPdfFileName } from '../../../../../../lib/sales-order-pdf';
+import { makeSalesOrderPublicMirrorCode } from '../../../../../../lib/sales-order-share';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-export async function GET(_: Request, props: { params: Promise<{ id: string }> }) {
+export async function GET(request: Request, props: { params: Promise<{ id: string }> }) {
   try {
     const params = await props.params;
     const session = await getServerSession(authOptions);
@@ -15,32 +15,15 @@ export async function GET(_: Request, props: { params: Promise<{ id: string }> }
     const id = Number(params.id);
     if (!Number.isFinite(id) || id <= 0) return new Response('ID inválido', { status: 400 });
 
-    const order = await prisma.salesOrder.findUnique({
+    const exists = await prisma.salesOrder.findUnique({
       where: { id: Math.trunc(id) },
-      include: {
-        entity: true,
-        client: true,
-        items: {
-          include: {
-            inventoryItem: { include: { commercialFamily: true } }
-          },
-          orderBy: { id: 'asc' }
-        }
-      }
+      select: { id: true },
     });
-    if (!order) return new Response('Pedido não encontrado', { status: 404 });
+    if (!exists) return new Response('Pedido não encontrado', { status: 404 });
 
-    const pdf = await renderSalesOrderPdf(order);
-    const fileName = salesOrderPdfFileName(order);
-
-    return new Response(pdf, {
-      status: 200,
-      headers: {
-        'Content-Type': 'application/pdf',
-        'Content-Disposition': `inline; filename="${fileName}"`,
-        'Cache-Control': 'no-store',
-      }
-    });
+    const publicCode = makeSalesOrderPublicMirrorCode(Math.trunc(id));
+    const url = new URL(`/${publicCode}`, request.url);
+    return Response.redirect(url, 302);
   } catch (err: any) {
     console.error('mirror-pdf error', err);
     return new Response(String(err?.message || err || 'Erro ao gerar PDF'), { status: 500 });
