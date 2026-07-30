@@ -178,6 +178,28 @@ const formatPhoneBr = (digitsRaw: string) => {
   return `(${area}) ${rest.slice(0, 5)}-${rest.slice(5, 9)}`;
 };
 
+const formatCurrencyBr = (value?: number | null) =>
+  Number(value ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+const parseMoneyInput = (raw: string): number => {
+  const s = String(raw || '').trim();
+  if (!s) return NaN;
+  const hasDot = s.includes('.');
+  const hasComma = s.includes(',');
+  let normalized = s.replace(/\s+/g, '');
+
+  if (hasDot && hasComma) {
+    normalized = s.lastIndexOf(',') > s.lastIndexOf('.')
+      ? s.replace(/\./g, '').replace(',', '.')
+      : s.replace(/,/g, '');
+  } else if (hasComma) {
+    normalized = s.replace(/\./g, '').replace(',', '.');
+  }
+
+  const value = Number(normalized);
+  return Number.isFinite(value) ? value : NaN;
+};
+
 const IconBtn = ({ title, onClick, children, disabled = false }: any) => (
   <button
     title={title}
@@ -220,6 +242,12 @@ const TrashIcon = () => (
     <path d="M6 6l1 14a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-14" strokeWidth="1.5" />
   </svg>
 );
+const PencilIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" className="w-4 h-4">
+    <path d="M12 20h9" strokeWidth="1.5" />
+    <path d="M16.5 3.5a2.1 2.1 0 1 1 3 3L7 19l-4 1 1-4 12.5-12.5Z" strokeWidth="1.5" />
+  </svg>
+);
 
 export default function ClientDetailsPage() {
   const params = useParams() as any;
@@ -254,6 +282,9 @@ export default function ClientDetailsPage() {
   const [unlinking, setUnlinking] = useState(false);
   const [linkingItems, setLinkingItems] = useState(false);
   const [applyingAdjust, setApplyingAdjust] = useState(false);
+  const [editingLinkedItem, setEditingLinkedItem] = useState<LinkedItem | null>(null);
+  const [editingLinkedItemPrice, setEditingLinkedItemPrice] = useState("");
+  const [savingLinkedItemPrice, setSavingLinkedItemPrice] = useState(false);
 
   const [contacts, setContacts] = useState<ClientContact[]>([]);
   const [loadingContacts, setLoadingContacts] = useState(false);
@@ -756,6 +787,64 @@ export default function ClientDetailsPage() {
       setApplyingAdjust(false);
     }
   }, [adjustPercent, adjustType, basePriceRep, client, hasBasePrices, refreshLinkedItems, selectedLinkedItemIds]);
+
+  const openLinkedItemPriceEditor = useCallback((item: LinkedItem) => {
+    if (!hasBasePrices) {
+      alert('Preço Base não disponível para edição deste item.');
+      return;
+    }
+    const basePrice = hasBasePrices ? getBasePrice(item) : null;
+    if (hasBasePrices && (basePrice == null || basePrice <= 0)) {
+      alert('Preço Base não disponível para este item.');
+      return;
+    }
+    setEditingLinkedItem(item);
+    setEditingLinkedItemPrice(String(Number(item.unitPrice ?? 0).toFixed(2)).replace('.', ','));
+  }, [getBasePrice, hasBasePrices]);
+
+  const closeLinkedItemPriceEditor = useCallback(() => {
+    if (savingLinkedItemPrice) return;
+    setEditingLinkedItem(null);
+    setEditingLinkedItemPrice("");
+  }, [savingLinkedItemPrice]);
+
+  const saveLinkedItemPrice = useCallback(async () => {
+    if (!client || !editingLinkedItem) return;
+    const nextPrice = parseMoneyInput(editingLinkedItemPrice);
+    if (!Number.isFinite(nextPrice) || nextPrice <= 0) {
+      alert('Informe um valor válido para o Preço Unit.');
+      return;
+    }
+
+    const basePrice = hasBasePrices ? getBasePrice(editingLinkedItem) : null;
+    if (basePrice != null && nextPrice < basePrice) {
+      alert(`O Preço Unit não pode ser menor que o Preço Base (${formatCurrencyBr(basePrice)}).`);
+      return;
+    }
+
+    setSavingLinkedItemPrice(true);
+    try {
+      const res = await fetch(`/api/clients/${client.id}/items`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          inventoryItemId: editingLinkedItem.id,
+          unit: editingLinkedItem.unit ?? null,
+          unitPrice: nextPrice,
+        }),
+      });
+      const body = await res.json().catch(() => ({} as any));
+      if (!res.ok) throw new Error(body?.error || 'Falha ao salvar preço unitário');
+
+      await refreshLinkedItems();
+      setEditingLinkedItem(null);
+      setEditingLinkedItemPrice("");
+    } catch (e: any) {
+      alert(e?.message || String(e));
+    } finally {
+      setSavingLinkedItemPrice(false);
+    }
+  }, [client, editingLinkedItem, editingLinkedItemPrice, getBasePrice, hasBasePrices, refreshLinkedItems]);
 
   const addToCart = async (inventoryItemId: number) => {
     if (!client) return;
@@ -1764,10 +1853,19 @@ export default function ClientDetailsPage() {
                             </div>
                             <div className="mt-2 flex items-center">
                               <div className="text-sm font-medium text-gray-900">
-                                {(it.unitPrice ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                {formatCurrencyBr(it.unitPrice ?? 0)}
                               </div>
                               <button
-                                className="ml-auto px-3 py-2 text-xs border rounded"
+                                className="ml-auto inline-flex items-center justify-center w-8 h-8 border rounded hover:bg-gray-100 mr-2 disabled:opacity-50"
+                                title="Editar preço unitário"
+                                aria-label="Editar preço unitário"
+                                disabled={loadingBasePrices || !hasBasePrices || getBasePrice(it) == null}
+                                onClick={() => openLinkedItemPriceEditor(it)}
+                              >
+                                <PencilIcon />
+                              </button>
+                              <button
+                                className="px-3 py-2 text-xs border rounded"
                                 title="Adicionar ao carrinho"
                                 aria-label="Adicionar ao carrinho"
                                 onClick={() => addToCart(it.id)}
@@ -1828,9 +1926,18 @@ export default function ClientDetailsPage() {
                             <td className="p-2">{it.length || '-'}</td>
                             <td className="p-2">{it.grammage || '-'}</td>
                             <td className="p-2">{it.unit || '-'}</td>
-                            {hasBasePrices && <td className="p-2">{basePrice != null ? basePrice.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : ''}</td>}
-                            <td className="p-2">{(it.unitPrice ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
+                            {hasBasePrices && <td className="p-2">{basePrice != null ? formatCurrencyBr(basePrice) : ''}</td>}
+                            <td className="p-2">{formatCurrencyBr(it.unitPrice ?? 0)}</td>
                             <td className="p-2">
+                              <button
+                                className="inline-flex items-center justify-center w-8 h-8 border rounded hover:bg-gray-100 mr-2 disabled:opacity-50"
+                                title="Editar preço unitário"
+                                aria-label="Editar preço unitário"
+                                disabled={loadingBasePrices || !hasBasePrices || basePrice == null}
+                                onClick={() => openLinkedItemPriceEditor(it)}
+                              >
+                                <PencilIcon />
+                              </button>
                               <button className="inline-flex items-center justify-center w-8 h-8 border rounded hover:bg-gray-100" title="Adicionar ao carrinho" aria-label="Adicionar ao carrinho" onClick={() => addToCart(it.id)}>
                                 <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M7 18a2 2 0 1 0 0 4 2 2 0 0 0 0-4Zm10 0a2 2 0 1 0 0 4 2 2 0 0 0 0-4ZM6.2 6l-.9-2H1V2h4.1l1.7 4H21l-2 7H8.1l-1 2H19v2H6a1 1 0 0 1-.9-.6L2 6h4.2Z"/></svg>
                               </button>
@@ -2119,7 +2226,55 @@ export default function ClientDetailsPage() {
         )}
       </div>
 
-      
+      {editingLinkedItem && (
+        <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50" onClick={closeLinkedItemPriceEditor}>
+          <div className="bg-white w-full max-w-md rounded shadow-lg mx-4" onClick={(e) => e.stopPropagation()}>
+            <div className="px-4 py-3 border-b flex items-center">
+              <div className="font-semibold">Editar Preço Unitário</div>
+              <button className="ml-auto text-gray-500 hover:text-black disabled:opacity-50" onClick={closeLinkedItemPriceEditor} aria-label="Fechar" disabled={savingLinkedItemPrice}>×</button>
+            </div>
+            <div className="p-4 space-y-4">
+              <div>
+                <div className="text-sm font-semibold text-gray-900">{editingLinkedItem.name}</div>
+                <div className="text-xs text-gray-500 font-mono">{editingLinkedItem.sku || '-'}</div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="border rounded bg-gray-50 px-3 py-2">
+                  <div className="text-xs text-gray-500">Preço Base</div>
+                  <div className="text-sm font-medium text-gray-900">{formatCurrencyBr(hasBasePrices ? getBasePrice(editingLinkedItem) ?? 0 : 0)}</div>
+                </div>
+                <div className="border rounded bg-gray-50 px-3 py-2">
+                  <div className="text-xs text-gray-500">Preço Atual</div>
+                  <div className="text-sm font-medium text-gray-900">{formatCurrencyBr(editingLinkedItem.unitPrice ?? 0)}</div>
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm text-gray-700 mb-1">Novo Preço Unit</label>
+                <input
+                  className="w-full px-3 py-2 border rounded"
+                  inputMode="decimal"
+                  value={editingLinkedItemPrice}
+                  onChange={(e) => setEditingLinkedItemPrice(e.target.value)}
+                  placeholder="0,00"
+                  autoFocus
+                />
+                {hasBasePrices && (
+                  <div className="mt-2 text-xs text-gray-500">
+                    O valor não pode ser menor que {formatCurrencyBr(getBasePrice(editingLinkedItem) ?? 0)}.
+                  </div>
+                )}
+              </div>
+            </div>
+            <div className="px-4 py-3 border-t flex items-center justify-end gap-2">
+              <button className="px-3 py-1.5 border rounded hover:bg-gray-100 disabled:opacity-50" onClick={closeLinkedItemPriceEditor} disabled={savingLinkedItemPrice}>Cancelar</button>
+              <button className="px-3 py-1.5 rounded bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50" onClick={saveLinkedItemPrice} disabled={savingLinkedItemPrice}>
+                {savingLinkedItemPrice ? 'Salvando...' : 'Salvar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Modal de itens */}
       {selected && (
         <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50" onClick={() => setSelected(null)}>

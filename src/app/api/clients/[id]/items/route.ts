@@ -5,6 +5,58 @@ function normalizeDoc(doc: string): string {
   return (doc || '').replace(/\D+/g, '');
 }
 
+async function findBasePriceForClientItem(clientId: number, inventoryItemId: number, unit?: string | null) {
+  const repLinks = await prisma.userClientRep.findMany({
+    where: { clientId },
+    select: { userId: true },
+    orderBy: { id: 'asc' },
+  });
+  const repUserIds = Array.from(new Set(repLinks.map((x) => Number(x.userId)).filter((x) => Number.isFinite(x) && x > 0)));
+  if (repUserIds.length === 0) return null;
+
+  const unitNorm = String(unit || '').trim().toUpperCase();
+  for (const repUserId of repUserIds) {
+    const rows = await prisma.userInventoryItemPrice.findMany({
+      where: { userId: repUserId, inventoryItemId },
+      select: { unit: true, unitPrice: true },
+    });
+    if (!rows.length) continue;
+
+    if (unitNorm) {
+      const exact = rows.find((row) => String(row.unit || '').trim().toUpperCase() === unitNorm);
+      const exactValue = Number(exact?.unitPrice ?? 0);
+      if (Number.isFinite(exactValue) && exactValue > 0) return exactValue;
+    }
+
+    const validPrices = rows
+      .map((row) => Number(row.unitPrice ?? 0))
+      .filter((price) => Number.isFinite(price) && price > 0);
+    const uniquePrices = Array.from(new Set(validPrices));
+    if (uniquePrices.length === 1) return uniquePrices[0];
+  }
+
+  return null;
+}
+
+async function validateClientItemPriceFloor(params: {
+  clientId: number;
+  inventoryItemId: number;
+  unit?: string | null;
+  unitPrice?: unknown;
+}) {
+  if (params.unitPrice === undefined) return;
+
+  const nextPrice = Number(params.unitPrice);
+  if (!Number.isFinite(nextPrice)) {
+    throw new Error('Preço Unit inválido');
+  }
+
+  const basePrice = await findBasePriceForClientItem(params.clientId, params.inventoryItemId, params.unit);
+  if (basePrice != null && nextPrice < basePrice) {
+    throw new Error(`Preço Unit não pode ser menor que o Preço Base (${basePrice.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })})`);
+  }
+}
+
 export async function GET(request: Request, props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
   try {
@@ -347,6 +399,13 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
           const unitPrice = Number(body.unitPrice ?? 0);
           const allowed = body.allowed === false ? false : true;
 
+            await validateClientItemPriceFloor({
+              clientId,
+              inventoryItemId,
+              unit,
+              unitPrice: body.unitPrice,
+            });
+
           const itemUpdate: any = {};
           if (body.width !== undefined) itemUpdate.width = Number(body.width);
           if (body.length !== undefined) itemUpdate.length = Number(body.length);
@@ -401,6 +460,13 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
             results.push({ error: 'inventoryItemId inválido', success: false });
             continue;
         }
+
+        await validateClientItemPriceFloor({
+          clientId,
+          inventoryItemId,
+          unit,
+          unitPrice: body.unitPrice,
+        });
 
         // Atualiza dados do item se fornecidos
         const itemUpdate: any = {};
