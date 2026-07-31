@@ -5,44 +5,64 @@ function normalizeDoc(doc: string): string {
   return (doc || '').replace(/\D+/g, '');
 }
 
-async function findBasePriceForClientItem(clientId: number, inventoryItemId: number, unit?: string | null) {
+async function buildBasePriceResolver(clientId: number, inventoryItemIds: number[]) {
   const repLinks = await prisma.userClientRep.findMany({
     where: { clientId },
     select: { userId: true },
     orderBy: { id: 'asc' },
   });
   const repUserIds = Array.from(new Set(repLinks.map((x) => Number(x.userId)).filter((x) => Number.isFinite(x) && x > 0)));
-  if (repUserIds.length === 0) return null;
-
-  const unitNorm = String(unit || '').trim().toUpperCase();
-  for (const repUserId of repUserIds) {
-    const rows = await prisma.userInventoryItemPrice.findMany({
-      where: { userId: repUserId, inventoryItemId },
-      select: { unit: true, unitPrice: true },
-    });
-    if (!rows.length) continue;
-
-    if (unitNorm) {
-      const exact = rows.find((row) => String(row.unit || '').trim().toUpperCase() === unitNorm);
-      const exactValue = Number(exact?.unitPrice ?? 0);
-      if (Number.isFinite(exactValue) && exactValue > 0) return exactValue;
-    }
-
-    const validPrices = rows
-      .map((row) => Number(row.unitPrice ?? 0))
-      .filter((price) => Number.isFinite(price) && price > 0);
-    const uniquePrices = Array.from(new Set(validPrices));
-    if (uniquePrices.length === 1) return uniquePrices[0];
+  if (repUserIds.length === 0 || inventoryItemIds.length === 0) {
+    return () => null;
   }
 
-  return null;
+  const prices = await prisma.userInventoryItemPrice.findMany({
+    where: {
+      userId: { in: repUserIds },
+      inventoryItemId: { in: Array.from(new Set(inventoryItemIds)) },
+    },
+    select: { userId: true, inventoryItemId: true, unit: true, unitPrice: true },
+  });
+
+  const rowsByRepAndItem = new Map<string, Array<{ unit: string; unitPrice: number }>>();
+  for (const row of prices) {
+    const key = `${row.userId}::${row.inventoryItemId}`;
+    const list = rowsByRepAndItem.get(key) || [];
+    list.push({
+      unit: String(row.unit || '').trim().toUpperCase(),
+      unitPrice: Number(row.unitPrice ?? 0),
+    });
+    rowsByRepAndItem.set(key, list);
+  }
+
+  return (inventoryItemId: number, unit?: string | null) => {
+    const unitNorm = String(unit || '').trim().toUpperCase();
+    for (const repUserId of repUserIds) {
+      const rows = rowsByRepAndItem.get(`${repUserId}::${inventoryItemId}`) || [];
+      if (!rows.length) continue;
+
+      if (unitNorm) {
+        const exact = rows.find((row) => row.unit === unitNorm);
+        const exactValue = Number(exact?.unitPrice ?? 0);
+        if (Number.isFinite(exactValue) && exactValue > 0) return exactValue;
+      }
+
+      const validPrices = rows
+        .map((row) => Number(row.unitPrice ?? 0))
+        .filter((price) => Number.isFinite(price) && price > 0);
+      const uniquePrices = Array.from(new Set(validPrices));
+      if (uniquePrices.length === 1) return uniquePrices[0];
+    }
+
+    return null;
+  };
 }
 
-async function validateClientItemPriceFloor(params: {
-  clientId: number;
+function validateClientItemPriceFloor(params: {
   inventoryItemId: number;
   unit?: string | null;
   unitPrice?: unknown;
+  resolveBasePrice: (inventoryItemId: number, unit?: string | null) => number | null;
 }) {
   if (params.unitPrice === undefined) return;
 
@@ -51,7 +71,7 @@ async function validateClientItemPriceFloor(params: {
     throw new Error('Preço Unit inválido');
   }
 
-  const basePrice = await findBasePriceForClientItem(params.clientId, params.inventoryItemId, params.unit);
+  const basePrice = params.resolveBasePrice(params.inventoryItemId, params.unit);
   if (basePrice != null && nextPrice < basePrice) {
     throw new Error(`Preço Unit não pode ser menor que o Preço Base (${basePrice.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })})`);
   }
@@ -393,18 +413,21 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
       }
 
       const keepIds = Array.from(normalized.keys());
+      const resolveBasePrice = await buildBasePriceResolver(clientId, keepIds);
+      for (const [inventoryItemId, body] of Array.from(normalized.entries())) {
+        validateClientItemPriceFloor({
+          inventoryItemId,
+          unit: body.unit ? String(body.unit) : null,
+          unitPrice: body.unitPrice,
+          resolveBasePrice,
+        });
+      }
+
       const unlinkedCount = await prisma.$transaction(async (tx) => {
         for (const [inventoryItemId, body] of Array.from(normalized.entries())) {
           const unit = body.unit ? String(body.unit) : null;
           const unitPrice = Number(body.unitPrice ?? 0);
           const allowed = body.allowed === false ? false : true;
-
-            await validateClientItemPriceFloor({
-              clientId,
-              inventoryItemId,
-              unit,
-              unitPrice: body.unitPrice,
-            });
 
           const itemUpdate: any = {};
           if (body.width !== undefined) itemUpdate.width = Number(body.width);
@@ -461,11 +484,12 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
             continue;
         }
 
-        await validateClientItemPriceFloor({
-          clientId,
+        const resolveBasePrice = await buildBasePriceResolver(clientId, [inventoryItemId]);
+        validateClientItemPriceFloor({
           inventoryItemId,
           unit,
           unitPrice: body.unitPrice,
+          resolveBasePrice,
         });
 
         // Atualiza dados do item se fornecidos
