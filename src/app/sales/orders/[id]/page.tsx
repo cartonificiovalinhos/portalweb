@@ -1360,7 +1360,7 @@ export default function SalesOrderMaintenancePage() {
                     <tr className="bg-gray-50">
                       <th className="p-2 text-left">Item</th>
                       <th className="p-2 text-left">SKU</th>
-                      {(() => { const hasSheet = list.some(supportsSheetDims); return hasSheet ? (<><th className="p-2 text-left">Larg.</th><th className="p-2 text-left">Compr.</th><th className="p-2 text-left">Gram.</th></>) : null; })()}
+                      {(() => { const hasSheet = list.some(supportsSheetDims); return hasSheet ? (<><th className="p-2 text-left">Compr.</th><th className="p-2 text-left">Larg.</th><th className="p-2 text-left">Gram.</th></>) : null; })()}
                       {(() => { const hasCore = list.some(supportsCoreDims); return hasCore ? (<><th className="p-2 text-left">Diâmetro</th><th className="p-2 text-left">Tubete</th></>) : null; })()}
                       <th className="p-2 text-left">UM</th>
                       <th className="p-2 text-left">Qtd</th>

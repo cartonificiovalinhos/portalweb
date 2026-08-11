@@ -341,16 +341,16 @@ export const SalesOrderItemRow = ({
                     <FormattedIntInput 
                         className={`${compactW} px-2 py-1 border rounded ${!canEdit ? disabledClass : ''}`}
                         disabled={!canEdit}
-                        value={localItem.width} 
-                        onChange={(val) => handleChange('width', val)} 
+                        value={localItem.length}
+                        onChange={(val) => handleChange('length', val)}
                     />
                 ) : '-'}</td>
                 <td className="p-2">{showWidthLengthGram ? (
                     <FormattedIntInput 
                         className={`${compactW} px-2 py-1 border rounded ${!canEdit ? disabledClass : ''}`}
                         disabled={!canEdit}
-                        value={localItem.length} 
-                        onChange={(val) => handleChange('length', val)} 
+                        value={localItem.width}
+                        onChange={(val) => handleChange('width', val)}
                     />
                 ) : '-'}</td>
                 <td className="p-2">{showWidthLengthGram ? (
@@ -819,21 +819,21 @@ export const SalesOrderItemCard = ({
         {hasSheetCol && showWidthLengthGram && (
           <>
             <div>
-              <div className="text-[11px] text-gray-600">Larg.</div>
-              <FormattedIntInput 
-                className={`w-full px-2 py-1 border rounded text-sm ${!canEdit ? disabledClass : ''}`}
-                disabled={!canEdit}
-                value={localItem.width} 
-                onChange={(val) => handleChange('width', val)} 
-              />
-            </div>
-            <div>
               <div className="text-[11px] text-gray-600">Compr.</div>
               <FormattedIntInput 
                 className={`w-full px-2 py-1 border rounded text-sm ${!canEdit ? disabledClass : ''}`}
                 disabled={!canEdit}
-                value={localItem.length} 
-                onChange={(val) => handleChange('length', val)} 
+                value={localItem.length}
+                onChange={(val) => handleChange('length', val)}
+              />
+            </div>
+            <div>
+              <div className="text-[11px] text-gray-600">Larg.</div>
+              <FormattedIntInput 
+                className={`w-full px-2 py-1 border rounded text-sm ${!canEdit ? disabledClass : ''}`}
+                disabled={!canEdit}
+                value={localItem.width}
+                onChange={(val) => handleChange('width', val)}
               />
             </div>
             <div className="col-span-2">
