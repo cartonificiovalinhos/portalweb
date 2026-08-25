@@ -657,6 +657,10 @@ model CommercialFamily {
   description    String
   erpCode        String?
   priceBy        String?
+  widthMin       Int?
+  widthMax       Int?
+  lengthMin      Int?
+  lengthMax      Int?
   createdAt      DateTime?       @default(now())
   updatedAt      DateTime?
   // Itens relacionados
