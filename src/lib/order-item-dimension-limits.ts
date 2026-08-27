@@ -17,6 +17,14 @@ export type OrderItemWithDimensionLimits = {
   } | null;
 };
 
+function normalizeText(value: unknown): string {
+  return String(value ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toUpperCase();
+}
+
 function normalizeOptionalNumber(value: unknown): number | null {
   if (value === undefined || value === null || value === '') return null;
   const parsed = Number(value);
@@ -30,6 +38,19 @@ function familyLabel(family?: CommercialFamilyDimensionLimits | null): string {
 
 function itemLabel(item: OrderItemWithDimensionLimits): string {
   return String(item.sku || item.name || 'item').trim();
+}
+
+export function inferCommercialFamilyKey(item: OrderItemWithDimensionLimits): string | null {
+  const directFamily = normalizeText(item.inventoryItem?.commercialFamily?.description || item.inventoryItem?.commercialFamily?.name || '');
+  if (directFamily) return directFamily;
+
+  const text = normalizeText(`${item.name || ''} ${item.sku || ''}`);
+  if (!text) return null;
+
+  if (text.includes('CHAPA') || text.includes('CHAPAS')) return 'CHAPAS';
+  if (text.includes('MIOLO')) return 'MIOLO';
+  if (text.includes('PAPEL') && !text.includes('PAPELAO')) return 'PAPEL';
+  return null;
 }
 
 function buildRangeMessage(fieldLabel: string, value: number, min: number | null, max: number | null, item: OrderItemWithDimensionLimits): string | null {

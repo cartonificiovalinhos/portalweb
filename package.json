@@ -4,10 +4,11 @@
   "private": true,
   "scripts": {
     "dev": "next dev --webpack -p 3001",
-    "build": "next build --webpack",
+    "build": "npm run prisma:generate && next build --webpack",
     "start": "node server.js",
-    "build:standalone": "next build --webpack",
+    "build:standalone": "npm run prisma:generate && next build --webpack",
     "lint": "eslint . --ext .js,.jsx,.ts,.tsx",
+    "postinstall": "npm run prisma:generate",
     "prisma:generate": "node -e \"process.env.PRISMA_CLIENT_ENGINE_TYPE='binary'; require('child_process').execSync('prisma generate', { stdio: 'inherit', shell: true })\"",
     "prisma:migrate": "node -e \"process.env.PRISMA_CLIENT_ENGINE_TYPE='binary'; require('child_process').execSync('prisma db push', { stdio: 'inherit', shell: true })\""
   },

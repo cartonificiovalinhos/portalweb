@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '../../../../../lib/prisma';
 import { validateOrderItemDimensionLimits } from '@/lib/order-item-dimension-limits';
+import { resolveCommercialFamilyForItem } from '@/lib/commercial-family-dimension-resolution';
 
 export async function POST(request: Request) {
   try {
@@ -48,10 +49,11 @@ export async function POST(request: Request) {
         if (payload.length === undefined) payload.length = invItem.length;
         if (payload.grammage === undefined) payload.grammage = invItem.grammage;
 
-        const dimensionError = validateOrderItemDimensionLimits({
+        const candidate = await resolveCommercialFamilyForItem(prisma, {
           ...payload,
           inventoryItem: { commercialFamily: invItem.commercialFamily ?? null },
         });
+        const dimensionError = validateOrderItemDimensionLimits(candidate);
         if (dimensionError) {
           return NextResponse.json({ error: dimensionError }, { status: 400 });
         }

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '../../../../../../lib/prisma';
 import { validateOrderItemDimensionLimits } from '@/lib/order-item-dimension-limits';
+import { resolveCommercialFamilyForItem } from '@/lib/commercial-family-dimension-resolution';
 
 function parseIdParam(raw: unknown): number | null {
   const s = String(raw ?? '').trim();
@@ -142,11 +143,12 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
     const keys = Object.keys(allowed);
     if (keys.length === 0) return NextResponse.json({ error: 'Nada para atualizar' }, { status: 400 });
 
-    const dimensionError = validateOrderItemDimensionLimits({
+    const candidate = await resolveCommercialFamilyForItem(prisma, {
       ...current,
       ...allowed,
       inventoryItem: current.inventoryItem,
     });
+    const dimensionError = validateOrderItemDimensionLimits(candidate);
     if (dimensionError) {
       return NextResponse.json({ error: dimensionError }, { status: 400 });
     }

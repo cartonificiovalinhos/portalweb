@@ -3,6 +3,7 @@ import { prisma } from '../../../../../lib/prisma';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '../../../../../lib/auth';
 import { sendOrderStatusChangeNotification } from '../../../../../lib/email';
+import { attachResolvedCommercialFamilies } from '@/lib/commercial-family-dimension-resolution';
 
 function normalizeDoc(doc: string): string {
   return (doc || '').replace(/\D+/g, '');
@@ -123,9 +124,11 @@ export async function GET(_: Request, props: { params: Promise<{ id: string }> }
     const clientId = order?.clientId != null ? Number((order as any).clientId) : null;
     if (clientId && Number.isFinite(clientId) && clientId > 0) {
       const itemRows: any[] = Array.isArray((order as any).items) ? (order as any).items : [];
+      const resolvedItems = await attachResolvedCommercialFamilies(prisma, itemRows);
+      (order as any).items = resolvedItems;
       const invIds = Array.from(
         new Set(
-          itemRows
+          resolvedItems
             .map((it) => Number(it?.inventoryItemId))
             .filter((n) => Number.isFinite(n) && n > 0)
             .map((n) => Math.trunc(n))
@@ -140,8 +143,7 @@ export async function GET(_: Request, props: { params: Promise<{ id: string }> }
         for (const l of links) {
           byInvId.set(Math.trunc(Number(l.inventoryItemId)), { unitPrice: Number(l.unitPrice ?? 0), manual: Boolean(l.manual) });
         }
-
-        for (const it of itemRows) {
+        for (const it of resolvedItems) {
           const invId = it?.inventoryItemId != null ? Math.trunc(Number(it.inventoryItemId)) : null;
           if (!invId) continue;
           const link = byInvId.get(invId);
@@ -153,6 +155,8 @@ export async function GET(_: Request, props: { params: Promise<{ id: string }> }
           }
         }
       }
+    } else if (Array.isArray((order as any).items)) {
+      (order as any).items = await attachResolvedCommercialFamilies(prisma, (order as any).items);
     }
 
     return NextResponse.json({ ...order, statusHistory: history });

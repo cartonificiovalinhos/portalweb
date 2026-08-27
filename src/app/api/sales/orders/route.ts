@@ -3,6 +3,7 @@ import { prisma } from '../../../../lib/prisma';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '../../../../lib/auth';
 import { validateOrderItemDimensionLimits } from '@/lib/order-item-dimension-limits';
+import { attachResolvedCommercialFamilies } from '@/lib/commercial-family-dimension-resolution';
 
 function normalizeDoc(doc: string): string {
   return (doc || '').replace(/\D+/g, '');
@@ -382,7 +383,8 @@ export async function POST(request: Request) {
       }
     }
 
-    const dimensionInvalid = normalizedItemsWithFamily.find((it: any) => Boolean(validateOrderItemDimensionLimits(it)));
+    const resolvedItemsWithFamily = await attachResolvedCommercialFamilies(prisma, normalizedItemsWithFamily);
+    const dimensionInvalid = resolvedItemsWithFamily.find((it: any) => Boolean(validateOrderItemDimensionLimits(it)));
     if (dimensionInvalid) {
       return NextResponse.json(
         { error: validateOrderItemDimensionLimits(dimensionInvalid) || 'Dimensões do item inválidas.' },
