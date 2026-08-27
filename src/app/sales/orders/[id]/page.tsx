@@ -9,7 +9,16 @@ type InventoryItem = {
   sku?: string | null;
   name: string;
   unit?: string | null;
-  commercialFamily?: { id: number; description?: string | null; name?: string | null; priceBy?: string | null } | null;
+  commercialFamily?: {
+    id: number;
+    description?: string | null;
+    name?: string | null;
+    priceBy?: string | null;
+    widthMin?: number | null;
+    widthMax?: number | null;
+    lengthMin?: number | null;
+    lengthMax?: number | null;
+  } | null;
   unitPrice?: number | null;
   clientItemManual?: boolean | null;
   width?: number | null;
@@ -468,7 +477,10 @@ export default function SalesOrderMaintenancePage() {
         body: JSON.stringify(payload)
       });
       
-      if (!res.ok) throw new Error('Falha ao adicionar item');
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || 'Falha ao adicionar item');
+      }
       
       setAddingItems(false);
       setSearchTerm('');
@@ -1393,7 +1405,10 @@ export default function SalesOrderMaintenancePage() {
                                 headers: { 'Content-Type': 'application/json' },
                                 body: JSON.stringify(updated)
                               });
-                              if (!res.ok) throw new Error('Falha ao salvar item');
+                               if (!res.ok) {
+                                 const err = await res.json().catch(() => ({}));
+                                 throw new Error(err.error || 'Falha ao salvar item');
+                               }
                            }}
                            onSaveSuccess={refreshOrder}
                            onDelete={async () => {

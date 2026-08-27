@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '../../../../lib/prisma';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '../../../../lib/auth';
+import { validateOrderItemDimensionLimits } from '@/lib/order-item-dimension-limits';
 
 function normalizeDoc(doc: string): string {
   return (doc || '').replace(/\D+/g, '');
@@ -338,6 +339,57 @@ export async function POST(request: Request) {
         lineTotal,
       };
     });
+
+    const normalizedItemsWithFamily = normalizedItems.map((it: any) => ({
+      ...it,
+      inventoryItem: null as any,
+    }));
+
+    const invIdsForLimits = Array.from(
+      new Set(
+        normalizedItemsWithFamily
+          .map((it: any) => Number(it.inventoryItemId))
+          .filter((n: number) => Number.isFinite(n) && n > 0)
+          .map((n: number) => Math.trunc(n))
+      )
+    );
+    if (invIdsForLimits.length > 0) {
+      const inventoryItems = await prisma.inventoryItem.findMany({
+        where: { id: { in: invIdsForLimits } },
+        select: {
+          id: true,
+          commercialFamily: {
+            select: {
+              id: true,
+              description: true,
+              name: true,
+              widthMin: true,
+              widthMax: true,
+              lengthMin: true,
+              lengthMax: true,
+            },
+          },
+        },
+      });
+      const familyByItemId = new Map<number, any>();
+      for (const inv of inventoryItems) {
+        familyByItemId.set(Number(inv.id), inv.commercialFamily ?? null);
+      }
+      for (const it of normalizedItemsWithFamily) {
+        const invId = Number(it.inventoryItemId);
+        if (Number.isFinite(invId) && invId > 0) {
+          it.inventoryItem = { commercialFamily: familyByItemId.get(Math.trunc(invId)) ?? null };
+        }
+      }
+    }
+
+    const dimensionInvalid = normalizedItemsWithFamily.find((it: any) => Boolean(validateOrderItemDimensionLimits(it)));
+    if (dimensionInvalid) {
+      return NextResponse.json(
+        { error: validateOrderItemDimensionLimits(dimensionInvalid) || 'Dimensões do item inválidas.' },
+        { status: 400 }
+      );
+    }
 
     if (clientId) {
       const invIds = Array.from(

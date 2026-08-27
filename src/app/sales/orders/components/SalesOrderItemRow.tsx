@@ -1,5 +1,6 @@
 "use client";
 import React, { useState, useEffect, useRef, useCallback } from "react";
+import { validateOrderItemDimensionField, validateOrderItemDimensionLimits } from "@/lib/order-item-dimension-limits";
 
 export type OrderItem = {
   id: number;
@@ -241,6 +242,11 @@ export const SalesOrderItemRow = ({
       alert('Não é permitido salvar item com preço zero.');
       return;
     }
+    const dimensionError = validateOrderItemDimensionLimits(merged);
+    if (dimensionError) {
+      alert(dimensionError);
+      return;
+    }
 
     setIsSaving(true);
     try {
@@ -249,7 +255,8 @@ export const SalesOrderItemRow = ({
       // Here we assume onAutoSave takes the updated object.
       await onAutoSave({ ...localItem, ...data });
       if (onSaveSuccess) onSaveSuccess();
-    } catch (e) {
+    } catch (e: any) {
+      alert(e?.message || String(e));
       console.error(e);
     } finally {
       setIsSaving(false);
@@ -260,6 +267,13 @@ export const SalesOrderItemRow = ({
 
   const handleChange = (field: keyof OrderItem, value: any) => {
     const updated = { ...localItem, [field]: value };
+    if (field === 'width' || field === 'length') {
+      const dimensionError = validateOrderItemDimensionField(updated, field, value);
+      if (dimensionError) {
+        alert(dimensionError);
+        return;
+      }
+    }
     setLocalItem(updated);
     onPreviewUpdate(updated); // Immediate update for UI/Calculations
     if (onAutoSave) {
@@ -621,12 +635,18 @@ export const SalesOrderItemCard = ({
       alert('Não é permitido salvar item com preço zero.');
       return;
     }
+    const dimensionError = validateOrderItemDimensionLimits(merged);
+    if (dimensionError) {
+      alert(dimensionError);
+      return;
+    }
 
     setIsSaving(true);
     try {
       await onAutoSave({ ...localItem, ...data });
       if (onSaveSuccess) onSaveSuccess();
-    } catch (e) {
+    } catch (e: any) {
+      alert(e?.message || String(e));
       console.error(e);
     } finally {
       setIsSaving(false);
@@ -637,6 +657,13 @@ export const SalesOrderItemCard = ({
 
   const handleChange = (field: keyof OrderItem, value: any) => {
     const updated = { ...localItem, [field]: value };
+    if (field === 'width' || field === 'length') {
+      const dimensionError = validateOrderItemDimensionField(updated, field, value);
+      if (dimensionError) {
+        alert(dimensionError);
+        return;
+      }
+    }
     setLocalItem(updated);
     onPreviewUpdate(updated);
     if (onAutoSave) {

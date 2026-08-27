@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '../../../../../../lib/prisma';
+import { validateOrderItemDimensionLimits } from '@/lib/order-item-dimension-limits';
 
 function parseIdParam(raw: unknown): number | null {
   const s = String(raw ?? '').trim();
@@ -59,7 +60,24 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
         sku: true,
         name: true,
         unitPrice: true,
+        width: true,
+        length: true,
         inventoryItemId: true,
+        inventoryItem: {
+          select: {
+            commercialFamily: {
+              select: {
+                id: true,
+                description: true,
+                name: true,
+                widthMin: true,
+                widthMax: true,
+                lengthMin: true,
+                lengthMax: true,
+              },
+            },
+          },
+        },
         order: { select: { clientId: true } },
       }
     });
@@ -124,6 +142,15 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
 
     const keys = Object.keys(allowed);
     if (keys.length === 0) return NextResponse.json({ error: 'Nada para atualizar' }, { status: 400 });
+
+    const dimensionError = validateOrderItemDimensionLimits({
+      ...current,
+      ...allowed,
+      inventoryItem: current.inventoryItem,
+    });
+    if (dimensionError) {
+      return NextResponse.json({ error: dimensionError }, { status: 400 });
+    }
 
     const updated = await prisma.$transaction(async (tx) => {
       const after = await tx.salesOrderItem.update({

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '../../../../../lib/prisma';
+import { validateOrderItemDimensionLimits } from '@/lib/order-item-dimension-limits';
 
 export async function POST(request: Request) {
   try {
@@ -23,11 +24,38 @@ export async function POST(request: Request) {
     if (body.tube !== undefined) payload.tube = Number(body.tube || 0);
 
     if (payload.inventoryItemId) {
-      const invItem = await prisma.inventoryItem.findUnique({ where: { id: payload.inventoryItemId } });
+      const invItem = await prisma.inventoryItem.findUnique({
+        where: { id: payload.inventoryItemId },
+        select: {
+          id: true,
+          width: true,
+          length: true,
+          grammage: true,
+          commercialFamily: {
+            select: {
+              id: true,
+              description: true,
+              name: true,
+              widthMin: true,
+              widthMax: true,
+              lengthMin: true,
+              lengthMax: true,
+            },
+          },
+        },
+      });
       if (invItem) {
         if (payload.width === undefined) payload.width = invItem.width;
         if (payload.length === undefined) payload.length = invItem.length;
         if (payload.grammage === undefined) payload.grammage = invItem.grammage;
+
+        const dimensionError = validateOrderItemDimensionLimits({
+          ...payload,
+          inventoryItem: { commercialFamily: invItem.commercialFamily ?? null },
+        });
+        if (dimensionError) {
+          return NextResponse.json({ error: dimensionError }, { status: 400 });
+        }
       }
     }
 
