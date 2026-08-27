@@ -509,6 +509,8 @@ export default function ClientDetailsPage() {
   const invoicesView = useMemo(() => {
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
 
     const isPaid = (inv: ClientInvoice) => String(inv.status || '').trim().toUpperCase() === 'PAGA';
     const dueDate = (inv: ClientInvoice) => parseCalendarDate(inv.dueDate);
