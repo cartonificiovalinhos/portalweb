@@ -7,6 +7,12 @@ function startOfToday(): Date {
   return d;
 }
 
+function startOfTomorrow(): Date {
+  const d = startOfToday();
+  d.setDate(d.getDate() + 1);
+  return d;
+}
+
 export async function GET(request: Request, props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
   try {
@@ -16,13 +22,14 @@ export async function GET(request: Request, props: { params: Promise<{ id: strin
     const url = new URL(request.url);
     const filter = String(url.searchParams.get('filter') || 'all').trim().toLowerCase();
     const today = startOfToday();
+    const tomorrow = startOfTomorrow();
 
     const where: any = { clientId: Math.trunc(clientId) };
     if (filter === 'due' || filter === 'a_vencer' || filter === 'avencer') {
-      where.dueDate = { gte: today };
+      where.dueDate = { gte: tomorrow };
       where.status = { not: 'PAGA' };
     } else if (filter === 'overdue' || filter === 'vencidos' || filter === 'vencido') {
-      where.dueDate = { lt: today };
+      where.dueDate = { lte: today };
       where.status = { not: 'PAGA' };
     }
 

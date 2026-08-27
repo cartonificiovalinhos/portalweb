@@ -219,7 +219,7 @@ export async function GET(request: Request) {
         const due = new Date(inv.dueDate);
         due.setHours(0, 0, 0, 0);
         const acc = totalsByClient.get(inv.clientId) ?? { titlesDue: 0, titlesOverdue: 0 };
-        if (due < today) acc.titlesOverdue += amount;
+        if (due <= today) acc.titlesOverdue += amount;
         else acc.titlesDue += amount;
         totalsByClient.set(inv.clientId, acc);
       }

@@ -84,6 +84,8 @@ const formatCalendarDateBr = (value?: string | null) => {
 const summarizeInvoiceTotals = (invoices: ClientInvoice[]) => {
   const now = new Date();
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const tomorrow = new Date(today);
+  tomorrow.setDate(tomorrow.getDate() + 1);
   let titlesDue = 0;
   let titlesOverdue = 0;
 
@@ -94,7 +96,7 @@ const summarizeInvoiceTotals = (invoices: ClientInvoice[]) => {
     if (!due) continue;
     const amount = Number(inv.totalValue || 0);
     if (!Number.isFinite(amount)) continue;
-    if (due < today) titlesOverdue += amount;
+    if (due <= today) titlesOverdue += amount;
     else titlesDue += amount;
   }
 
@@ -512,7 +514,7 @@ export default function ClientDetailsPage() {
     const dueDate = (inv: ClientInvoice) => parseCalendarDate(inv.dueDate);
     const isOverdue = (inv: ClientInvoice) => {
       const d = dueDate(inv);
-      return !isPaid(inv) && d != null && d < today;
+      return !isPaid(inv) && d != null && d <= today;
     };
 
     let filtered = clientInvoices;
@@ -522,7 +524,7 @@ export default function ClientDetailsPage() {
         if (isPaid(inv)) return false;
         const d = dueDate(inv);
         if (!d) return false;
-        return d >= today;
+        return d >= tomorrow;
       });
     }
     else if (invoiceFilter === 'overdue') {
@@ -2165,7 +2167,7 @@ export default function ClientDetailsPage() {
                         const raw = String(inv.status || '').trim().toUpperCase();
                         const isPaid = raw === 'PAGA';
                         const due = parseCalendarDate(inv.dueDate);
-                        const isOverdue = !isPaid && due != null && due < today;
+                        const isOverdue = !isPaid && due != null && due <= today;
                         const label = isPaid ? 'Paga' : (isOverdue ? 'Vencida' : 'Em Aberto');
                         const cls = isPaid
                           ? 'bg-green-100 text-green-800'
@@ -2198,7 +2200,7 @@ export default function ClientDetailsPage() {
                     const raw = String(inv.status || '').trim().toUpperCase();
                     const isPaid = raw === 'PAGA';
                     const due = parseCalendarDate(inv.dueDate);
-                    const isOverdue = !isPaid && due != null && due < today;
+                    const isOverdue = !isPaid && due != null && due <= today;
                     const label = isPaid ? 'Paga' : (isOverdue ? 'Vencida' : 'Em Aberto');
                     const cls = isPaid
                       ? 'bg-green-100 text-green-800'
