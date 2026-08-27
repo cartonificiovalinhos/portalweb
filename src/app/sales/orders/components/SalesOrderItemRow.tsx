@@ -1,6 +1,6 @@
 "use client";
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { validateOrderItemDimensionField, validateOrderItemDimensionLimits } from "@/lib/order-item-dimension-limits";
+import { validateOrderItemDimensionLimits } from "@/lib/order-item-dimension-limits";
 
 export type OrderItem = {
   id: number;
@@ -208,6 +208,7 @@ export const SalesOrderItemRow = ({
   const [weightInput, setWeightInput] = useState('');
   const [isEditingWeight, setIsEditingWeight] = useState(false);
   const [isRowLocked, setIsRowLocked] = useState(false);
+  const [hasPendingDimensionChanges, setHasPendingDimensionChanges] = useState(false);
 
   if (minUnitPriceItemIdRef.current !== item.id) {
     minUnitPriceItemIdRef.current = item.id;
@@ -220,6 +221,7 @@ export const SalesOrderItemRow = ({
         if (prev.discountPct !== item.discountPct) {
             setDiscountInput(item.discountPct.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
         }
+        setHasPendingDimensionChanges(false);
         return item;
       }
       return prev;
@@ -242,11 +244,6 @@ export const SalesOrderItemRow = ({
       alert('Não é permitido salvar item com preço zero.');
       return;
     }
-    const dimensionError = validateOrderItemDimensionLimits(merged);
-    if (dimensionError) {
-      alert(dimensionError);
-      return;
-    }
 
     setIsSaving(true);
     try {
@@ -267,18 +264,53 @@ export const SalesOrderItemRow = ({
 
   const handleChange = (field: keyof OrderItem, value: any) => {
     const updated = { ...localItem, [field]: value };
-    if (field === 'width' || field === 'length') {
-      const dimensionError = validateOrderItemDimensionField(updated, field, value);
-      if (dimensionError) {
-        alert(dimensionError);
-        return;
-      }
+    const isDimensionField = field === 'width' || field === 'length';
+    if (isDimensionField) {
+      setHasPendingDimensionChanges(true);
     }
     setLocalItem(updated);
-    onPreviewUpdate(updated); // Immediate update for UI/Calculations
-    if (onAutoSave) {
+    const shouldPropagateImmediately = Boolean(onAutoSave);
+    if (shouldPropagateImmediately) {
+      onPreviewUpdate(updated); // Immediate update for UI/Calculations
+    }
+    if (onAutoSave && !isDimensionField && !hasPendingDimensionChanges) {
         debouncedSave(updated); // Delayed save for API
     }
+  };
+
+  const handleSaveToggle = async () => {
+    if (lockToggleDisabled) return;
+    if (isEffectivelyLocked) {
+      setIsRowLocked(false);
+      return;
+    }
+    if (Number(localItem.unitPrice ?? 0) <= 0) {
+      alert('Não é permitido salvar item com preço zero.');
+      return;
+    }
+    const dimensionError = validateOrderItemDimensionLimits(localItem);
+    if (dimensionError) {
+      alert(dimensionError);
+      return;
+    }
+    if (onAutoSave) {
+      setIsSaving(true);
+      try {
+        await onAutoSave(localItem);
+        if (onSaveSuccess) onSaveSuccess();
+        setHasPendingDimensionChanges(false);
+      } catch (e: any) {
+        alert(e?.message || String(e));
+        console.error(e);
+        return;
+      } finally {
+        setIsSaving(false);
+      }
+    } else {
+      onPreviewUpdate(localItem);
+      setHasPendingDimensionChanges(false);
+    }
+    setIsRowLocked(true);
   };
 
   const handleDiscountChange = (val: string) => {
@@ -462,14 +494,7 @@ export const SalesOrderItemRow = ({
                   aria-label={isEffectivelyLocked ? 'Editar item' : 'Salvar item'}
                   disabled={lockToggleDisabled}
                   style={{ opacity: lockToggleDisabled ? 0.5 : 1, pointerEvents: lockToggleDisabled ? 'none' : 'auto' }}
-                  onClick={() => {
-                    if (lockToggleDisabled) return;
-                    if (!isEffectivelyLocked && Number(localItem.unitPrice ?? 0) <= 0) {
-                      alert('Não é permitido salvar item com preço zero.');
-                      return;
-                    }
-                    setIsRowLocked((prev) => !prev);
-                  }}
+                  onClick={handleSaveToggle}
                 >
                   {isEffectivelyLocked ? (
                     <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path></svg>
@@ -602,6 +627,7 @@ export const SalesOrderItemCard = ({
   const [weightInput, setWeightInput] = useState('');
   const [isEditingWeight, setIsEditingWeight] = useState(false);
   const [isRowLocked, setIsRowLocked] = useState(false);
+  const [hasPendingDimensionChanges, setHasPendingDimensionChanges] = useState(false);
 
   if (minUnitPriceItemIdRef.current !== item.id) {
     minUnitPriceItemIdRef.current = item.id;
@@ -614,6 +640,7 @@ export const SalesOrderItemCard = ({
         if (prev.discountPct !== item.discountPct) {
             setDiscountInput(item.discountPct.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
         }
+        setHasPendingDimensionChanges(false);
         return item;
       }
       return prev;
@@ -635,11 +662,6 @@ export const SalesOrderItemCard = ({
       alert('Não é permitido salvar item com preço zero.');
       return;
     }
-    const dimensionError = validateOrderItemDimensionLimits(merged);
-    if (dimensionError) {
-      alert(dimensionError);
-      return;
-    }
 
     setIsSaving(true);
     try {
@@ -657,18 +679,53 @@ export const SalesOrderItemCard = ({
 
   const handleChange = (field: keyof OrderItem, value: any) => {
     const updated = { ...localItem, [field]: value };
-    if (field === 'width' || field === 'length') {
-      const dimensionError = validateOrderItemDimensionField(updated, field, value);
-      if (dimensionError) {
-        alert(dimensionError);
-        return;
-      }
+    const isDimensionField = field === 'width' || field === 'length';
+    if (isDimensionField) {
+      setHasPendingDimensionChanges(true);
     }
     setLocalItem(updated);
-    onPreviewUpdate(updated);
-    if (onAutoSave) {
+    const shouldPropagateImmediately = Boolean(onAutoSave);
+    if (shouldPropagateImmediately) {
+      onPreviewUpdate(updated);
+    }
+    if (onAutoSave && !isDimensionField && !hasPendingDimensionChanges) {
         debouncedSave(updated);
     }
+  };
+
+  const handleSaveToggle = async () => {
+    if (lockToggleDisabled) return;
+    if (isEffectivelyLocked) {
+      setIsRowLocked(false);
+      return;
+    }
+    if (Number(localItem.unitPrice ?? 0) <= 0) {
+      alert('Não é permitido salvar item com preço zero.');
+      return;
+    }
+    const dimensionError = validateOrderItemDimensionLimits(localItem);
+    if (dimensionError) {
+      alert(dimensionError);
+      return;
+    }
+    if (onAutoSave) {
+      setIsSaving(true);
+      try {
+        await onAutoSave(localItem);
+        if (onSaveSuccess) onSaveSuccess();
+        setHasPendingDimensionChanges(false);
+      } catch (e: any) {
+        alert(e?.message || String(e));
+        console.error(e);
+        return;
+      } finally {
+        setIsSaving(false);
+      }
+    } else {
+      onPreviewUpdate(localItem);
+      setHasPendingDimensionChanges(false);
+    }
+    setIsRowLocked(true);
   };
 
   const handleDiscountChange = (val: string) => {
@@ -741,14 +798,7 @@ export const SalesOrderItemCard = ({
             aria-label={isEffectivelyLocked ? 'Editar item' : 'Salvar item'}
             disabled={lockToggleDisabled}
             style={{ opacity: lockToggleDisabled ? 0.5 : 1, pointerEvents: lockToggleDisabled ? 'none' : 'auto' }}
-            onClick={() => {
-              if (lockToggleDisabled) return;
-              if (!isEffectivelyLocked && Number(localItem.unitPrice ?? 0) <= 0) {
-                alert('Não é permitido salvar item com preço zero.');
-                return;
-              }
-              setIsRowLocked((prev) => !prev);
-            }}
+            onClick={handleSaveToggle}
           >
             {isEffectivelyLocked ? (
               <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path></svg>

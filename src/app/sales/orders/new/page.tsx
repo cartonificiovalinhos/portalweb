@@ -1,7 +1,6 @@
 "use client";
 import React, { useEffect, useMemo, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { validateOrderItemDimensionLimits } from "@/lib/order-item-dimension-limits";
 
 type InventoryItem = {
   id: number;
@@ -450,12 +449,6 @@ function NewSalesOrderContent() {
       alert(`Não é permitido salvar item com preço zero: ${String(bad.sku || bad.name || 'Item')}`);
       return;
     }
-    const dimensionInvalid = (order.items || []).find((it) => Boolean(validateOrderItemDimensionLimits(it)));
-    if (dimensionInvalid) {
-      alert(validateOrderItemDimensionLimits(dimensionInvalid) || 'Dimensões do item inválidas.');
-      return;
-    }
-    
     setLoading(true);
     try {
       const res = await fetch('/api/sales/orders', {

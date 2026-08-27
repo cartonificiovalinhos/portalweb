@@ -362,7 +362,6 @@ export async function POST(request: Request) {
             select: {
               id: true,
               description: true,
-              name: true,
               widthMin: true,
               widthMax: true,
               lengthMin: true,

@@ -69,7 +69,6 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
               select: {
                 id: true,
                 description: true,
-                name: true,
                 widthMin: true,
                 widthMax: true,
                 lengthMin: true,
