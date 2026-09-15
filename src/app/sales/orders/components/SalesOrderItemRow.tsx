@@ -1,6 +1,7 @@
 "use client";
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { validateOrderItemDimensionLimits } from "@/lib/order-item-dimension-limits";
+import { resolveItemClientOrderNumber } from "@/lib/sales-order-client-fields";
 
 export type OrderItem = {
   id: number;
@@ -20,6 +21,7 @@ export type OrderItem = {
   inventoryItem?: any;
   creases?: Record<string, number> | null;
   clientOrderNumber?: string | null;
+  clientItemCode?: string | null;
   clientOrderItemNumber?: number | null;
   itemDeliveryDate?: string | Date | null;
   internalResin?: boolean;
@@ -181,6 +183,7 @@ interface SalesOrderItemRowProps {
   hasSheetCol: boolean;
   hasCoreCol: boolean;
   canDelete: boolean;
+  headerClientOrderNumber?: string | null;
 }
 
 export const SalesOrderItemRow = ({
@@ -196,7 +199,8 @@ export const SalesOrderItemRow = ({
   fmtInt,
   hasSheetCol,
   hasCoreCol,
-  canDelete
+  canDelete,
+  headerClientOrderNumber
 }: SalesOrderItemRowProps) => {
   const [localItem, setLocalItem] = useState<OrderItem>(item);
   const [discountInput, setDiscountInput] = useState(
@@ -369,6 +373,7 @@ export const SalesOrderItemRow = ({
         ? (weightKg / (localItem.quantity ?? 0)) * (localItem.unitPrice ?? 0)
         : 0
       : (localItem.unitPrice ?? 0);
+  const effectiveClientOrderNumber = resolveItemClientOrderNumber(localItem.clientOrderNumber, headerClientOrderNumber) ?? '';
 
   return (
     <>
@@ -387,16 +392,16 @@ export const SalesOrderItemRow = ({
                     <FormattedIntInput 
                         className={`${compactW} px-2 py-1 border rounded ${!canEdit ? disabledClass : ''}`}
                         disabled={!canEdit}
-                        value={localItem.length}
-                        onChange={(val) => handleChange('length', val)}
+                        value={localItem.width}
+                        onChange={(val) => handleChange('width', val)}
                     />
                 ) : '-'}</td>
                 <td className="p-2">{showWidthLengthGram ? (
                     <FormattedIntInput 
                         className={`${compactW} px-2 py-1 border rounded ${!canEdit ? disabledClass : ''}`}
                         disabled={!canEdit}
-                        value={localItem.width}
-                        onChange={(val) => handleChange('width', val)}
+                        value={localItem.length}
+                        onChange={(val) => handleChange('length', val)}
                     />
                 ) : '-'}</td>
                 <td className="p-2">{showWidthLengthGram ? (
@@ -547,8 +552,18 @@ export const SalesOrderItemRow = ({
                     type="text" 
                     className={`w-48 px-2 py-1 border rounded text-sm ${!canEdit ? disabledClass : ''}`}
                     disabled={!canEdit}
-                    value={localItem.clientOrderNumber ?? ''}
-                    onChange={(e) => handleChange('clientOrderNumber', e.target.value)}
+                    value={effectiveClientOrderNumber}
+                    onChange={(e) => handleChange('clientOrderNumber', e.target.value || null)}
+                />
+                </div>
+                <div className="space-y-1">
+                <label className="text-xs text-gray-600 block">Cod Item do Cliente</label>
+                <input
+                    type="text"
+                    className={`w-40 px-2 py-1 border rounded text-sm ${!canEdit ? disabledClass : ''}`}
+                    disabled={!canEdit}
+                    value={localItem.clientItemCode ?? ''}
+                    onChange={(e) => handleChange('clientItemCode', e.target.value || null)}
                 />
                 </div>
                 <div className="space-y-1">
@@ -615,7 +630,8 @@ export const SalesOrderItemCard = ({
   fmtInt,
   hasSheetCol,
   hasCoreCol,
-  canDelete
+  canDelete,
+  headerClientOrderNumber
 }: SalesOrderItemRowProps) => {
   const [localItem, setLocalItem] = useState<OrderItem>(item);
   const [discountInput, setDiscountInput] = useState(
@@ -782,6 +798,7 @@ export const SalesOrderItemCard = ({
         ? (weightKg / (localItem.quantity ?? 0)) * (localItem.unitPrice ?? 0)
         : 0
       : (localItem.unitPrice ?? 0);
+  const effectiveClientOrderNumber = resolveItemClientOrderNumber(localItem.clientOrderNumber, headerClientOrderNumber) ?? '';
 
   return (
     <div className={`p-3 ${isSaving ? 'bg-blue-50' : ''}`}>
@@ -896,21 +913,21 @@ export const SalesOrderItemCard = ({
         {hasSheetCol && showWidthLengthGram && (
           <>
             <div>
-              <div className="text-[11px] text-gray-600">Compr.</div>
-              <FormattedIntInput 
-                className={`w-full px-2 py-1 border rounded text-sm ${!canEdit ? disabledClass : ''}`}
-                disabled={!canEdit}
-                value={localItem.length}
-                onChange={(val) => handleChange('length', val)}
-              />
-            </div>
-            <div>
               <div className="text-[11px] text-gray-600">Larg.</div>
               <FormattedIntInput 
                 className={`w-full px-2 py-1 border rounded text-sm ${!canEdit ? disabledClass : ''}`}
                 disabled={!canEdit}
                 value={localItem.width}
                 onChange={(val) => handleChange('width', val)}
+              />
+            </div>
+            <div>
+              <div className="text-[11px] text-gray-600">Compr.</div>
+              <FormattedIntInput 
+                className={`w-full px-2 py-1 border rounded text-sm ${!canEdit ? disabledClass : ''}`}
+                disabled={!canEdit}
+                value={localItem.length}
+                onChange={(val) => handleChange('length', val)}
               />
             </div>
             <div className="col-span-2">
@@ -982,8 +999,18 @@ export const SalesOrderItemCard = ({
                     type="text" 
                     className={`w-full px-2 py-1 border rounded text-sm ${!canEdit ? disabledClass : ''}`}
                     disabled={!canEdit}
-                    value={localItem.clientOrderNumber ?? ''}
-                    onChange={(e) => handleChange('clientOrderNumber', e.target.value)}
+                    value={effectiveClientOrderNumber}
+                    onChange={(e) => handleChange('clientOrderNumber', e.target.value || null)}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs text-gray-600 block">Cod Item do Cliente</label>
+                  <input
+                    type="text"
+                    className={`w-full px-2 py-1 border rounded text-sm ${!canEdit ? disabledClass : ''}`}
+                    disabled={!canEdit}
+                    value={localItem.clientItemCode ?? ''}
+                    onChange={(e) => handleChange('clientItemCode', e.target.value || null)}
                   />
                 </div>
                 <div className="grid grid-cols-2 gap-3">

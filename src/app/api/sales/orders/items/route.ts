@@ -23,6 +23,13 @@ export async function POST(request: Request) {
     if (body.grammage !== undefined) payload.grammage = Number(body.grammage || 0);
     if (body.diameter !== undefined) payload.diameter = Number(body.diameter || 0);
     if (body.tube !== undefined) payload.tube = Number(body.tube || 0);
+    if (body.clientOrderNumber !== undefined) payload.clientOrderNumber = String(body.clientOrderNumber).trim() || null;
+    if (body.clientItemCode !== undefined) payload.clientItemCode = String(body.clientItemCode).trim() || null;
+    if (body.clientOrderItemNumber !== undefined) payload.clientOrderItemNumber = body.clientOrderItemNumber ? Number(body.clientOrderItemNumber) : null;
+    if (body.itemDeliveryDate !== undefined) payload.itemDeliveryDate = body.itemDeliveryDate ? new Date(body.itemDeliveryDate) : null;
+    if (body.internalResin !== undefined) payload.internalResin = Boolean(body.internalResin);
+    if (body.externalResin !== undefined) payload.externalResin = Boolean(body.externalResin);
+    if (body.creases !== undefined) payload.creases = body.creases;
 
     if (payload.inventoryItemId) {
       const invItem = await prisma.inventoryItem.findUnique({
@@ -116,6 +123,13 @@ export async function POST(request: Request) {
         grammage: payload.grammage ?? null,
         diameter: payload.diameter ?? null,
         tube: payload.tube ?? null,
+        clientOrderNumber: payload.clientOrderNumber ?? null,
+        clientItemCode: payload.clientItemCode ?? null,
+        clientOrderItemNumber: payload.clientOrderItemNumber ?? null,
+        itemDeliveryDate: payload.itemDeliveryDate ?? null,
+        internalResin: payload.internalResin ?? false,
+        externalResin: payload.externalResin ?? false,
+        creases: payload.creases ?? null,
       },
     });
     return NextResponse.json(created, { status: 201 });

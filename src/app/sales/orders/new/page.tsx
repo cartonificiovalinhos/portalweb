@@ -41,6 +41,7 @@ type OrderItem = {
   tube?: number | null;
   inventoryItem?: InventoryItem | null;
   clientOrderNumber?: string | null;
+  clientItemCode?: string | null;
   clientOrderItemNumber?: number | null;
   itemDeliveryDate?: string | Date | null;
   internalResin?: boolean;
@@ -56,6 +57,7 @@ type SalesOrder = {
   customerName: string;
   customerId?: number;
   customerDoc?: string | null;
+  clientOrderNumber?: string | null;
   triangularCustomerName?: string | null;
   triangularCustomerDoc?: string | null;
   paymentTerms?: string | null;
@@ -190,6 +192,7 @@ function NewSalesOrderContent() {
     orderDate: new Date().toISOString(),
     customerName: '',
     customerId: undefined,
+    clientOrderNumber: '',
     paymentTerms: '',
     deliveryDate: '',
     items: [],
@@ -309,6 +312,7 @@ function NewSalesOrderContent() {
             tube: it?.tube ?? null,
             inventoryItem: inv ?? fallbackInv,
             clientOrderNumber: it?.clientOrderNumber ?? null,
+            clientItemCode: it?.clientItemCode ?? null,
             clientOrderItemNumber: it?.clientOrderItemNumber ?? null,
             itemDeliveryDate: it?.itemDeliveryDate ?? null,
             internalResin: !!it?.internalResin,
@@ -324,6 +328,7 @@ function NewSalesOrderContent() {
           customerName: String((src as any)?.customerName || ''),
           customerDoc: (src as any)?.customerDoc ?? null,
           customerId: Number.isFinite(clientId) && clientId > 0 ? clientId : undefined,
+          clientOrderNumber: (src as any)?.clientOrderNumber ?? '',
           paymentTerms: (src as any)?.paymentTerms ?? '',
           deliveryDate: (src as any)?.deliveryDate ? new Date((src as any).deliveryDate).toISOString().slice(0, 10) : '',
           triangularCustomerName: (src as any)?.triangularCustomerName ?? '',
@@ -408,7 +413,8 @@ function NewSalesOrderContent() {
       inventoryItem: invItem,
       width: invItem.width,
       length: invItem.length,
-      grammage: invItem.grammage
+      grammage: invItem.grammage,
+      clientItemCode: null
     };
     
     setOrder(prev => {
@@ -458,6 +464,7 @@ function NewSalesOrderContent() {
           customerName: order.customerName,
           customerDoc: order.customerDoc,
           customerId: order.customerId,
+          clientOrderNumber: order.clientOrderNumber,
           triangularCustomerName: order.triangularCustomerName,
           triangularCustomerDoc: order.triangularCustomerDoc,
           entityCnpj: sessionEntity?.cnpj,
@@ -478,6 +485,7 @@ function NewSalesOrderContent() {
             diameter: it.diameter,
             tube: it.tube,
             clientOrderNumber: it.clientOrderNumber,
+            clientItemCode: it.clientItemCode,
             clientOrderItemNumber: it.clientOrderItemNumber,
             itemDeliveryDate: it.itemDeliveryDate,
             internalResin: it.internalResin,
@@ -834,6 +842,17 @@ function NewSalesOrderContent() {
               </div>
               <div className="md:col-span-6"></div>
 
+              <div className="md:col-span-6">
+                <span className="text-gray-600">Número Pedido/Ordem Compra Cliente</span>
+                <input
+                  type="text"
+                  className="mt-1 w-full px-2 py-1 border rounded"
+                  value={order.clientOrderNumber ?? ''}
+                  onChange={(e) => setOrder(prev => ({ ...prev, clientOrderNumber: e.target.value }))}
+                />
+              </div>
+              <div className="md:col-span-6"></div>
+
               <div className="md:col-span-12 grid grid-cols-1 md:grid-cols-3 gap-3">
                 <div>
                   <span className="text-gray-600">Total Sem Imp R$</span>
@@ -921,6 +940,7 @@ function NewSalesOrderContent() {
                   fmtInt={fmtInt}
                   hasSheetCol={list.some(supportsSheetDims)}
                   hasCoreCol={list.some(supportsCoreDims)}
+                  headerClientOrderNumber={order.clientOrderNumber ?? null}
                 />
               ))}
             </div>
@@ -930,7 +950,7 @@ function NewSalesOrderContent() {
                   <tr className="bg-gray-50">
                     <th className="p-2 text-left">Item</th>
                     <th className="p-2 text-left">SKU</th>
-                    {(() => { const hasSheet = list.some(supportsSheetDims); return hasSheet ? (<><th className="p-2 text-left">Compr.</th><th className="p-2 text-left">Larg.</th><th className="p-2 text-left">Gram.</th></>) : null; })()}
+                    {(() => { const hasSheet = list.some(supportsSheetDims); return hasSheet ? (<><th className="p-2 text-left">Larg.</th><th className="p-2 text-left">Compr.</th><th className="p-2 text-left">Gram.</th></>) : null; })()}
                     {(() => { const hasCore = list.some(supportsCoreDims); return hasCore ? (<><th className="p-2 text-left">Diâmetro</th><th className="p-2 text-left">Tubete</th></>) : null; })()}
                     <th className="p-2 text-left">UM</th>
                     <th className="p-2 text-left">Qtd</th>
@@ -957,6 +977,7 @@ function NewSalesOrderContent() {
                       fmtInt={fmtInt}
                       hasSheetCol={list.some(supportsSheetDims)}
                       hasCoreCol={list.some(supportsCoreDims)}
+                      headerClientOrderNumber={order.clientOrderNumber ?? null}
                     />
                   ))}
                 </tbody>

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '../../../../../../lib/prisma';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '../../../../../../lib/auth';
+import { resolveItemClientOrderNumber } from '@/lib/sales-order-client-fields';
 import { sendOrderStatusChangeNotification } from '../../../../../../lib/email';
 
 export async function POST(request: Request, props: { params: Promise<{ id: string }> }) {
@@ -130,7 +131,7 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
               crease6: creases?.['6'] || 0,
               crease7: creases?.['7'] || 0,
               crease8: creases?.['8'] || 0,
-              clientOrderNumber: item.clientOrderNumber || "",
+              clientOrderNumber: resolveItemClientOrderNumber(item.clientOrderNumber, order.clientOrderNumber) || "",
               clientOrderItemNumber: item.clientOrderItemNumber || 0,
               deliveryDate: item.itemDeliveryDate ? item.itemDeliveryDate.toISOString().split('T')[0] : "",
               externalResin: item.externalResin ? "S" : "N",

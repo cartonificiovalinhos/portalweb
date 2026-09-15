@@ -44,6 +44,7 @@ type OrderItem = {
   inventoryItem?: InventoryItem | null;
   creases?: Record<string, number> | null;
   clientOrderNumber?: string | null;
+  clientItemCode?: string | null;
   clientOrderItemNumber?: number | null;
   itemDeliveryDate?: string | Date | null;
   internalResin?: boolean;
@@ -58,6 +59,7 @@ type SalesOrder = {
   customerName: string;
   customerDoc?: string | null;
   clientId?: number | null;
+  clientOrderNumber?: string | null;
   paymentTerms?: string | null;
   deliveryDate?: string | null;
   notes?: string | null;
@@ -333,7 +335,7 @@ export default function SalesOrderMaintenancePage() {
   const [error, setError] = useState<string | null>(null);
   const [helpOpen, setHelpOpen] = useState(false);
   const [showFeaturesFor, setShowFeaturesFor] = useState<number | null>(null);
-  const [hdrDraft, setHdrDraft] = useState<{ paymentTerms?: string; deliveryDate?: string; customerName?: string; customerDoc?: string; triangularCustomerName?: string; triangularCustomerDoc?: string }>({});
+  const [hdrDraft, setHdrDraft] = useState<{ paymentTerms?: string; deliveryDate?: string; customerName?: string; customerDoc?: string; clientOrderNumber?: string; triangularCustomerName?: string; triangularCustomerDoc?: string }>({});
   const [deliveryDateBr, setDeliveryDateBr] = useState('');
   const [hdrCustomerId, setHdrCustomerId] = useState<number | null>(null);
   const [isHeaderEditing, setIsHeaderEditing] = useState(false);
@@ -468,7 +470,8 @@ export default function SalesOrderMaintenancePage() {
         discountPct: 0,
         width: item.width,
         length: item.length,
-        grammage: item.grammage
+        grammage: item.grammage,
+        clientItemCode: null
       };
       
       const res = await fetch('/api/sales/orders/items', {
@@ -543,6 +546,7 @@ export default function SalesOrderMaintenancePage() {
           deliveryDate: data.deliveryDate ? new Date(data.deliveryDate).toISOString().slice(0, 10) : '',
           customerName: data.customerName || '',
           customerDoc: data.customerDoc || '',
+          clientOrderNumber: data.clientOrderNumber || '',
           triangularCustomerName: data.triangularCustomerName || '',
           triangularCustomerDoc: data.triangularCustomerDoc || ''
         });
@@ -609,7 +613,7 @@ export default function SalesOrderMaintenancePage() {
     return qty * price;
   };
 
-  const saveHeader = async (partial: { paymentTerms?: string; deliveryDate?: string; customerName?: string; customerDoc?: string; triangularCustomerName?: string; triangularCustomerDoc?: string; clientId?: number | null }) => {
+  const saveHeader = async (partial: { paymentTerms?: string; deliveryDate?: string; customerName?: string; customerDoc?: string; clientOrderNumber?: string; triangularCustomerName?: string; triangularCustomerDoc?: string; clientId?: number | null }) => {
     if (!order) return;
 
     // Validate items: Sum of creases vs Width
@@ -641,6 +645,7 @@ export default function SalesOrderMaintenancePage() {
         deliveryDate: updated.deliveryDate ? new Date(updated.deliveryDate).toISOString().slice(0,10) : '',
         customerName: updated.customerName || '',
         customerDoc: updated.customerDoc || '',
+        clientOrderNumber: updated.clientOrderNumber || '',
         triangularCustomerName: updated.triangularCustomerName || '',
         triangularCustomerDoc: updated.triangularCustomerDoc || ''
       });
@@ -867,14 +872,14 @@ export default function SalesOrderMaintenancePage() {
                           alert('Entrega inválida. Use DD/MM/AAAA.');
                           return;
                         }
-                        saveHeader({ paymentTerms: hdrDraft.paymentTerms, deliveryDate: iso, customerName: hdrDraft.customerName, customerDoc: hdrDraft.customerDoc, triangularCustomerName: hdrDraft.triangularCustomerName, triangularCustomerDoc: hdrDraft.triangularCustomerDoc, clientId: hdrCustomerId });
+                      saveHeader({ paymentTerms: hdrDraft.paymentTerms, deliveryDate: iso, customerName: hdrDraft.customerName, customerDoc: hdrDraft.customerDoc, clientOrderNumber: hdrDraft.clientOrderNumber, triangularCustomerName: hdrDraft.triangularCustomerName, triangularCustomerDoc: hdrDraft.triangularCustomerDoc, clientId: hdrCustomerId });
                         return;
                       }
-                      saveHeader({ paymentTerms: hdrDraft.paymentTerms, deliveryDate: '', customerName: hdrDraft.customerName, customerDoc: hdrDraft.customerDoc, triangularCustomerName: hdrDraft.triangularCustomerName, triangularCustomerDoc: hdrDraft.triangularCustomerDoc, clientId: hdrCustomerId });
+                      saveHeader({ paymentTerms: hdrDraft.paymentTerms, deliveryDate: '', customerName: hdrDraft.customerName, customerDoc: hdrDraft.customerDoc, clientOrderNumber: hdrDraft.clientOrderNumber, triangularCustomerName: hdrDraft.triangularCustomerName, triangularCustomerDoc: hdrDraft.triangularCustomerDoc, clientId: hdrCustomerId });
                     }}>
                       <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M9 16.17 4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17Z"/></svg>
                     </button>
-                    <button className="inline-flex items-center justify-center w-8 h-8 bg-red-50 border border-red-200 rounded shadow-sm hover:bg-red-100 text-red-600" title="Cancelar" aria-label="Cancelar" onClick={() => { setIsHeaderEditing(false); setHdrCustomerId((order as any)?.clientId != null ? Number((order as any).clientId) : hdrCustomerId); setHdrDraft({ paymentTerms: order.paymentTerms || '', deliveryDate: order.deliveryDate ? new Date(order.deliveryDate).toISOString().slice(0,10) : '', customerName: order.customerName || '', customerDoc: order.customerDoc || '', triangularCustomerName: order.triangularCustomerName || '', triangularCustomerDoc: order.triangularCustomerDoc || '' }); }}>
+                    <button className="inline-flex items-center justify-center w-8 h-8 bg-red-50 border border-red-200 rounded shadow-sm hover:bg-red-100 text-red-600" title="Cancelar" aria-label="Cancelar" onClick={() => { setIsHeaderEditing(false); setHdrCustomerId((order as any)?.clientId != null ? Number((order as any).clientId) : hdrCustomerId); setHdrDraft({ paymentTerms: order.paymentTerms || '', deliveryDate: order.deliveryDate ? new Date(order.deliveryDate).toISOString().slice(0,10) : '', customerName: order.customerName || '', customerDoc: order.customerDoc || '', clientOrderNumber: order.clientOrderNumber || '', triangularCustomerName: order.triangularCustomerName || '', triangularCustomerDoc: order.triangularCustomerDoc || '' }); }}>
                       <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M18.3 5.71 12 12l6.3 6.29-1.41 1.42L10.59 13.41 4.29 19.71 2.88 18.3 9.17 12 2.88 5.71 4.29 4.29 10.59 10.59 16.89 4.29l1.41 1.42Z"/></svg>
                     </button>
                       </>
@@ -1092,6 +1097,16 @@ export default function SalesOrderMaintenancePage() {
                           </div>
                         )}
                       />
+                  </div>
+                  <div className={`md:col-span-6 ${!isHeaderEditing ? "opacity-75 pointer-events-none" : ""}`}>
+                    <span className="text-gray-600">Número Pedido/Ordem Compra Cliente</span>
+                    <input
+                      type="text"
+                      className="mt-1 w-full px-2 py-1 border rounded"
+                      value={hdrDraft.clientOrderNumber ?? ''}
+                      onChange={(e) => setHdrDraft((d) => ({ ...d, clientOrderNumber: e.target.value }))}
+                      disabled={!isHeaderEditing}
+                    />
                   </div>
                 </div>
 
@@ -1362,6 +1377,7 @@ export default function SalesOrderMaintenancePage() {
                       hasSheetCol={hasSheet}
                       hasCoreCol={hasCore}
                       onSaveSuccess={refreshOrder}
+                      headerClientOrderNumber={order.clientOrderNumber ?? null}
                     />
                   );
                 })}
@@ -1372,7 +1388,7 @@ export default function SalesOrderMaintenancePage() {
                     <tr className="bg-gray-50">
                       <th className="p-2 text-left">Item</th>
                       <th className="p-2 text-left">SKU</th>
-                      {(() => { const hasSheet = list.some(supportsSheetDims); return hasSheet ? (<><th className="p-2 text-left">Compr.</th><th className="p-2 text-left">Larg.</th><th className="p-2 text-left">Gram.</th></>) : null; })()}
+                      {(() => { const hasSheet = list.some(supportsSheetDims); return hasSheet ? (<><th className="p-2 text-left">Larg.</th><th className="p-2 text-left">Compr.</th><th className="p-2 text-left">Gram.</th></>) : null; })()}
                       {(() => { const hasCore = list.some(supportsCoreDims); return hasCore ? (<><th className="p-2 text-left">Diâmetro</th><th className="p-2 text-left">Tubete</th></>) : null; })()}
                       <th className="p-2 text-left">UM</th>
                       <th className="p-2 text-left">Qtd</th>
@@ -1429,6 +1445,7 @@ export default function SalesOrderMaintenancePage() {
                            // Extra props for column visibility
                            hasSheetCol={hasSheet}
                            hasCoreCol={hasCore}
+                           headerClientOrderNumber={order.clientOrderNumber ?? null}
                         />
                       );
                     })}

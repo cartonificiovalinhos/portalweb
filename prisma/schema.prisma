@@ -279,6 +279,7 @@ model SalesOrder {
   orderDate              DateTime                  @default(now())
   customerName           String
   customerDoc            String?
+  clientOrderNumber      String?
   paymentTerms           String?
   carrier                String?
   deliveryDate           DateTime?
@@ -360,6 +361,7 @@ model SalesOrderItem {
   weightKg              Int?
   creases               Json?
   clientOrderNumber     String?
+  clientItemCode        String?
   clientOrderItemNumber Int?
   itemDeliveryDate      DateTime?
   internalResin         Boolean?       @default(false)

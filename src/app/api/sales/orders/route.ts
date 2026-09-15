@@ -221,6 +221,7 @@ export async function POST(request: Request) {
       customerName,
       customerDoc,
       customerId,
+      clientOrderNumber,
       triangularCustomerName,
       triangularCustomerDoc,
       paymentTerms,
@@ -237,6 +238,7 @@ export async function POST(request: Request) {
 
     const customerDocNorm = typeof customerDoc === 'string' ? normalizeDoc(customerDoc) : undefined;
     const triangularCustomerDocNorm = typeof triangularCustomerDoc === 'string' ? normalizeDoc(triangularCustomerDoc) : undefined;
+    const orderClientOrderNumber = typeof clientOrderNumber === 'string' ? clientOrderNumber.trim() || undefined : undefined;
 
     let clientId: number | undefined = undefined;
     if (typeof customerId === 'number' && Number.isFinite(customerId) && customerId > 0) {
@@ -331,7 +333,8 @@ export async function POST(request: Request) {
         grammage: it.grammage ? Number(it.grammage) : undefined,
         diameter: it.diameter ? Number(it.diameter) : undefined,
         tube: it.tube ? Number(it.tube) : undefined,
-        clientOrderNumber: it.clientOrderNumber || undefined,
+        clientOrderNumber: typeof it.clientOrderNumber === 'string' ? String(it.clientOrderNumber).trim() || undefined : undefined,
+        clientItemCode: it.clientItemCode || undefined,
         clientOrderItemNumber: it.clientOrderItemNumber ? Number(it.clientOrderItemNumber) : undefined,
         itemDeliveryDate: parseDate(it.itemDeliveryDate),
         internalResin: !!it.internalResin,
@@ -506,6 +509,7 @@ export async function POST(request: Request) {
       customerName,
       customerDoc: customerDocNorm || undefined,
       clientId: clientId,
+      clientOrderNumber: orderClientOrderNumber,
       triangularCustomerName: triangularCustomerName || undefined,
       triangularCustomerDoc: triangularCustomerDocNorm || undefined,
       paymentTerms: paymentTerms !== undefined && paymentTerms !== null ? String(paymentTerms) : undefined,
@@ -543,14 +547,15 @@ export async function POST(request: Request) {
 
             await tx.$executeRawUnsafe(
               `INSERT INTO salesorder
-                (id, code, entityId, customerName, customerDoc, clientId, triangularCustomerName, triangularCustomerDoc, paymentTerms, carrier, deliveryDate, notes, createdById, subtotal, discountTotal, total, createdAt, updatedAt)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
+                (id, code, entityId, customerName, customerDoc, clientId, clientOrderNumber, triangularCustomerName, triangularCustomerDoc, paymentTerms, carrier, deliveryDate, notes, createdById, subtotal, discountTotal, total, createdAt, updatedAt)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
               Math.trunc(nextOrderId),
               code,
               entityId ?? null,
               customerName,
               customerDocNorm || null,
               clientId ?? null,
+               orderClientOrderNumber ?? null,
               triangularCustomerName || null,
               triangularCustomerDocNorm || null,
               paymentTerms !== undefined && paymentTerms !== null ? String(paymentTerms) : null,
@@ -573,8 +578,8 @@ export async function POST(request: Request) {
               const creasesJson = it.creases !== undefined ? JSON.stringify(it.creases) : null;
               await tx.$executeRawUnsafe(
                 `INSERT INTO salesorderitem
-                  (id, orderId, inventoryItemId, sku, name, quantity, unit, unitPrice, discountPct, lineTotal, width, length, grammage, diameter, tube, weightKg, creases, clientOrderNumber, clientOrderItemNumber, itemDeliveryDate, internalResin, externalResin)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                  (id, orderId, inventoryItemId, sku, name, quantity, unit, unitPrice, discountPct, lineTotal, width, length, grammage, diameter, tube, weightKg, creases, clientOrderNumber, clientItemCode, clientOrderItemNumber, itemDeliveryDate, internalResin, externalResin)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
                 Math.trunc(nextItemId),
                 Math.trunc(id),
                 it.inventoryItemId ?? null,
@@ -593,6 +598,7 @@ export async function POST(request: Request) {
                 it.weightKg ?? null,
                 creasesJson,
                 it.clientOrderNumber ?? null,
+                 it.clientItemCode ?? null,
                 it.clientOrderItemNumber ?? null,
                 it.itemDeliveryDate instanceof Date ? it.itemDeliveryDate : (it.itemDeliveryDate ? new Date(it.itemDeliveryDate) : null),
                 it.internalResin ? 1 : 0,

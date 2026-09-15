@@ -206,6 +206,9 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
     if (typeof body.customerDoc === 'string') {
       allowed.customerDoc = String(body.customerDoc);
     }
+    if (typeof body.clientOrderNumber === 'string') {
+      allowed.clientOrderNumber = String(body.clientOrderNumber).trim() || null;
+    }
     if (typeof body.clientId === 'number') {
       allowed.clientId = Number.isFinite(body.clientId) ? Math.trunc(body.clientId) : null;
     }
