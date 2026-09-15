@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '../../../../../lib/prisma';
 import { validateOrderItemDimensionLimits } from '@/lib/order-item-dimension-limits';
 import { resolveCommercialFamilyForItem } from '@/lib/commercial-family-dimension-resolution';
+import { resolveClientItemDimensionCode } from '@/lib/client-item-dimension-code';
 
 export async function POST(request: Request) {
   try {
@@ -73,7 +74,15 @@ export async function POST(request: Request) {
 
     const order = await prisma.salesOrder.findUnique({
       where: { id: Math.trunc(orderId) },
-      select: { clientId: true }
+      select: { clientId: true, customerDoc: true }
+    });
+
+    payload.clientItemCode = await resolveClientItemDimensionCode(prisma, {
+      customerDoc: order?.customerDoc,
+      sku: payload.sku,
+      width: payload.width,
+      length: payload.length,
+      grammage: payload.grammage,
     });
 
     const clientId = order?.clientId != null ? Number(order.clientId) : null;

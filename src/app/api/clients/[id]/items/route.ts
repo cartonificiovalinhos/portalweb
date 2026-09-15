@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '../../../../../lib/prisma';
+import { syncClientItemDimensionCode } from '@/lib/client-item-dimension-code';
 
 function normalizeDoc(doc: string): string {
   return (doc || '').replace(/\D+/g, '');
@@ -224,6 +225,12 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
     const clientId = Number(params.id);
     if (!Number.isFinite(clientId) || clientId <= 0) return NextResponse.json({ error: 'clientId inválido' }, { status: 400 });
 
+    const client = await prisma.client.findUnique({
+      where: { id: clientId },
+      select: { id: true, doc: true },
+    }).catch(() => null);
+    if (!client) return NextResponse.json({ error: 'Cliente não encontrado' }, { status: 404 });
+
     const rawBody = await request.json();
     if (rawBody && typeof rawBody === 'object' && !Array.isArray(rawBody) && typeof (rawBody as any).action === 'string') {
       const action = String((rawBody as any).action || '').trim();
@@ -413,6 +420,17 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
       }
 
       const keepIds = Array.from(normalized.keys());
+      const inventoryItems = keepIds.length
+        ? await prisma.inventoryItem.findMany({
+            where: { id: { in: keepIds } },
+            select: { id: true, sku: true },
+          })
+        : [];
+      const skuByInventoryItemId = new Map<number, string>();
+      for (const item of inventoryItems) {
+        const sku = String(item.sku || '').trim();
+        if (sku) skuByInventoryItemId.set(Number(item.id), sku);
+      }
       const resolveBasePrice = await buildBasePriceResolver(clientId, keepIds);
       for (const [inventoryItemId, body] of Array.from(normalized.entries())) {
         validateClientItemPriceFloor({
@@ -428,6 +446,7 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
           const unit = body.unit ? String(body.unit) : null;
           const unitPrice = Number(body.unitPrice ?? 0);
           const allowed = body.allowed === false ? false : true;
+          const sku = String(body.itemCode || body.sku || skuByInventoryItemId.get(inventoryItemId) || '').trim();
 
           const itemUpdate: any = {};
           if (body.width !== undefined) itemUpdate.width = Number(body.width);
@@ -442,6 +461,18 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
             update: { unit, unitPrice, allowed },
             create: { clientId, inventoryItemId, unit, unitPrice, allowed, manual: false },
           });
+
+          if (Object.prototype.hasOwnProperty.call(body, 'clientItemCode')) {
+            await syncClientItemDimensionCode(tx as any, {
+              customerDoc: client.doc,
+              sku,
+              width: body.width,
+              length: body.length,
+              grammage: body.grammage,
+              clientItemCode: body.clientItemCode,
+            });
+          }
+
           results.push({ ...row, success: true });
         }
 
@@ -460,6 +491,7 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
     for (const body of items) {
       try {
         let inventoryItemId = Number(body.inventoryItemId);
+        let sku = String(body.itemCode || body.sku || '').trim();
 
         // Se não veio ID, tenta buscar pelo código (sku)
         if ((!inventoryItemId || isNaN(inventoryItemId)) && (body.itemCode || body.sku)) {
@@ -469,6 +501,7 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
           });
           if (item) {
             inventoryItemId = item.id;
+            if (!sku) sku = String(item.sku || '').trim();
           } else {
              results.push({ error: `Item com código '${code}' não encontrado`, success: false });
              continue;
@@ -482,6 +515,14 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
         if (!Number.isFinite(inventoryItemId) || inventoryItemId <= 0) {
             results.push({ error: 'inventoryItemId inválido', success: false });
             continue;
+        }
+
+        if (!sku) {
+          const item = await prisma.inventoryItem.findUnique({
+            where: { id: inventoryItemId },
+            select: { sku: true },
+          });
+          sku = String(item?.sku || '').trim();
         }
 
         const resolveBasePrice = await buildBasePriceResolver(clientId, [inventoryItemId]);
@@ -509,6 +550,17 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
         const row = existing
           ? await prisma.clientItem.update({ where: { id: existing.id }, data: { unit, unitPrice, allowed } })
           : await prisma.clientItem.create({ data: { clientId, inventoryItemId, unit, unitPrice, allowed, manual: false } });
+
+        if (Object.prototype.hasOwnProperty.call(body, 'clientItemCode')) {
+          await syncClientItemDimensionCode(prisma as any, {
+            customerDoc: client.doc,
+            sku,
+            width: body.width,
+            length: body.length,
+            grammage: body.grammage,
+            clientItemCode: body.clientItemCode,
+          });
+        }
         
         results.push({ ...row, success: true });
       } catch (innerErr: any) {

@@ -1377,6 +1377,7 @@ export default function SalesOrderMaintenancePage() {
                       hasSheetCol={hasSheet}
                       hasCoreCol={hasCore}
                       onSaveSuccess={refreshOrder}
+                      customerDoc={order.customerDoc ?? null}
                       headerClientOrderNumber={order.clientOrderNumber ?? null}
                     />
                   );
@@ -1445,6 +1446,7 @@ export default function SalesOrderMaintenancePage() {
                            // Extra props for column visibility
                            hasSheetCol={hasSheet}
                            hasCoreCol={hasCore}
+                           customerDoc={order.customerDoc ?? null}
                            headerClientOrderNumber={order.clientOrderNumber ?? null}
                         />
                       );

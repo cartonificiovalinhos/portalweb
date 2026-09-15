@@ -169,6 +169,83 @@ const FormattedMoneyInput = ({
   );
 };
 
+function useAutoResolvedClientItemCode({
+  customerDoc,
+  localItem,
+  setLocalItem,
+  onPreviewUpdate,
+}: {
+  customerDoc?: string | null;
+  localItem: OrderItem;
+  setLocalItem: React.Dispatch<React.SetStateAction<OrderItem>>;
+  onPreviewUpdate: (updated: OrderItem) => void;
+}) {
+  const previewRef = useRef(onPreviewUpdate);
+  const itemRef = useRef(localItem);
+
+  useEffect(() => {
+    previewRef.current = onPreviewUpdate;
+  }, [onPreviewUpdate]);
+
+  useEffect(() => {
+    itemRef.current = localItem;
+  }, [localItem]);
+
+  useEffect(() => {
+    const customerDocDigits = String(customerDoc || '').replace(/\D+/g, '');
+    const sku = String(localItem.sku || '').trim();
+    const width = Number(localItem.width ?? 0);
+    const length = Number(localItem.length ?? 0);
+    const grammage = Number(localItem.grammage ?? 0);
+
+    const applyClientItemCode = (nextCode: string | null) => {
+      const currentItem = itemRef.current;
+      const currentCode = String(currentItem.clientItemCode || '').trim() || null;
+      if (currentCode === nextCode) return;
+      const updated = { ...currentItem, clientItemCode: nextCode };
+      setLocalItem(updated);
+      previewRef.current(updated);
+    };
+
+    if (!customerDocDigits || !sku || width <= 0 || length <= 0 || grammage <= 0) {
+      applyClientItemCode(null);
+      return;
+    }
+
+    const params = new URLSearchParams({
+      customerDoc: customerDocDigits,
+      sku,
+      width: String(width),
+      length: String(length),
+      grammage: String(grammage),
+    });
+
+    let active = true;
+    const timeoutId = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/client-item-dimension-codes/resolve?${params.toString()}`, { cache: 'no-store' });
+        if (!active) return;
+        if (!res.ok) {
+          applyClientItemCode(null);
+          return;
+        }
+
+        const data = await res.json();
+        if (!active) return;
+        const nextCode = String(data?.clientItemCode || '').trim() || null;
+        applyClientItemCode(nextCode);
+      } catch {
+        if (active) applyClientItemCode(null);
+      }
+    }, 250);
+
+    return () => {
+      active = false;
+      clearTimeout(timeoutId);
+    };
+  }, [customerDoc, localItem.sku, localItem.width, localItem.length, localItem.grammage, setLocalItem]);
+}
+
 interface SalesOrderItemRowProps {
   item: OrderItem;
   isOrderEditable: boolean;
@@ -183,6 +260,7 @@ interface SalesOrderItemRowProps {
   hasSheetCol: boolean;
   hasCoreCol: boolean;
   canDelete: boolean;
+  customerDoc?: string | null;
   headerClientOrderNumber?: string | null;
 }
 
@@ -200,6 +278,7 @@ export const SalesOrderItemRow = ({
   hasSheetCol,
   hasCoreCol,
   canDelete,
+  customerDoc,
   headerClientOrderNumber
 }: SalesOrderItemRowProps) => {
   const [localItem, setLocalItem] = useState<OrderItem>(item);
@@ -239,6 +318,13 @@ export const SalesOrderItemRow = ({
         setWeightInput(fmtInt(w));
     }
   }, [localItem, computeWeightKg, fmtInt, isEditingWeight]);
+
+  useAutoResolvedClientItemCode({
+    customerDoc,
+    localItem,
+    setLocalItem,
+    onPreviewUpdate,
+  });
 
   const saveItem = async (data: Partial<OrderItem>) => {
     if (!onAutoSave) return; // Local mode only
@@ -635,6 +721,7 @@ export const SalesOrderItemCard = ({
   hasSheetCol,
   hasCoreCol,
   canDelete,
+  customerDoc,
   headerClientOrderNumber
 }: SalesOrderItemRowProps) => {
   const [localItem, setLocalItem] = useState<OrderItem>(item);
@@ -673,6 +760,13 @@ export const SalesOrderItemCard = ({
         setWeightInput(fmtInt(w));
     }
   }, [localItem, computeWeightKg, fmtInt, isEditingWeight]);
+
+  useAutoResolvedClientItemCode({
+    customerDoc,
+    localItem,
+    setLocalItem,
+    onPreviewUpdate,
+  });
 
   const saveItem = async (data: Partial<OrderItem>) => {
     if (!onAutoSave) return;

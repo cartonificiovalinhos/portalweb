@@ -938,6 +938,7 @@ function NewSalesOrderContent() {
                   hasSheetCol={list.some(supportsSheetDims)}
                   hasCoreCol={list.some(supportsCoreDims)}
                   headerClientOrderNumber={order.clientOrderNumber ?? null}
+                  customerDoc={order.customerDoc ?? null}
                 />
               ))}
             </div>
@@ -975,6 +976,7 @@ function NewSalesOrderContent() {
                       hasSheetCol={list.some(supportsSheetDims)}
                       hasCoreCol={list.some(supportsCoreDims)}
                       headerClientOrderNumber={order.clientOrderNumber ?? null}
+                      customerDoc={order.customerDoc ?? null}
                     />
                   ))}
                 </tbody>

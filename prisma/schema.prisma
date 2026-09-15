@@ -372,6 +372,22 @@ model SalesOrderItem {
   @@map("salesorderitem")
 }
 
+model ClientItemDimensionCode {
+  id             Int      @id @default(autoincrement())
+  customerDoc    String
+  sku            String
+  width          Int
+  length         Int
+  grammage       Int
+  clientItemCode String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([customerDoc, sku, width, length, grammage], map: "uq_cidc_doc_sku_dims")
+  @@index([customerDoc, sku], map: "idx_cidc_doc_sku")
+  @@map("clientitemdimensioncode")
+}
+
 // Ligação de disponibilidade de Item por EntityModule
 model EntityModuleItem {
   id              Int           @id @default(autoincrement())

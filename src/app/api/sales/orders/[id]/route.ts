@@ -4,6 +4,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '../../../../../lib/auth';
 import { sendOrderStatusChangeNotification } from '../../../../../lib/email';
 import { attachResolvedCommercialFamilies } from '@/lib/commercial-family-dimension-resolution';
+import { resolveClientItemDimensionCode } from '@/lib/client-item-dimension-code';
 
 function normalizeDoc(doc: string): string {
   return (doc || '').replace(/\D+/g, '');
@@ -231,6 +232,26 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
       data: allowed,
       include: { items: { include: { inventoryItem: { include: { commercialFamily: true } } } } },
     });
+
+    if (Object.prototype.hasOwnProperty.call(allowed, 'customerDoc')) {
+      for (const item of updated.items || []) {
+        const clientItemCode = await resolveClientItemDimensionCode(prisma, {
+          customerDoc: updated.customerDoc,
+          sku: item.sku,
+          width: item.width,
+          length: item.length,
+          grammage: item.grammage,
+        });
+
+        if ((item.clientItemCode ?? null) !== clientItemCode) {
+          await prisma.salesOrderItem.update({
+            where: { id: item.id },
+            data: { clientItemCode },
+          });
+          (item as any).clientItemCode = clientItemCode;
+        }
+      }
+    }
 
     if (allowed.status) {
       const messages: any[] = Array.isArray(body?.messages) ? body.messages : [];

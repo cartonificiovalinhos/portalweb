@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '../../../../../../lib/prisma';
 import { validateOrderItemDimensionLimits } from '@/lib/order-item-dimension-limits';
 import { resolveCommercialFamilyForItem } from '@/lib/commercial-family-dimension-resolution';
+import { resolveClientItemDimensionCode } from '@/lib/client-item-dimension-code';
 
 function parseIdParam(raw: unknown): number | null {
   const s = String(raw ?? '').trim();
@@ -63,6 +64,7 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
         unitPrice: true,
         width: true,
         length: true,
+        grammage: true,
         inventoryItemId: true,
         inventoryItem: {
           select: {
@@ -78,7 +80,7 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
             },
           },
         },
-        order: { select: { clientId: true } },
+        order: { select: { clientId: true, customerDoc: true } },
       }
     });
     if (!current) return NextResponse.json({ error: 'Item não encontrado' }, { status: 404 });
@@ -148,6 +150,13 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
       ...current,
       ...allowed,
       inventoryItem: current.inventoryItem,
+    });
+    allowed.clientItemCode = await resolveClientItemDimensionCode(prisma, {
+      customerDoc: current.order?.customerDoc,
+      sku: candidate.sku,
+      width: candidate.width,
+      length: candidate.length,
+      grammage: candidate.grammage,
     });
     const dimensionError = validateOrderItemDimensionLimits(candidate);
     if (dimensionError) {

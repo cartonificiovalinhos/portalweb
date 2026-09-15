@@ -4,6 +4,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '../../../../lib/auth';
 import { validateOrderItemDimensionLimits } from '@/lib/order-item-dimension-limits';
 import { attachResolvedCommercialFamilies } from '@/lib/commercial-family-dimension-resolution';
+import { resolveClientItemDimensionCode } from '@/lib/client-item-dimension-code';
 
 function normalizeDoc(doc: string): string {
   return (doc || '').replace(/\D+/g, '');
@@ -304,7 +305,7 @@ export async function POST(request: Request) {
     }
     const rawItems = Array.isArray(items) ? items : [];
 
-    const normalizedItems = rawItems.map((it: any) => {
+    const normalizedItems = await Promise.all(rawItems.map(async (it: any) => {
       const qty = Number(it.quantity || 1);
       const price = Number(it.unitPrice || 0);
       const disc = Number(it.discountPct || 0);
@@ -320,7 +321,7 @@ export async function POST(request: Request) {
         },
       );
       const lineTotal = base * (1 - disc / 100);
-      return {
+      const normalizedItem = {
         inventoryItemId,
         sku: it.sku || undefined,
         name: String(it.name || it.productName || 'Produto'),
@@ -342,7 +343,17 @@ export async function POST(request: Request) {
         creases: it.creases || undefined,
         lineTotal,
       };
-    });
+      return {
+        ...normalizedItem,
+        clientItemCode: await resolveClientItemDimensionCode(prisma, {
+          customerDoc: customerDocNorm,
+          sku: normalizedItem.sku,
+          width: normalizedItem.width,
+          length: normalizedItem.length,
+          grammage: normalizedItem.grammage,
+        }),
+      };
+    }));
 
     const normalizedItemsWithFamily = normalizedItems.map((it: any) => ({
       ...it,
