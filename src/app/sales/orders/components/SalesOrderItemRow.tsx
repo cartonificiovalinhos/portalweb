@@ -525,16 +525,16 @@ export const SalesOrderItemRow = ({
         <td colSpan={20} className="p-4">
             <div className="space-y-4">
             <h4 className="font-semibold text-sm">Características</h4>
-            <div className="flex flex-wrap items-end gap-6">
-                <div className="space-y-1">
+            <div className="flex flex-wrap items-start gap-4">
+                <div className="min-w-[310px] space-y-1">
                 <label className="text-xs text-gray-600 block">Vincos</label>
-                <div className="grid grid-cols-4 gap-2">
+                <div className="grid grid-cols-4 gap-x-3 gap-y-2">
                     {[1, 2, 3, 4, 5, 6, 7, 8].map((n) => (
                     <div key={n} className="flex items-center gap-1">
                         <span className="text-xs text-gray-500 w-3">{n}</span>
-                        <FormattedIntInput 
-                            className={`w-16 px-2 py-1 border rounded text-sm ${!canEdit ? disabledClass : ''}`}
-                            placeholder="0" 
+                        <FormattedIntInput
+                            className={`w-14 px-2 py-1 border rounded text-sm ${!canEdit ? disabledClass : ''}`}
+                            placeholder="0"
                             disabled={!canEdit}
                             value={localItem.creases?.[n]}
                             onChange={(val) => {
@@ -546,30 +546,45 @@ export const SalesOrderItemRow = ({
                     ))}
                 </div>
                 </div>
+                <div className="pt-6 space-y-3 min-w-[105px]">
+                <div className="flex items-center gap-2">
+                <input
+                    type="checkbox"
+                    id={`res-in-${localItem.id}`}
+                    className="rounded border-gray-300 disabled:bg-gray-100"
+                    disabled={!canEdit}
+                    checked={localItem.internalResin ?? false}
+                    onChange={(e) => handleChange('internalResin', e.target.checked)}
+                />
+                <label htmlFor={`res-in-${localItem.id}`} className={`text-sm whitespace-nowrap ${!canEdit ? 'text-gray-500' : 'text-gray-700'}`}>Resina interna</label>
+                </div>
+                <div className="flex items-center gap-2">
+                <input
+                    type="checkbox"
+                    id={`res-out-${localItem.id}`}
+                    className="rounded border-gray-300 disabled:bg-gray-100"
+                    disabled={!canEdit}
+                    checked={localItem.externalResin ?? false}
+                    onChange={(e) => handleChange('externalResin', e.target.checked)}
+                />
+                <label htmlFor={`res-out-${localItem.id}`} className={`text-sm whitespace-nowrap ${!canEdit ? 'text-gray-500' : 'text-gray-700'}`}>Resina externa</label>
+                </div>
+                </div>
+                <div className="flex flex-wrap items-start gap-4 pt-6">
                 <div className="space-y-1">
                 <label className="text-xs text-gray-600 block">Número Ordem Compra</label>
-                <input 
-                    type="text" 
-                    className={`w-48 px-2 py-1 border rounded text-sm ${!canEdit ? disabledClass : ''}`}
+                <input
+                    type="text"
+                    className={`w-44 px-2 py-1 border rounded text-sm ${!canEdit ? disabledClass : ''}`}
                     disabled={!canEdit}
                     value={effectiveClientOrderNumber}
                     onChange={(e) => handleChange('clientOrderNumber', e.target.value || null)}
                 />
                 </div>
                 <div className="space-y-1">
-                <label className="text-xs text-gray-600 block">Cod Item do Cliente</label>
-                <input
-                    type="text"
-                    className={`w-40 px-2 py-1 border rounded text-sm ${!canEdit ? disabledClass : ''}`}
-                    disabled={!canEdit}
-                    value={localItem.clientItemCode ?? ''}
-                    onChange={(e) => handleChange('clientItemCode', e.target.value || null)}
-                />
-                </div>
-                <div className="space-y-1">
                 <label className="text-xs text-gray-600 block">Seq Item Ordem</label>
-                <input 
-                    type="number" 
+                <input
+                    type="number"
                     className={`w-24 px-2 py-1 border rounded text-sm ${!canEdit ? disabledClass : ''}`}
                     disabled={!canEdit}
                     value={localItem.clientOrderItemNumber ?? ''}
@@ -577,36 +592,25 @@ export const SalesOrderItemRow = ({
                 />
                 </div>
                 <div className="space-y-1">
+                <label className="text-xs text-gray-600 block">Cod Item do Cliente</label>
+                <input
+                    type="text"
+                    className={`w-36 px-2 py-1 border rounded text-sm ${!canEdit ? disabledClass : ''}`}
+                    disabled={!canEdit}
+                    value={localItem.clientItemCode ?? ''}
+                    onChange={(e) => handleChange('clientItemCode', e.target.value || null)}
+                />
+                </div>
+                <div className="space-y-1">
                 <label className="text-xs text-gray-600 block">Data Entrega</label>
-                <input 
-                    type="date" 
-                    className={`w-32 px-2 py-1 border rounded text-sm ${!canEdit ? disabledClass : ''}`}
+                <input
+                    type="date"
+                    className={`w-36 px-2 py-1 border rounded text-sm ${!canEdit ? disabledClass : ''}`}
                     disabled={!canEdit}
                     value={localItem.itemDeliveryDate ? new Date(localItem.itemDeliveryDate).toISOString().split('T')[0] : ''}
                     onChange={(e) => handleChange('itemDeliveryDate', e.target.value ? new Date(e.target.value) : null)}
                 />
                 </div>
-                <div className="flex items-center gap-2 pb-2">
-                <input 
-                    type="checkbox" 
-                    id={`res-in-${localItem.id}`} 
-                    className="rounded border-gray-300 disabled:bg-gray-100" 
-                    disabled={!canEdit}
-                    checked={localItem.internalResin ?? false}
-                    onChange={(e) => handleChange('internalResin', e.target.checked)}
-                />
-                <label htmlFor={`res-in-${localItem.id}`} className={`text-sm ${!canEdit ? 'text-gray-500' : 'text-gray-700'}`}>Resina interna</label>
-                </div>
-                <div className="flex items-center gap-2 pb-2">
-                <input 
-                    type="checkbox" 
-                    id={`res-out-${localItem.id}`} 
-                    className="rounded border-gray-300 disabled:bg-gray-100" 
-                    disabled={!canEdit}
-                    checked={localItem.externalResin ?? false}
-                    onChange={(e) => handleChange('externalResin', e.target.checked)}
-                />
-                <label htmlFor={`res-out-${localItem.id}`} className={`text-sm ${!canEdit ? 'text-gray-500' : 'text-gray-700'}`}>Resina externa</label>
                 </div>
             </div>
             </div>

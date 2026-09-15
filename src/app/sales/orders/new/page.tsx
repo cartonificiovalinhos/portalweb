@@ -840,8 +840,6 @@ function NewSalesOrderContent() {
                   )}
                 />
               </div>
-              <div className="md:col-span-6"></div>
-
               <div className="md:col-span-6">
                 <span className="text-gray-600">Número Pedido/Ordem Compra Cliente</span>
                 <input
@@ -851,7 +849,6 @@ function NewSalesOrderContent() {
                   onChange={(e) => setOrder(prev => ({ ...prev, clientOrderNumber: e.target.value }))}
                 />
               </div>
-              <div className="md:col-span-6"></div>
 
               <div className="md:col-span-12 grid grid-cols-1 md:grid-cols-3 gap-3">
                 <div>
