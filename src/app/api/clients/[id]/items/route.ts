@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '../../../../../lib/prisma';
-import { syncClientItemDimensionCode } from '@/lib/client-item-dimension-code';
+import { replaceClientItemDimensionCodes, syncClientItemDimensionCode } from '@/lib/client-item-dimension-code';
 
 function normalizeDoc(doc: string): string {
   return (doc || '').replace(/\D+/g, '');
@@ -471,6 +471,12 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
               grammage: body.grammage,
               clientItemCode: body.clientItemCode,
             });
+          } else if (Object.prototype.hasOwnProperty.call(body, 'clientItemDimensionCodes')) {
+            await replaceClientItemDimensionCodes(tx as any, {
+              customerDoc: client.doc,
+              sku,
+              entries: Array.isArray(body.clientItemDimensionCodes) ? body.clientItemDimensionCodes : [],
+            });
           }
 
           results.push({ ...row, success: true });
@@ -559,6 +565,12 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
             length: body.length,
             grammage: body.grammage,
             clientItemCode: body.clientItemCode,
+          });
+        } else if (Object.prototype.hasOwnProperty.call(body, 'clientItemDimensionCodes')) {
+          await replaceClientItemDimensionCodes(prisma as any, {
+            customerDoc: client.doc,
+            sku,
+            entries: Array.isArray(body.clientItemDimensionCodes) ? body.clientItemDimensionCodes : [],
           });
         }
         

@@ -14,6 +14,12 @@ export type ClientItemDimensionCodeInput = {
   grammage?: number | null;
 };
 
+export type ClientItemDimensionCodeBatchInput = {
+  customerDoc?: string | null;
+  sku?: string | null;
+  entries?: Array<(ClientItemDimensionCodeInput & { clientItemCode?: string | null }) | null | undefined> | null;
+};
+
 function toPositiveInt(value: unknown): number | null {
   const numeric = Number(value);
   if (!Number.isFinite(numeric) || numeric <= 0) return null;
@@ -32,6 +38,13 @@ export function normalizeClientItemDimensionCodeInput(input: ClientItemDimension
   }
 
   return { customerDoc, sku, width, length, grammage };
+}
+
+function normalizeClientItemDimensionCodeScope(input: Pick<ClientItemDimensionCodeInput, 'customerDoc' | 'sku'>) {
+  const customerDoc = String(input.customerDoc || '').replace(/\D+/g, '');
+  const sku = String(input.sku || '').trim();
+  if (!customerDoc || !sku) return null;
+  return { customerDoc, sku };
 }
 
 export async function resolveClientItemDimensionCode(
@@ -81,4 +94,28 @@ export async function syncClientItemDimensionCode(
       clientItemCode,
     },
   });
+}
+
+export async function replaceClientItemDimensionCodes(
+  db: ClientItemDimensionCodeLookupDb,
+  input: ClientItemDimensionCodeBatchInput,
+): Promise<void> {
+  const scope = normalizeClientItemDimensionCodeScope(input);
+  if (!scope) return;
+
+  await db.clientItemDimensionCode.deleteMany({
+    where: scope,
+  });
+
+  const entries = Array.isArray(input.entries) ? input.entries : [];
+  for (const entry of entries) {
+    await syncClientItemDimensionCode(db, {
+      customerDoc: scope.customerDoc,
+      sku: String(entry?.sku || scope.sku).trim() || scope.sku,
+      width: entry?.width,
+      length: entry?.length,
+      grammage: entry?.grammage,
+      clientItemCode: entry?.clientItemCode,
+    });
+  }
 }
