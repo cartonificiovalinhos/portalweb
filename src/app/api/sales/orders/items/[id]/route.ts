@@ -3,6 +3,7 @@ import { prisma } from '../../../../../../lib/prisma';
 import { validateOrderItemDimensionLimits } from '@/lib/order-item-dimension-limits';
 import { resolveCommercialFamilyForItem } from '@/lib/commercial-family-dimension-resolution';
 import { resolveClientItemDimensionCode } from '@/lib/client-item-dimension-code';
+import { normalizeOptionalText } from '@/lib/sales-order-client-fields';
 
 function parseIdParam(raw: unknown): number | null {
   const s = String(raw ?? '').trim();
@@ -135,8 +136,8 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
       allowed.unitPrice = nextPrice;
     }
     if (body.discountPct !== undefined) allowed.discountPct = Number(body.discountPct);
-    if (body.clientOrderNumber !== undefined) allowed.clientOrderNumber = String(body.clientOrderNumber).trim() || null;
-    if (body.clientItemCode !== undefined) allowed.clientItemCode = String(body.clientItemCode).trim() || null;
+    if (body.clientOrderNumber !== undefined) allowed.clientOrderNumber = normalizeOptionalText(body.clientOrderNumber);
+    if (body.clientItemCode !== undefined) allowed.clientItemCode = normalizeOptionalText(body.clientItemCode);
     if (body.clientOrderItemNumber !== undefined) allowed.clientOrderItemNumber = Number(body.clientOrderItemNumber);
     if (body.itemDeliveryDate !== undefined) allowed.itemDeliveryDate = body.itemDeliveryDate ? new Date(body.itemDeliveryDate) : null;
     if (body.internalResin !== undefined) allowed.internalResin = Boolean(body.internalResin);

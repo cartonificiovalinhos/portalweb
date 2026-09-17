@@ -5,6 +5,7 @@ import { authOptions } from '../../../../../lib/auth';
 import { sendOrderStatusChangeNotification } from '../../../../../lib/email';
 import { attachResolvedCommercialFamilies } from '@/lib/commercial-family-dimension-resolution';
 import { resolveClientItemDimensionCode } from '@/lib/client-item-dimension-code';
+import { normalizeOptionalText } from '@/lib/sales-order-client-fields';
 
 function normalizeDoc(doc: string): string {
   return (doc || '').replace(/\D+/g, '');
@@ -207,8 +208,8 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
     if (typeof body.customerDoc === 'string') {
       allowed.customerDoc = String(body.customerDoc);
     }
-    if (typeof body.clientOrderNumber === 'string') {
-      allowed.clientOrderNumber = String(body.clientOrderNumber).trim() || null;
+    if (body.clientOrderNumber !== undefined) {
+      allowed.clientOrderNumber = normalizeOptionalText(body.clientOrderNumber);
     }
     if (typeof body.clientId === 'number') {
       allowed.clientId = Number.isFinite(body.clientId) ? Math.trunc(body.clientId) : null;

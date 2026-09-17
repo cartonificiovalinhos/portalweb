@@ -3,6 +3,7 @@ import { prisma } from '../../../../../lib/prisma';
 import { validateOrderItemDimensionLimits } from '@/lib/order-item-dimension-limits';
 import { resolveCommercialFamilyForItem } from '@/lib/commercial-family-dimension-resolution';
 import { resolveClientItemDimensionCode } from '@/lib/client-item-dimension-code';
+import { normalizeOptionalText } from '@/lib/sales-order-client-fields';
 
 export async function POST(request: Request) {
   try {
@@ -24,8 +25,8 @@ export async function POST(request: Request) {
     if (body.grammage !== undefined) payload.grammage = Number(body.grammage || 0);
     if (body.diameter !== undefined) payload.diameter = Number(body.diameter || 0);
     if (body.tube !== undefined) payload.tube = Number(body.tube || 0);
-    if (body.clientOrderNumber !== undefined) payload.clientOrderNumber = String(body.clientOrderNumber).trim() || null;
-    if (body.clientItemCode !== undefined) payload.clientItemCode = String(body.clientItemCode).trim() || null;
+    if (body.clientOrderNumber !== undefined) payload.clientOrderNumber = normalizeOptionalText(body.clientOrderNumber);
+    if (body.clientItemCode !== undefined) payload.clientItemCode = normalizeOptionalText(body.clientItemCode);
     if (body.clientOrderItemNumber !== undefined) payload.clientOrderItemNumber = body.clientOrderItemNumber ? Number(body.clientOrderItemNumber) : null;
     if (body.itemDeliveryDate !== undefined) payload.itemDeliveryDate = body.itemDeliveryDate ? new Date(body.itemDeliveryDate) : null;
     if (body.internalResin !== undefined) payload.internalResin = Boolean(body.internalResin);
