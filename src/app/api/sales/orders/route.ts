@@ -77,6 +77,41 @@ function lineBase(it: { quantity?: number | null; unitPrice?: number | null; uni
   return qty * price;
 }
 
+function normalizePaymentTermsInput(body: any): string | undefined {
+  const candidates = [
+    body?.paymentTerms,
+    body?.paymentTermsErp,
+    body?.payload?.order?.paymentTerms,
+    body?.payload?.order?.paymentTermsErp,
+  ];
+
+  for (const candidate of candidates) {
+    if (candidate === null || candidate === undefined) continue;
+    const value = String(candidate).trim();
+    if (value) return value;
+  }
+  return undefined;
+}
+
+async function resolvePaymentTermByInput(raw: string) {
+  const trimmed = String(raw || '').trim();
+  if (!trimmed) return null;
+
+  const bracketCode = trimmed.match(/^\[(\d+)\]/);
+  if (bracketCode?.[1]) {
+    return prisma.paymentTerm.findFirst({ where: { code: Number(bracketCode[1]) } });
+  }
+
+  if (/^\d+$/.test(trimmed)) {
+    const numericCode = Number(trimmed);
+    return prisma.paymentTerm.findFirst({ where: { code: numericCode } });
+  }
+
+  return prisma.paymentTerm.findFirst({
+    where: { description: { equals: trimmed } }
+  });
+}
+
 export async function GET(request: Request) {
   try {
     const session = await getServerSession(authOptions);
@@ -219,6 +254,7 @@ export async function POST(request: Request) {
     const body = await request.json();
     const session = await getServerSession(authOptions);
     const createdById = session?.user ? Number((session.user as any).id) : undefined;
+    const normalizedPaymentTerms = normalizePaymentTermsInput(body);
     const {
       customerName,
       customerDoc,
@@ -226,7 +262,7 @@ export async function POST(request: Request) {
       clientOrderNumber,
       triangularCustomerName,
       triangularCustomerDoc,
-      paymentTerms,
+      paymentTerms = normalizedPaymentTerms,
       carrier,
       deliveryDate,
       notes,
@@ -481,13 +517,7 @@ export async function POST(request: Request) {
 
       if (paymentTerms && String(paymentTerms).trim()) {
         const raw = String(paymentTerms).trim();
-        const m = raw.match(/^\[(\d+)\]/);
-
-        const resolved = m?.[1]
-          ? await prisma.paymentTerm.findFirst({ where: { code: Number(m[1]) } })
-          : await prisma.paymentTerm.findFirst({
-              where: { description: { equals: raw } }
-            });
+        const resolved = await resolvePaymentTermByInput(raw);
 
         if (hasLinkedTerms) {
           if (!resolved) {
