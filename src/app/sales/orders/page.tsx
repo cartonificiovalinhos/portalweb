@@ -2,7 +2,20 @@
 import Link from "next/link";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 
-type OrderItem = { id: number; name: string; quantity: number; unitPrice: number; discountPct: number };
+type OrderItem = {
+  id: number;
+  name: string;
+  sku?: string | null;
+  unit?: string | null;
+  quantity: number;
+  unitPrice: number;
+  discountPct: number;
+  width?: number | null;
+  length?: number | null;
+  grammage?: number | null;
+  weightKg?: number | null;
+  lineTotal?: number | null;
+};
 type SalesOrder = {
   id: number;
   code: string;
@@ -19,6 +32,15 @@ type SalesOrder = {
   items?: OrderItem[];
 };
 
+type ViewMode = "order" | "item";
+type FlatOrderItemRow = {
+  rowId: string;
+  order: SalesOrder;
+  item: OrderItem;
+  weightKg: number;
+  total: number;
+};
+
 export default function SalesOrdersPage() {
   const [orders, setOrders] = useState<SalesOrder[]>([]);
   const [loading, setLoading] = useState(false);
@@ -33,6 +55,7 @@ export default function SalesOrdersPage() {
   const [approvingAction, setApprovingAction] = useState<"approve" | "reject" | null>(null);
   const [page, setPage] = useState(0);
   const [helpOpen, setHelpOpen] = useState(false);
+  const [viewMode, setViewMode] = useState<ViewMode>("order");
 
   const PAGE_SIZE = 30;
 
@@ -134,19 +157,74 @@ export default function SalesOrdersPage() {
 
   useEffect(() => {
     setPage(0);
-  }, [q, status, dateStart, dateEnd]);
+  }, [q, status, dateStart, dateEnd, viewMode]);
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const computeItemWeightKg = useCallback((item: OrderItem) => {
+    const explicitWeight = Number(item.weightKg ?? 0);
+    if (Number.isFinite(explicitWeight) && explicitWeight > 0) return explicitWeight;
+
+    const width = Number(item.width ?? 0);
+    const length = Number(item.length ?? 0);
+    const grammage = Number(item.grammage ?? 0);
+    const quantity = Number(item.quantity ?? 0);
+    if (width > 0 && length > 0 && grammage > 0 && quantity > 0) {
+      const areaM2 = (length / 1000) * (width / 1000);
+      const weightKg = (areaM2 * grammage * quantity) / 1000;
+      return Number.isFinite(weightKg) ? weightKg : 0;
+    }
+
+    return 0;
+  }, []);
+
+  const computeItemTotal = useCallback((item: OrderItem) => {
+    const explicitTotal = Number(item.lineTotal ?? 0);
+    if (Number.isFinite(explicitTotal) && explicitTotal > 0) return explicitTotal;
+    const quantity = Number(item.quantity ?? 0);
+    const unitPrice = Number(item.unitPrice ?? 0);
+    const discountPct = Number(item.discountPct ?? 0);
+    const base = quantity * unitPrice;
+    return base * (1 - discountPct / 100);
+  }, []);
+
+  const flattenedItems = useMemo<FlatOrderItemRow[]>(() => {
+    return filtered.flatMap((order) =>
+      (order.items || []).map((item, idx) => ({
+        rowId: `${order.id}-${item.id ?? idx}`,
+        order,
+        item,
+        weightKg: computeItemWeightKg(item),
+        total: computeItemTotal(item),
+      }))
+    );
+  }, [computeItemTotal, computeItemWeightKg, filtered]);
+
+  const visibleCount = viewMode === "order" ? filtered.length : flattenedItems.length;
+  const totalPages = Math.max(1, Math.ceil(visibleCount / PAGE_SIZE));
   useEffect(() => {
     setPage((p) => Math.min(Math.max(0, totalPages - 1), Math.max(0, p)));
   }, [totalPages]);
 
   const pageSliceStart = page * PAGE_SIZE;
-  const pageItems = filtered.slice(pageSliceStart, pageSliceStart + PAGE_SIZE);
+  const pageOrders = filtered.slice(pageSliceStart, pageSliceStart + PAGE_SIZE);
+  const pageItemRows = flattenedItems.slice(pageSliceStart, pageSliceStart + PAGE_SIZE);
 
   const fmtCurrency = (v: any) => {
     const n = Number(v ?? 0);
     return (Number.isFinite(n) ? n : 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+  };
+  const fmtWeight = (v: any) => {
+    const n = Number(v ?? 0);
+    return (Number.isFinite(n) ? n : 0).toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 3 });
+  };
+  const formatItemMeasures = (item: OrderItem) => {
+    const width = Number(item.width ?? 0);
+    const length = Number(item.length ?? 0);
+    const grammage = Number(item.grammage ?? 0);
+    const parts: string[] = [];
+    if (width > 0) parts.push(`L ${width.toLocaleString('pt-BR')}`);
+    if (length > 0) parts.push(`C ${length.toLocaleString('pt-BR')}`);
+    if (grammage > 0) parts.push(`G ${grammage.toLocaleString('pt-BR')}`);
+    return parts.length ? parts.join(' x ') : '-';
   };
 
   const displayTotalWithTax = (o: SalesOrder) => {
@@ -160,6 +238,68 @@ export default function SalesOrdersPage() {
     const items = Array.isArray((o as any)?.items) ? ((o as any).items as any[]) : [];
     return items.some((it) => Number(it?.discountPct ?? 0) > 0);
   };
+
+  const displayOrderWeightKg = useCallback((o: SalesOrder) => {
+    return (o.items || []).reduce((acc, item) => acc + computeItemWeightKg(item), 0);
+  }, [computeItemWeightKg]);
+
+  const downloadVisibleGridAsExcel = useCallback(() => {
+    const escapeHtml = (value: unknown) =>
+      String(value ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/\"/g, "&quot;");
+
+    const headers =
+      viewMode === "order"
+        ? ["Número", "Entidade", "Cliente", "Data", "Peso KG", "Total em R$", "Situação", "Repres"]
+        : ["Número", "Entidade", "Cliente", "Data", "SKU", "Descrição do item", "Medidas", "Quantidade", "Peso KG", "Total em R$", "Repres"];
+
+    const rows =
+      viewMode === "order"
+        ? pageOrders.map((order) => [
+            order.code || order.id,
+            order.entity?.name || "-",
+            order.customerName || "-",
+            order.orderDate ? new Date(order.orderDate).toLocaleDateString("pt-BR") : "-",
+            fmtWeight(displayOrderWeightKg(order)),
+            fmtCurrency(displayTotalWithTax(order)),
+            statusLabelPt(order.status),
+            String((order as any)?.createdBy?.abbrevName || "-"),
+          ])
+        : pageItemRows.map((row) => [
+            row.order.code || row.order.id,
+            row.order.entity?.name || "-",
+            row.order.customerName || "-",
+            row.order.orderDate ? new Date(row.order.orderDate).toLocaleDateString("pt-BR") : "-",
+            row.item.sku || "-",
+            row.item.name || "-",
+            formatItemMeasures(row.item),
+            Number(row.item.quantity ?? 0),
+            fmtWeight(row.weightKg),
+            fmtCurrency(row.total),
+            String((row.order as any)?.createdBy?.abbrevName || "-"),
+          ]);
+
+    const tableRows = rows
+      .map((cols) => `<tr>${cols.map((col) => `<td>${escapeHtml(col)}</td>`).join("")}</tr>`)
+      .join("");
+
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8" /></head><body><table><thead><tr>${headers
+      .map((header) => `<th>${escapeHtml(header)}</th>`)
+      .join("")}</tr></thead><tbody>${tableRows}</tbody></table></body></html>`;
+
+    const blob = new Blob([html], { type: "application/vnd.ms-excel;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = viewMode === "order" ? "pedidos-visiveis.xls" : "pedidos-por-item-visiveis.xls";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }, [displayOrderWeightKg, displayTotalWithTax, fmtCurrency, fmtWeight, formatItemMeasures, pageItemRows, pageOrders, statusLabelPt, viewMode]);
 
   const sendOrderToErp = async (o: SalesOrder) => {
     if (hasAnyDiscount(o)) {
@@ -384,7 +524,22 @@ export default function SalesOrdersPage() {
                 »
               </button>
             </div>
-            <span className="text-xs text-gray-500">{filtered.length} registro(s)</span>
+            <button
+              type="button"
+              className="px-3 py-1.5 text-xs border rounded bg-white hover:bg-gray-100"
+              onClick={downloadVisibleGridAsExcel}
+              disabled={visibleCount === 0}
+            >
+              Exportar Excel
+            </button>
+            <button
+              type="button"
+              className="px-3 py-1.5 text-xs border rounded bg-white hover:bg-gray-100"
+              onClick={() => setViewMode((prev) => (prev === "order" ? "item" : "order"))}
+            >
+              {viewMode === "order" ? "Exibir por item" : "Agrupar por pedido"}
+            </button>
+            <span className="text-xs text-gray-500">{visibleCount} registro(s)</span>
             <Link href="/sales/orders/new" className="px-3 py-1.5 text-xs border rounded bg-white hover:bg-gray-100">Novo Pedido</Link>
           </div>
         </div>
@@ -392,10 +547,10 @@ export default function SalesOrdersPage() {
           {loading && (
             <div className="px-3 py-4 text-center text-gray-500 text-sm">Carregando...</div>
           )}
-          {!loading && filtered.length === 0 && (
+          {!loading && visibleCount === 0 && (
             <div className="px-3 py-4 text-center text-gray-500 text-sm">Nenhum pedido encontrado.</div>
           )}
-          {!loading && pageItems.map((o) => (
+          {!loading && viewMode === "order" && pageOrders.map((o) => (
             <div key={o.id} className="px-3 py-3">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
@@ -409,6 +564,7 @@ export default function SalesOrdersPage() {
 
               <div className="mt-2 flex items-center justify-between gap-3 text-xs text-gray-600">
                 <div>{o.orderDate ? new Date(o.orderDate).toLocaleDateString('pt-BR') : '-'}</div>
+                <div>Peso KG: <span className="font-medium text-gray-900">{fmtWeight(displayOrderWeightKg(o))}</span></div>
                 <div className="font-medium text-gray-900">{fmtCurrency(displayTotalWithTax(o))}</div>
               </div>
 
@@ -458,6 +614,27 @@ export default function SalesOrdersPage() {
               </div>
             </div>
           ))}
+          {!loading && viewMode === "item" && pageItemRows.map((row) => (
+            <div key={row.rowId} className="px-3 py-3">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="font-mono text-xs text-gray-700">{row.order.code || row.order.id}</div>
+                  <div className="text-xs text-gray-600 truncate">{row.order.customerName || '-'}</div>
+                  <div className="text-xs text-gray-600 truncate">{String((row.order as any)?.createdBy?.abbrevName || '-')}</div>
+                  <div className="text-xs text-gray-600 truncate">{row.order.orderDate ? new Date(row.order.orderDate).toLocaleDateString('pt-BR') : '-'}</div>
+                  <div className="text-xs text-gray-600 truncate">SKU: {row.item.sku || '-'}</div>
+                  <div className="text-sm font-medium text-gray-900 truncate">{row.item.name || '-'}</div>
+                  <div className="text-xs text-gray-600 truncate">Medidas: {formatItemMeasures(row.item)}</div>
+                  <div className="text-xs text-gray-600 truncate">Quantidade: <span className="font-medium text-gray-900">{row.item.quantity}</span></div>
+                </div>
+              </div>
+
+              <div className="mt-2 flex items-center justify-between gap-3 text-xs text-gray-600">
+                <div>Peso KG: <span className="font-medium text-gray-900">{fmtWeight(row.weightKg)}</span></div>
+                <div className="font-medium text-gray-900">{fmtCurrency(row.total)}</div>
+              </div>
+            </div>
+          ))}
         </div>
 
         <div className="hidden sm:block overflow-x-auto">
@@ -467,26 +644,37 @@ export default function SalesOrdersPage() {
                 <th className="text-left px-3 py-2">Número</th>
                 <th className="text-left px-3 py-2">Entidade</th>
                 <th className="text-left px-3 py-2">Cliente</th>
-                <th className="text-left px-3 py-2">Data</th>
-                <th className="text-right px-3 py-2">Total Com Imp R$</th>
-                <th className="text-left px-3 py-2">Situação</th>
+                {viewMode === "item" && (
+                  <>
+                    <th className="text-left px-3 py-2">Data</th>
+                    <th className="text-left px-3 py-2">SKU</th>
+                    <th className="text-left px-3 py-2">Descrição do item</th>
+                    <th className="text-left px-3 py-2">Medidas</th>
+                    <th className="text-right px-3 py-2">Quantidade</th>
+                  </>
+                )}
+                {viewMode === "order" && <th className="text-left px-3 py-2">Data</th>}
+                <th className="text-right px-3 py-2">Peso KG</th>
+                <th className="text-right px-3 py-2">Total em R$</th>
+                {viewMode === "order" && <th className="text-left px-3 py-2">Situação</th>}
                 <th className="text-left px-3 py-2">Repres</th>
-                <th className="text-center px-3 py-2">Ações</th>
+                {viewMode === "order" && <th className="text-center px-3 py-2">Ações</th>}
               </tr>
             </thead>
             <tbody>
               {loading && (
-                <tr><td colSpan={8} className="px-3 py-4 text-center text-gray-500">Carregando...</td></tr>
+                <tr><td colSpan={viewMode === "order" ? 8 : 11} className="px-3 py-4 text-center text-gray-500">Carregando...</td></tr>
               )}
-              {!loading && filtered.length === 0 && (
-                <tr><td colSpan={8} className="px-3 py-4 text-center text-gray-500">Nenhum pedido encontrado.</td></tr>
+              {!loading && visibleCount === 0 && (
+                <tr><td colSpan={viewMode === "order" ? 8 : 11} className="px-3 py-4 text-center text-gray-500">Nenhum pedido encontrado.</td></tr>
               )}
-              {!loading && pageItems.map((o) => (
+              {!loading && viewMode === "order" && pageOrders.map((o) => (
                 <tr key={o.id} className="border-t hover:bg-gray-50">
                   <td className="px-3 py-2 font-mono text-xs">{o.code || o.id}</td>
                   <td className="px-3 py-2 text-xs text-gray-600">{o.entity?.name || '-'}</td>
                   <td className="px-3 py-2">{o.customerName || '-'}</td>
                   <td className="px-3 py-2">{o.orderDate ? new Date(o.orderDate).toLocaleDateString('pt-BR') : '-'}</td>
+                  <td className="px-3 py-2 text-right">{fmtWeight(displayOrderWeightKg(o))}</td>
                   <td className="px-3 py-2 text-right">
                     {fmtCurrency(displayTotalWithTax(o))}
                   </td>
@@ -536,6 +724,21 @@ export default function SalesOrdersPage() {
                       </IconBtn>
                     </div>
                   </td>
+                </tr>
+              ))}
+              {!loading && viewMode === "item" && pageItemRows.map((row) => (
+                <tr key={row.rowId} className="border-t hover:bg-gray-50">
+                  <td className="px-3 py-2 font-mono text-xs">{row.order.code || row.order.id}</td>
+                  <td className="px-3 py-2 text-xs text-gray-600">{row.order.entity?.name || '-'}</td>
+                  <td className="px-3 py-2">{row.order.customerName || '-'}</td>
+                  <td className="px-3 py-2">{row.order.orderDate ? new Date(row.order.orderDate).toLocaleDateString('pt-BR') : '-'}</td>
+                  <td className="px-3 py-2 text-xs text-gray-600">{row.item.sku || '-'}</td>
+                  <td className="px-3 py-2">{row.item.name || '-'}</td>
+                  <td className="px-3 py-2 text-xs text-gray-600">{formatItemMeasures(row.item)}</td>
+                  <td className="px-3 py-2 text-right">{Number(row.item.quantity ?? 0)}</td>
+                  <td className="px-3 py-2 text-right">{fmtWeight(row.weightKg)}</td>
+                  <td className="px-3 py-2 text-right">{fmtCurrency(row.total)}</td>
+                  <td className="px-3 py-2 text-xs text-gray-700">{String((row.order as any)?.createdBy?.abbrevName || '-')}</td>
                 </tr>
               ))}
             </tbody>
