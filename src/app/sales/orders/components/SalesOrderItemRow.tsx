@@ -169,6 +169,25 @@ const FormattedMoneyInput = ({
   );
 };
 
+function getMinAllowedUnitPrice(item: OrderItem, fallbackMinUnitPrice?: number | null): number {
+  const minUnitPrice = Number(item.minUnitPrice ?? fallbackMinUnitPrice ?? 0);
+  return Number.isFinite(minUnitPrice) && minUnitPrice > 0 ? minUnitPrice : 0;
+}
+
+function getUnitPriceFloorError(item: OrderItem, fallbackMinUnitPrice?: number | null): string | null {
+  const nextPrice = Number(item.unitPrice ?? 0);
+  if (!Number.isFinite(nextPrice) || nextPrice <= 0) {
+    return 'Não é permitido salvar item com preço zero.';
+  }
+
+  const minAllowed = getMinAllowedUnitPrice(item, fallbackMinUnitPrice);
+  if (minAllowed > 0 && nextPrice < minAllowed) {
+    return `O preço do item não pode ser menor que o Preço Unitário do cliente (${minAllowed.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}).`;
+  }
+
+  return null;
+}
+
 function useAutoResolvedClientItemCode({
   customerDoc,
   localItem,
@@ -354,8 +373,8 @@ export const SalesOrderItemRow = ({
 
   const handleChange = (field: keyof OrderItem, value: any) => {
     const updated = { ...localItem, [field]: value };
-    const isDimensionField = field === 'width' || field === 'length';
-    if (isDimensionField) {
+    const requiresExplicitSave = field === 'width' || field === 'length' || field === 'unitPrice';
+    if (requiresExplicitSave) {
       setHasPendingDimensionChanges(true);
     }
     setLocalItem(updated);
@@ -363,7 +382,7 @@ export const SalesOrderItemRow = ({
     if (shouldPropagateImmediately) {
       onPreviewUpdate(updated); // Immediate update for UI/Calculations
     }
-    if (onAutoSave && !isDimensionField && !hasPendingDimensionChanges) {
+    if (onAutoSave && !requiresExplicitSave && !hasPendingDimensionChanges) {
         debouncedSave(updated); // Delayed save for API
     }
   };
@@ -374,8 +393,9 @@ export const SalesOrderItemRow = ({
       setIsRowLocked(false);
       return;
     }
-    if (Number(localItem.unitPrice ?? 0) <= 0) {
-      alert('Não é permitido salvar item com preço zero.');
+    const unitPriceError = getUnitPriceFloorError(localItem, minUnitPriceRef.current);
+    if (unitPriceError) {
+      alert(unitPriceError);
       return;
     }
     const dimensionError = validateOrderItemDimensionLimits(localItem);
@@ -553,11 +573,7 @@ export const SalesOrderItemRow = ({
               className={`${compactW} px-2 py-1 border rounded ${!canEditPrice ? 'bg-gray-100 text-gray-600 cursor-not-allowed' : ''}`}
               disabled={!canEditPrice}
               value={localItem.unitPrice}
-              onChange={(val) => {
-                const base = Number(minUnitPriceRef.current ?? 0);
-                const next = Math.max(Number(val ?? base), base);
-                handleChange('unitPrice', next);
-              }}
+              onChange={(val) => handleChange('unitPrice', val)}
             />
         </td>
         <td className="p-2">
@@ -772,8 +788,9 @@ export const SalesOrderItemCard = ({
     if (!onAutoSave) return;
 
     const merged = { ...localItem, ...data };
-    if (Number(merged.unitPrice ?? 0) <= 0) {
-      alert('Não é permitido salvar item com preço zero.');
+    const unitPriceError = getUnitPriceFloorError(merged, minUnitPriceRef.current);
+    if (unitPriceError) {
+      alert(unitPriceError);
       return;
     }
 
@@ -793,8 +810,8 @@ export const SalesOrderItemCard = ({
 
   const handleChange = (field: keyof OrderItem, value: any) => {
     const updated = { ...localItem, [field]: value };
-    const isDimensionField = field === 'width' || field === 'length';
-    if (isDimensionField) {
+    const requiresExplicitSave = field === 'width' || field === 'length' || field === 'unitPrice';
+    if (requiresExplicitSave) {
       setHasPendingDimensionChanges(true);
     }
     setLocalItem(updated);
@@ -802,7 +819,7 @@ export const SalesOrderItemCard = ({
     if (shouldPropagateImmediately) {
       onPreviewUpdate(updated);
     }
-    if (onAutoSave && !isDimensionField && !hasPendingDimensionChanges) {
+    if (onAutoSave && !requiresExplicitSave && !hasPendingDimensionChanges) {
         debouncedSave(updated);
     }
   };
@@ -813,8 +830,9 @@ export const SalesOrderItemCard = ({
       setIsRowLocked(false);
       return;
     }
-    if (Number(localItem.unitPrice ?? 0) <= 0) {
-      alert('Não é permitido salvar item com preço zero.');
+    const unitPriceError = getUnitPriceFloorError(localItem, minUnitPriceRef.current);
+    if (unitPriceError) {
+      alert(unitPriceError);
       return;
     }
     const dimensionError = validateOrderItemDimensionLimits(localItem);
@@ -982,11 +1000,7 @@ export const SalesOrderItemCard = ({
             className={`w-full px-2 py-1 border rounded text-sm ${!canEditPrice ? 'bg-gray-100 text-gray-600 cursor-not-allowed' : ''}`}
             disabled={!canEditPrice}
             value={localItem.unitPrice}
-            onChange={(val) => {
-              const base = Number(minUnitPriceRef.current ?? 0);
-              const next = Math.max(Number(val ?? base), base);
-              handleChange('unitPrice', next);
-            }}
+            onChange={(val) => handleChange('unitPrice', val)}
           />
         </div>
         <div>
