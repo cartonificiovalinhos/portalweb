@@ -750,6 +750,7 @@ export default function ClientDetailsPage() {
       const itemsPayload = selectedUnlinkedItemIds.map((inventoryItemId) => ({
         inventoryItemId,
         unit: (basePriceFallbackUnitByItemId as any)[inventoryItemId] ?? null,
+        unitPrice: Number((basePriceFallbackByItemId as any)[inventoryItemId] ?? 0),
       }));
       const res = await fetch(`/api/clients/${client.id}/items`, {
         method: 'POST',
@@ -764,7 +765,7 @@ export default function ClientDetailsPage() {
     } finally {
       setLinkingItems(false);
     }
-  }, [basePriceFallbackUnitByItemId, client, refreshLinkedItems, refreshUnlinkedItems, selectedUnlinkedItemIds]);
+  }, [basePriceFallbackByItemId, basePriceFallbackUnitByItemId, client, refreshLinkedItems, refreshUnlinkedItems, selectedUnlinkedItemIds]);
 
   const applyAdjustToClientItems = useCallback(async () => {
     if (!client) return;

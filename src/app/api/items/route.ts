@@ -3,6 +3,7 @@ import { prisma } from '../../../lib/prisma';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '../../../lib/auth';
 import { attachResolvedCommercialFamilies } from '@/lib/commercial-family-dimension-resolution';
+import { buildClientItemPriceFloorResolver } from '@/lib/client-item-price-floor';
 
 export async function GET(request: Request) {
   try {
@@ -53,13 +54,26 @@ export async function GET(request: Request) {
           } 
         }
       });
+
+      const resolvePriceFloor = await buildClientItemPriceFloorResolver(
+        prisma,
+        filterClientId,
+        links.map((link) => Number(link.inventoryItemId)),
+      );
       
-      let items = links.map(l => ({
-        ...l.inventoryItem,
-        unitPrice: l.unitPrice,
-        priceUnit: l.unit,
-        clientItemManual: l.manual
-      }));
+      let items = links.map(l => {
+        const pricing = resolvePriceFloor(l.inventoryItemId, l.unit ?? l.inventoryItem.unit);
+        const effectiveUnitPrice = pricing.minAllowedPrice ?? Number(l.unitPrice ?? 0);
+        return {
+          ...l.inventoryItem,
+          unitPrice: effectiveUnitPrice,
+          minUnitPrice: pricing.minAllowedPrice,
+          baseUnitPrice: pricing.basePrice,
+          clientUnitPrice: Number(l.unitPrice ?? 0),
+          priceUnit: l.unit,
+          clientItemManual: l.manual
+        };
+      });
       
       if (qParam) {
         const lower = qParam.toLowerCase();

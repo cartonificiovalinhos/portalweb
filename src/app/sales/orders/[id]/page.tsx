@@ -20,6 +20,7 @@ type InventoryItem = {
     lengthMax?: number | null;
   } | null;
   unitPrice?: number | null;
+  minUnitPrice?: number | null;
   clientItemManual?: boolean | null;
   width?: number | null;
   length?: number | null;
@@ -459,6 +460,7 @@ export default function SalesOrderMaintenancePage() {
   const addItemToOrder = async (item: InventoryItem) => {
     if (!order) return;
     try {
+      const minUnitPrice = Number(item.minUnitPrice ?? item.unitPrice ?? 0);
       const payload = {
         orderId: order.id,
         inventoryItemId: item.id,
@@ -466,7 +468,7 @@ export default function SalesOrderMaintenancePage() {
         sku: item.sku,
         unit: item.unit,
         quantity: 1,
-        unitPrice: item.unitPrice ?? 0,
+        unitPrice: Math.max(Number(item.unitPrice ?? 0), minUnitPrice),
         discountPct: 0,
         width: item.width,
         length: item.length,
@@ -1389,7 +1391,7 @@ export default function SalesOrderMaintenancePage() {
                     <tr className="bg-gray-50">
                       <th className="p-2 text-left">Item</th>
                       <th className="p-2 text-left">SKU</th>
-                      {(() => { const hasSheet = list.some(supportsSheetDims); return hasSheet ? (<><th className="p-2 text-left">Compr.</th><th className="p-2 text-left">Larg.</th><th className="p-2 text-left">Gram.</th></>) : null; })()}
+                      {(() => { const hasSheet = list.some(supportsSheetDims); return hasSheet ? (<><th className="p-2 text-left">Larg.</th><th className="p-2 text-left">Compr.</th><th className="p-2 text-left">Gram.</th></>) : null; })()}
                       {(() => { const hasCore = list.some(supportsCoreDims); return hasCore ? (<><th className="p-2 text-left">Diâmetro</th><th className="p-2 text-left">Tubete</th></>) : null; })()}
                       <th className="p-2 text-left">UM</th>
                       <th className="p-2 text-left">Qtd</th>

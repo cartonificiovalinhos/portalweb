@@ -6,6 +6,7 @@ import { sendOrderStatusChangeNotification } from '../../../../../lib/email';
 import { attachResolvedCommercialFamilies } from '@/lib/commercial-family-dimension-resolution';
 import { resolveClientItemDimensionCode } from '@/lib/client-item-dimension-code';
 import { normalizeOptionalText } from '@/lib/sales-order-client-fields';
+import { buildClientItemPriceFloorResolver } from '@/lib/client-item-price-floor';
 
 function normalizeDoc(doc: string): string {
   return (doc || '').replace(/\D+/g, '');
@@ -137,23 +138,15 @@ export async function GET(_: Request, props: { params: Promise<{ id: string }> }
         )
       );
       if (invIds.length > 0) {
-        const links = await prisma.clientItem.findMany({
-          where: { clientId: Math.trunc(clientId), inventoryItemId: { in: invIds }, allowed: true },
-          select: { inventoryItemId: true, unitPrice: true, manual: true },
-        });
-        const byInvId = new Map<number, { unitPrice: number; manual: boolean }>();
-        for (const l of links) {
-          byInvId.set(Math.trunc(Number(l.inventoryItemId)), { unitPrice: Number(l.unitPrice ?? 0), manual: Boolean(l.manual) });
-        }
+        const resolvePriceFloor = await buildClientItemPriceFloorResolver(prisma, Math.trunc(clientId), invIds);
         for (const it of resolvedItems) {
           const invId = it?.inventoryItemId != null ? Math.trunc(Number(it.inventoryItemId)) : null;
           if (!invId) continue;
-          const link = byInvId.get(invId);
-          if (!link) continue;
-          it.minUnitPrice = link.unitPrice;
-          it.clientItemManual = link.manual;
+          const pricing = resolvePriceFloor(invId, it?.unit || undefined);
+          it.minUnitPrice = pricing.minAllowedPrice;
+          it.clientItemManual = pricing.manual;
           if (it.inventoryItem) {
-            it.inventoryItem.clientItemManual = link.manual;
+            it.inventoryItem.clientItemManual = pricing.manual;
           }
         }
       }

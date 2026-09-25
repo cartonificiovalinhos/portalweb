@@ -5,6 +5,7 @@ import { authOptions } from '../../../../lib/auth';
 import { validateOrderItemDimensionLimits } from '@/lib/order-item-dimension-limits';
 import { attachResolvedCommercialFamilies } from '@/lib/commercial-family-dimension-resolution';
 import { resolveClientItemDimensionCode } from '@/lib/client-item-dimension-code';
+import { buildClientItemPriceFloorResolver } from '@/lib/client-item-price-floor';
 
 function normalizeDoc(doc: string): string {
   return (doc || '').replace(/\D+/g, '');
@@ -416,36 +417,29 @@ export async function POST(request: Request) {
         )
       );
       if (invIds.length > 0) {
-        const links = await prisma.clientItem.findMany({
-          where: { clientId: Math.trunc(clientId), inventoryItemId: { in: invIds }, allowed: true },
-          select: { inventoryItemId: true, unitPrice: true, manual: true },
-        });
-        const byInvId = new Map<number, { unitPrice: number; manual: boolean }>();
-        for (const l of links) {
-          byInvId.set(Math.trunc(Number(l.inventoryItemId)), { unitPrice: Number(l.unitPrice ?? 0), manual: Boolean(l.manual) });
-        }
+        const resolvePriceFloor = await buildClientItemPriceFloorResolver(prisma, Math.trunc(clientId), invIds);
 
         const cents = (n: number) => Math.round(Number(n || 0) * 100);
 
         for (const it of normalizedItems) {
           const invId = it.inventoryItemId ? Math.trunc(Number(it.inventoryItemId)) : null;
           if (!invId) continue;
-          const link = byInvId.get(invId);
-          if (!link) continue;
+          const pricing = resolvePriceFloor(invId, it.unit || undefined);
+          if (pricing.minAllowedPrice == null) continue;
           const reqCents = cents(it.unitPrice);
-          const baseCents = cents(link.unitPrice);
+          const floorCents = cents(pricing.minAllowedPrice);
 
-          if (!link.manual) {
-            if (reqCents !== baseCents) {
+          if (!pricing.manual) {
+            if (reqCents !== floorCents) {
               return NextResponse.json(
                 { error: `Preço não pode ser alterado para item não manual: ${String(it.sku || it.name || 'Item')}` },
                 { status: 400 }
               );
             }
           } else {
-            if (reqCents < baseCents) {
+            if (reqCents < floorCents) {
               return NextResponse.json(
-                { error: `Preço não pode ser inferior ao valor carregado: ${String(it.sku || it.name || 'Item')}` },
+                { error: `Preço não pode ser inferior ao preço mínimo permitido: ${String(it.sku || it.name || 'Item')}` },
                 { status: 400 }
               );
             }

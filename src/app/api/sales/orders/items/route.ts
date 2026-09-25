@@ -4,6 +4,7 @@ import { validateOrderItemDimensionLimits } from '@/lib/order-item-dimension-lim
 import { resolveCommercialFamilyForItem } from '@/lib/commercial-family-dimension-resolution';
 import { resolveClientItemDimensionCode } from '@/lib/client-item-dimension-code';
 import { normalizeOptionalText } from '@/lib/sales-order-client-fields';
+import { buildClientItemPriceFloorResolver } from '@/lib/client-item-price-floor';
 
 export async function POST(request: Request) {
   try {
@@ -89,30 +90,25 @@ export async function POST(request: Request) {
     const clientId = order?.clientId != null ? Number(order.clientId) : null;
     const invId = payload.inventoryItemId != null ? Number(payload.inventoryItemId) : null;
     if (clientId && Number.isFinite(clientId) && clientId > 0 && invId && Number.isFinite(invId) && invId > 0) {
-      const link = await prisma.clientItem.findFirst({
-        where: { clientId: Math.trunc(clientId), inventoryItemId: Math.trunc(invId), allowed: true },
-        select: { unitPrice: true, manual: true },
-      });
-
-      if (link) {
+      const resolvePriceFloor = await buildClientItemPriceFloorResolver(prisma, Math.trunc(clientId), [Math.trunc(invId)]);
+      const pricing = resolvePriceFloor(Math.trunc(invId), payload.unit ?? undefined);
+      if (pricing.minAllowedPrice != null) {
         const cents = (n: number) => Math.round(Number(n || 0) * 100);
         const reqCents = cents(Number(payload.unitPrice ?? 0));
-        const baseCents = cents(Number(link.unitPrice ?? 0));
+        const floorCents = cents(Number(pricing.minAllowedPrice ?? 0));
 
-        if (!link.manual) {
-          if (reqCents !== baseCents) {
+        if (!pricing.manual) {
+          if (reqCents !== floorCents) {
             return NextResponse.json(
               { error: `Preço não pode ser alterado para item não manual: ${String(payload.sku || payload.name || 'Item')}` },
               { status: 400 }
             );
           }
-        } else {
-          if (reqCents < baseCents) {
-            return NextResponse.json(
-              { error: `Preço não pode ser inferior ao valor carregado: ${String(payload.sku || payload.name || 'Item')}` },
-              { status: 400 }
-            );
-          }
+        } else if (reqCents < floorCents) {
+          return NextResponse.json(
+            { error: `Preço não pode ser inferior ao preço mínimo permitido: ${String(payload.sku || payload.name || 'Item')}` },
+            { status: 400 }
+          );
         }
       }
     }

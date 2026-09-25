@@ -19,6 +19,7 @@ type InventoryItem = {
     lengthMax?: number | null;
   } | null;
   unitPrice?: number | null;
+  minUnitPrice?: number | null;
   clientItemManual?: boolean | null;
   width?: number | null;
   length?: number | null;
@@ -289,6 +290,7 @@ function NewSalesOrderContent() {
         const copiedItems: OrderItem[] = srcItems.map((it: any, idx: number) => {
           const invId = Number(it?.inventoryItemId ?? it?.inventoryItem?.id);
           const inv = Number.isFinite(invId) && invId > 0 ? invById.get(invId) : undefined;
+          const minUnitPrice = inv?.minUnitPrice != null ? Number(inv.minUnitPrice) : null;
           const unitPrice = inv?.unitPrice != null ? Number(inv.unitPrice) : Number(it?.unitPrice ?? 0);
 
           const fallbackInv: InventoryItem | null = it?.inventoryItem
@@ -303,8 +305,9 @@ function NewSalesOrderContent() {
             sku: it?.sku ?? null,
             unit: it?.unit ?? null,
             quantity: Number(it?.quantity ?? 1),
-            unitPrice,
+            unitPrice: minUnitPrice != null && Number.isFinite(minUnitPrice) ? Math.max(unitPrice, minUnitPrice) : unitPrice,
             discountPct: Number(it?.discountPct ?? 0),
+            minUnitPrice,
             width: it?.width ?? inv?.width ?? null,
             length: it?.length ?? inv?.length ?? null,
             grammage: it?.grammage ?? inv?.grammage ?? null,
@@ -400,16 +403,18 @@ function NewSalesOrderContent() {
   };
 
   const addItemToOrder = (invItem: InventoryItem) => {
+    const minUnitPrice = Number(invItem.minUnitPrice ?? invItem.unitPrice ?? 0);
     const basePrice = Number(invItem.unitPrice ?? 0);
+    const effectiveUnitPrice = Math.max(basePrice, minUnitPrice);
     const newItem: OrderItem = {
       id: -Date.now(), // Temp ID
       name: invItem.name,
       sku: invItem.sku,
       unit: invItem.priceUnit ?? invItem.unit,
       quantity: 1,
-      unitPrice: basePrice,
+      unitPrice: effectiveUnitPrice,
       discountPct: 0,
-      minUnitPrice: basePrice,
+      minUnitPrice,
       inventoryItem: invItem,
       width: invItem.width,
       length: invItem.length,
@@ -948,7 +953,7 @@ function NewSalesOrderContent() {
                   <tr className="bg-gray-50">
                     <th className="p-2 text-left">Item</th>
                     <th className="p-2 text-left">SKU</th>
-                    {(() => { const hasSheet = list.some(supportsSheetDims); return hasSheet ? (<><th className="p-2 text-left">Compr.</th><th className="p-2 text-left">Larg.</th><th className="p-2 text-left">Gram.</th></>) : null; })()}
+                    {(() => { const hasSheet = list.some(supportsSheetDims); return hasSheet ? (<><th className="p-2 text-left">Larg.</th><th className="p-2 text-left">Compr.</th><th className="p-2 text-left">Gram.</th></>) : null; })()}
                     {(() => { const hasCore = list.some(supportsCoreDims); return hasCore ? (<><th className="p-2 text-left">Diâmetro</th><th className="p-2 text-left">Tubete</th></>) : null; })()}
                     <th className="p-2 text-left">UM</th>
                     <th className="p-2 text-left">Qtd</th>

@@ -251,11 +251,12 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
       if (action === 'link') {
         const inventoryItemIdsRaw = (rawBody as any).inventoryItemIds;
         const itemsRaw = (rawBody as any).items;
-        const items: { inventoryItemId: number; unit?: string | null }[] = Array.isArray(itemsRaw)
+        const items: { inventoryItemId: number; unit?: string | null; unitPrice?: number | null }[] = Array.isArray(itemsRaw)
           ? (itemsRaw as any[])
               .map((x: any) => ({
                 inventoryItemId: Number(x?.inventoryItemId ?? x?.id ?? x?.itemId),
                 unit: x?.unit != null ? String(x.unit).trim().toUpperCase() : null,
+                unitPrice: x?.unitPrice != null ? Number(x.unitPrice) : null,
               }))
               .filter((x) => Number.isFinite(x.inventoryItemId) && x.inventoryItemId > 0)
           : [];
@@ -269,9 +270,12 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
         if (!inventoryItemIds.length) return NextResponse.json({ error: 'inventoryItemIds/items é obrigatório' }, { status: 400 });
 
         const unitByInvId = new Map<number, string>();
+        const unitPriceByInvId = new Map<number, number>();
         for (const it of items) {
           const u = String(it.unit || '').trim();
           if (u) unitByInvId.set(it.inventoryItemId, u);
+          const n = Number(it.unitPrice ?? 0);
+          if (Number.isFinite(n) && n > 0) unitPriceByInvId.set(it.inventoryItemId, n);
         }
 
         const invs = await prisma.inventoryItem.findMany({
@@ -288,10 +292,11 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
         await prisma.$transaction(async (tx) => {
           for (const inventoryItemId of inventoryItemIds) {
             const desiredUnit = unitByInvId.get(inventoryItemId) ?? invUnitById.get(inventoryItemId) ?? null;
+            const desiredUnitPrice = unitPriceByInvId.get(inventoryItemId) ?? 0;
             await tx.clientItem.upsert({
               where: { clientId_inventoryItemId: { clientId, inventoryItemId } },
-              update: { allowed: true, manual: true, ...(desiredUnit ? { unit: desiredUnit } : {}) },
-              create: { clientId, inventoryItemId, unit: desiredUnit, unitPrice: 0, allowed: true, manual: true },
+              update: { allowed: true, manual: true, unitPrice: desiredUnitPrice, ...(desiredUnit ? { unit: desiredUnit } : {}) },
+              create: { clientId, inventoryItemId, unit: desiredUnit, unitPrice: desiredUnitPrice, allowed: true, manual: true },
             });
             upsertedCount += 1;
           }
