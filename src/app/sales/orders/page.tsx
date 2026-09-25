@@ -216,6 +216,16 @@ export default function SalesOrdersPage() {
     const n = Number(v ?? 0);
     return (Number.isFinite(n) ? n : 0).toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 3 });
   };
+  const formatDateTimeStamp = (value: Date) => {
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return `${pad(value.getDate())}${pad(value.getMonth() + 1)}${String(value.getFullYear()).slice(-2)}_${pad(value.getHours())}${pad(value.getMinutes())}`;
+  };
+  const sanitizeFilenamePart = (value: string) =>
+    String(value || 'representante')
+      .trim()
+      .replace(/[\\/:*?"<>|]/g, '')
+      .replace(/\s+/g, ' ')
+      .trim() || 'representante';
   const formatItemMeasures = (item: OrderItem) => {
     const width = Number(item.width ?? 0);
     const length = Number(item.length ?? 0);
@@ -244,13 +254,6 @@ export default function SalesOrdersPage() {
   }, [computeItemWeightKg]);
 
   const downloadVisibleGridAsExcel = useCallback(() => {
-    const escapeHtml = (value: unknown) =>
-      String(value ?? "")
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/\"/g, "&quot;");
-
     const headers =
       viewMode === "order"
         ? ["Número", "Entidade", "Cliente", "Data", "Peso KG", "Total em R$", "Situação", "Repres"]
@@ -282,19 +285,24 @@ export default function SalesOrdersPage() {
             String((row.order as any)?.createdBy?.abbrevName || "-"),
           ]);
 
-    const tableRows = rows
-      .map((cols) => `<tr>${cols.map((col) => `<td>${escapeHtml(col)}</td>`).join("")}</tr>`)
-      .join("");
+    const repAbbrev =
+      viewMode === "order"
+        ? String((pageOrders[0] as any)?.createdBy?.abbrevName || 'representante')
+        : String((pageItemRows[0]?.order as any)?.createdBy?.abbrevName || 'representante');
+    const filename = `representante(${sanitizeFilenamePart(repAbbrev)})_${formatDateTimeStamp(new Date())}.csv`;
 
-    const html = `<!DOCTYPE html><html><head><meta charset="utf-8" /></head><body><table><thead><tr>${headers
-      .map((header) => `<th>${escapeHtml(header)}</th>`)
-      .join("")}</tr></thead><tbody>${tableRows}</tbody></table></body></html>`;
+    const escapeCsv = (value: unknown) => {
+      const text = String(value ?? '');
+      if (/[;"\n\r]/.test(text)) return `"${text.replace(/"/g, '""')}"`;
+      return text;
+    };
+    const csv = `\uFEFF${[headers, ...rows].map((cols) => cols.map(escapeCsv).join(';')).join('\r\n')}`;
 
-    const blob = new Blob([html], { type: "application/vnd.ms-excel;charset=utf-8;" });
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = viewMode === "order" ? "pedidos-visiveis.xls" : "pedidos-por-item-visiveis.xls";
+    a.download = filename;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -492,6 +500,23 @@ export default function SalesOrdersPage() {
       <div className="bg-white rounded border border-gray-200 overflow-hidden">
         <div className="px-3 py-2 border-b bg-gray-50 text-sm text-gray-700 flex items-center">
           <span>Listagem de pedidos</span>
+          <div className="ml-6 flex items-center gap-2">
+            <button
+              type="button"
+              className="px-3 py-1.5 text-xs border rounded bg-white hover:bg-gray-100"
+              onClick={downloadVisibleGridAsExcel}
+              disabled={visibleCount === 0}
+            >
+              Exportar Excel
+            </button>
+            <button
+              type="button"
+              className="px-3 py-1.5 text-xs border rounded bg-white hover:bg-gray-100"
+              onClick={() => setViewMode((prev) => (prev === "order" ? "item" : "order"))}
+            >
+              {viewMode === "order" ? "Exibir por item" : "Agrupar por pedido"}
+            </button>
+          </div>
           <div className="ml-auto flex items-center gap-2">
             <div className="flex items-center gap-1">
               <button
@@ -524,21 +549,6 @@ export default function SalesOrdersPage() {
                 »
               </button>
             </div>
-            <button
-              type="button"
-              className="px-3 py-1.5 text-xs border rounded bg-white hover:bg-gray-100"
-              onClick={downloadVisibleGridAsExcel}
-              disabled={visibleCount === 0}
-            >
-              Exportar Excel
-            </button>
-            <button
-              type="button"
-              className="px-3 py-1.5 text-xs border rounded bg-white hover:bg-gray-100"
-              onClick={() => setViewMode((prev) => (prev === "order" ? "item" : "order"))}
-            >
-              {viewMode === "order" ? "Exibir por item" : "Agrupar por pedido"}
-            </button>
             <span className="text-xs text-gray-500">{visibleCount} registro(s)</span>
             <Link href="/sales/orders/new" className="px-3 py-1.5 text-xs border rounded bg-white hover:bg-gray-100">Novo Pedido</Link>
           </div>
