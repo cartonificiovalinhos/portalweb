@@ -241,7 +241,11 @@ export default function SalesOrdersPage() {
     const n = Number((o as any)?.totalWithTax ?? 0);
     if (Number.isFinite(n) && n > 0) return n;
     const fallback = Number((o as any)?.total ?? 0);
-    return Number.isFinite(fallback) ? fallback : 0;
+    if (Number.isFinite(fallback) && fallback > 0) return fallback;
+
+    const items = Array.isArray(o?.items) ? o.items : [];
+    const computed = items.reduce((acc, item) => acc + computeItemTotal(item), 0);
+    return Number.isFinite(computed) ? computed : 0;
   };
 
   const hasAnyDiscount = (o: SalesOrder) => {

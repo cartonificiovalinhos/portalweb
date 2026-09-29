@@ -24,7 +24,19 @@ type Client = {
   titlesOverdue?: number;
 };
 type PaymentTerm = { id: number; code: number | null; description: string; installments?: number };
-type OrderItem = { id: number; sku?: string | null; name: string; unit?: string | null; quantity: number; unitPrice: number; discountPct: number };
+type OrderItem = {
+  id: number;
+  sku?: string | null;
+  name: string;
+  unit?: string | null;
+  quantity: number;
+  unitPrice: number;
+  discountPct: number;
+  width?: number | null;
+  length?: number | null;
+  grammage?: number | null;
+  lineTotal?: number | null;
+};
 type SalesOrder = { 
   id: number; 
   code: string; 
@@ -914,7 +926,31 @@ export default function ClientDetailsPage() {
     const withTax = Number(o?.totalWithTax ?? 0);
     if (Number.isFinite(withTax) && withTax > 0) return withTax;
     const fallback = Number(o?.total ?? 0);
-    return Number.isFinite(fallback) ? fallback : 0;
+    if (Number.isFinite(fallback) && fallback > 0) return fallback;
+
+    const computed = (Array.isArray(o?.items) ? o.items : []).reduce((acc, item) => {
+      const explicitTotal = Number(item?.lineTotal ?? 0);
+      if (Number.isFinite(explicitTotal) && explicitTotal > 0) return acc + explicitTotal;
+
+      const width = Number(item?.width ?? 0);
+      const length = Number(item?.length ?? 0);
+      const grammage = Number(item?.grammage ?? 0);
+      const quantity = Number(item?.quantity ?? 0);
+      const unitPrice = Number(item?.unitPrice ?? 0);
+      const discountPct = Number(item?.discountPct ?? 0);
+      const unit = String(item?.unit || '').trim().toUpperCase();
+
+      let base = quantity * unitPrice;
+      if (unit === 'KG' && width > 0 && length > 0 && grammage > 0 && quantity > 0) {
+        const areaM2 = (length / 1000) * (width / 1000);
+        const weightKg = (areaM2 * grammage * quantity) / 1000;
+        base = weightKg * unitPrice;
+      }
+
+      return acc + (base * (1 - discountPct / 100));
+    }, 0);
+
+    return Number.isFinite(computed) ? computed : 0;
   };
 
   const ordersTotalPages = Math.max(1, Math.ceil(orders.length / PAGE_SIZE));
