@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '../../../../lib/prisma';
+import { Prisma } from '@prisma/client';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '../../../../lib/auth';
 
@@ -138,6 +139,56 @@ async function resolvePaymentTermIds(body: any): Promise<number[] | null> {
   return out;
 }
 
+async function findClientIdsBySearch(
+  q: string,
+  digits: string,
+  idCandidate: number | null,
+  userId: number,
+  isSalesAdmin: boolean,
+): Promise<number[]> {
+  const qPattern = `%${q}%`;
+  const digitsPattern = digits ? `%${digits}%` : null;
+  const qValue = Prisma.sql`CAST(${qPattern} AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci`;
+  const digitsValue = digitsPattern
+    ? Prisma.sql`CAST(${digitsPattern} AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci`
+    : null;
+
+  const visibilitySql = isSalesAdmin
+    ? Prisma.sql``
+    : Prisma.sql`EXISTS (
+        SELECT 1
+        FROM userclientrep ucr
+        WHERE ucr.clientId = c.id
+          AND ucr.userId = ${userId}
+      ) AND `;
+
+  const numericSql = idCandidate !== null
+    ? Prisma.sql` OR c.id = ${idCandidate} OR c.clientCode = ${idCandidate}`
+    : Prisma.sql``;
+
+  const docSql = digitsValue
+    ? Prisma.sql` OR c.doc COLLATE utf8mb4_unicode_ci LIKE ${digitsValue}`
+    : Prisma.sql``;
+
+  const rows = await prisma.$queryRaw<Array<{ id: number }>>(Prisma.sql`
+    SELECT c.id
+    FROM client c
+    WHERE
+      ${visibilitySql}
+      (
+        c.name COLLATE utf8mb4_unicode_ci LIKE ${qValue}
+        OR c.abbrevName COLLATE utf8mb4_unicode_ci LIKE ${qValue}
+        OR c.cidade COLLATE utf8mb4_unicode_ci LIKE ${qValue}
+        OR c.estado COLLATE utf8mb4_unicode_ci LIKE ${qValue}
+        ${docSql}
+        ${numericSql}
+      )
+    ORDER BY c.name ASC
+  `);
+
+  return rows.map((row) => Number(row.id)).filter((id) => Number.isFinite(id));
+}
+
 export async function GET(request: Request) {
   try {
     const session = await getServerSession(authOptions);
@@ -162,16 +213,9 @@ export async function GET(request: Request) {
     if (!isSalesAdmin) where.reps = { some: { userId } };
 
     if (q) {
-      const or: any[] = [
-        { name: { contains: q } },
-        { abbrevName: { contains: q } },
-        { cidade: { contains: q } },
-        { estado: { contains: q } },
-      ];
-      if (digits) or.push({ doc: { contains: digits } });
-      if (idCandidate !== null) or.push({ id: idCandidate });
-      if (idCandidate !== null) or.push({ clientCode: idCandidate });
-      where.OR = or;
+      const matchedIds = await findClientIdsBySearch(q, digits, idCandidate, userId, isSalesAdmin);
+      if (matchedIds.length === 0) return NextResponse.json([]);
+      where.id = { in: matchedIds };
     }
 
     const clients = await prisma.client.findMany({
