@@ -1,6 +1,10 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '../../../../../../lib/prisma';
 
+function normalizeDoc(v: any): string {
+  return String(v ?? '').replace(/\D+/g, '');
+}
+
 function normalizeSku(v: any): string {
   return String(v ?? '').trim();
 }
@@ -18,9 +22,41 @@ function normalizeUnitPrice(v: any): number {
   return Number.isFinite(n) ? n : 0;
 }
 
+async function resolveRepresentative(rawId: string) {
+  const raw = String(rawId ?? '').trim();
+  const doc = normalizeDoc(raw);
+
+  // CPF/CNPJ tem prioridade quando o identificador tem tamanho típico de documento.
+  if (doc.length === 11 || doc.length === 14) {
+    const byDoc = await prisma.user.findUnique({
+      where: { doc },
+      select: { id: true, doc: true, salesRepAdmin: true },
+    });
+    if (byDoc) return byDoc;
+  }
+
+  const numericId = Number(raw);
+  if (Number.isFinite(numericId) && numericId > 0) {
+    const byId = await prisma.user.findUnique({
+      where: { id: numericId },
+      select: { id: true, doc: true, salesRepAdmin: true },
+    });
+    if (byId) return byId;
+  }
+
+  if (doc) {
+    return prisma.user.findUnique({
+      where: { doc },
+      select: { id: true, doc: true, salesRepAdmin: true },
+    });
+  }
+
+  return null;
+}
+
 export async function GET(request: Request, props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
-  const repUserId = Number((params as any)?.id);
+  const rep = await resolveRepresentative(String((params as any)?.id ?? ''));
   const url = new URL(request.url);
   const debugParam = String(url.searchParams.get('debug') || '').trim().toLowerCase();
   const debug = debugParam === '1' || debugParam === 'true' || debugParam === 'yes';
@@ -29,7 +65,8 @@ export async function GET(request: Request, props: { params: Promise<{ id: strin
     {
       ok: false,
       error: 'Use POST para atualizar preços-base e reajustar preços do cliente.',
-      repUserId: Number.isFinite(repUserId) ? repUserId : null,
+      repUserId: Number.isFinite(Number(rep?.id)) ? Number(rep?.id) : null,
+      repDoc: rep?.doc ?? null,
       debug,
       exampleBody: [{ itemCode: 'CMC-B S', unit: 'KG', unitPrice: 12.8 }],
     },
@@ -44,22 +81,15 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
     const debugParam = String(url.searchParams.get('debug') || '').trim().toLowerCase();
     const debug = debugParam === '1' || debugParam === 'true' || debugParam === 'yes';
 
-    const repUserId = Number(params.id);
-    if (!Number.isFinite(repUserId) || repUserId <= 0) {
-      return NextResponse.json({ error: 'id inválido' }, { status: 400 });
-    }
+    const rep = await resolveRepresentative(params.id);
+    if (!rep) return NextResponse.json({ error: 'Representante não encontrado' }, { status: 404 });
+    const repUserId = Number(rep.id);
 
     const body = await request.json().catch(() => null);
-    const itemsRaw = Array.isArray(body) ? body : Array.isArray((body as any)?.items) ? (body as any).items : [];
-    if (!Array.isArray(itemsRaw) || itemsRaw.length === 0) {
-      return NextResponse.json({ error: 'items vazio' }, { status: 400 });
+    const itemsRaw = Array.isArray(body) ? body : Array.isArray((body as any)?.items) ? (body as any).items : null;
+    if (!Array.isArray(itemsRaw)) {
+      return NextResponse.json({ error: 'items inválido' }, { status: 400 });
     }
-
-    const rep = await prisma.user.findUnique({
-      where: { id: repUserId },
-      select: { id: true, salesRepAdmin: true },
-    });
-    if (!rep) return NextResponse.json({ error: 'Representante não encontrado' }, { status: 404 });
 
     const cleaned = itemsRaw
       .map((it: any) => ({
@@ -77,7 +107,7 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
       }))
       .filter((it: any) => Boolean(it.itemCode) && Boolean(it.unit));
 
-    if (cleaned.length === 0) {
+    if (itemsRaw.length > 0 && cleaned.length === 0) {
       return NextResponse.json({ error: 'Nenhum item válido (itemCode e unit são obrigatórios)' }, { status: 400 });
     }
 
@@ -92,11 +122,20 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
     }
 
     const results: any[] = [];
+    let removedRepresentativeItems = 0;
+    let removedClientLinks = 0;
+    let preservedClientLinks = 0;
     await prisma.$transaction(async (tx) => {
       const repLinks = await tx.userClientRep.findMany({ where: { userId: repUserId }, select: { clientId: true } });
       const repClientIds = Array.from(
         new Set(repLinks.map((x) => Number(x.clientId)).filter((x) => Number.isFinite(x) && x > 0))
       );
+      const existingRepRows = await tx.userInventoryItemPrice.findMany({
+        where: { userId: repUserId },
+        select: { id: true, inventoryItemId: true, unit: true, unitPrice: true },
+        orderBy: [{ updatedAt: 'desc' }, { id: 'desc' }],
+      });
+      const incomingInventoryItemIds = new Set<number>();
 
       for (const it of cleaned) {
         const inventoryItemId = invBySku.get(it.itemCode);
@@ -104,13 +143,10 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
           results.push({ itemCode: it.itemCode, unit: it.unit, success: false, error: 'SKU não encontrado no portal' });
           continue;
         }
+        incomingInventoryItemIds.add(inventoryItemId);
 
         try {
-          const previousRows = await tx.userInventoryItemPrice.findMany({
-            where: { userId: repUserId, inventoryItemId },
-            select: { id: true, unit: true, unitPrice: true },
-            orderBy: [{ updatedAt: 'desc' }, { id: 'desc' }],
-          });
+          const previousRows = existingRepRows.filter((row) => Number(row.inventoryItemId) === inventoryItemId);
           const previousMatches = previousRows.filter((r) => normalizeUnit(r.unit) === it.unit);
           const previousPreferred =
             previousMatches.find((r) => String(r.unit || '').trim().toUpperCase() === it.unit) ?? previousMatches[0] ?? null;
@@ -144,13 +180,22 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
           if (duplicateIds.length > 0) {
             await tx.userInventoryItemPrice.deleteMany({ where: { id: { in: duplicateIds } } });
           }
+          const existingRowIndex = existingRepRows.findIndex((r) => r.id === row.id);
+          if (existingRowIndex >= 0) {
+            existingRepRows[existingRowIndex] = { ...existingRepRows[existingRowIndex], unit: row.unit, unitPrice: row.unitPrice };
+          } else {
+            existingRepRows.push({ id: row.id, inventoryItemId, unit: row.unit, unitPrice: row.unitPrice });
+          }
+          for (let idx = existingRepRows.length - 1; idx >= 0; idx -= 1) {
+            if (duplicateIds.includes(existingRepRows[idx].id)) existingRepRows.splice(idx, 1);
+          }
 
           let adjustedClients = 0;
           let foundClients = 0;
           let skippedUnitMismatch = 0;
           let skippedInvalidRatio = 0;
           let skippedInvalidUpdatedPrice = 0;
-          if (oldBasePrice > 0 && newBasePrice > 0) {
+          if (oldBasePrice > 0 && newBasePrice > 0 && oldBasePrice !== newBasePrice) {
             if (repClientIds.length === 0) {
               foundClients = 0;
             } else {
@@ -158,7 +203,6 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
                 where: {
                   inventoryItemId,
                   allowed: true,
-                  manual: true,
                   clientId: { in: repClientIds },
                 },
                 select: { id: true, unitPrice: true, unit: true, lastBasePrice: true },
@@ -217,11 +261,103 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
           results.push({ itemCode: it.itemCode, unit: it.unit, success: false, error: String(innerErr?.message || innerErr) });
         }
       }
+
+      const removedRepRows = existingRepRows.filter((row) => !incomingInventoryItemIds.has(Number(row.inventoryItemId)));
+      const removedRepRowIds = removedRepRows.map((row) => Number(row.id)).filter((id) => Number.isFinite(id) && id > 0);
+      const removedInventoryItemIds = Array.from(
+        new Set(
+          removedRepRows
+            .map((row) => Number(row.inventoryItemId))
+            .filter((inventoryItemId) => Number.isFinite(inventoryItemId) && inventoryItemId > 0)
+        )
+      );
+
+      if (removedRepRowIds.length > 0) {
+        removedRepresentativeItems = (
+          await tx.userInventoryItemPrice.deleteMany({
+            where: { id: { in: removedRepRowIds } },
+          })
+        ).count;
+      }
+
+      if (repClientIds.length > 0 && removedInventoryItemIds.length > 0) {
+        const otherRepLinks = await tx.userClientRep.findMany({
+          where: {
+            clientId: { in: repClientIds },
+            userId: { not: repUserId },
+          },
+          select: { clientId: true, userId: true },
+        });
+        const otherRepIds = Array.from(
+          new Set(otherRepLinks.map((link) => Number(link.userId)).filter((userId) => Number.isFinite(userId) && userId > 0))
+        );
+        const otherRepSupportSet = new Set<string>();
+        if (otherRepIds.length > 0) {
+          const otherRepPrices = await tx.userInventoryItemPrice.findMany({
+            where: {
+              userId: { in: otherRepIds },
+              inventoryItemId: { in: removedInventoryItemIds },
+            },
+            select: { userId: true, inventoryItemId: true },
+          });
+          for (const price of otherRepPrices) {
+            otherRepSupportSet.add(`${price.userId}::${price.inventoryItemId}`);
+          }
+        }
+
+        const otherRepIdsByClient = new Map<number, number[]>();
+        for (const link of otherRepLinks) {
+          const clientId = Number(link.clientId);
+          const userId = Number(link.userId);
+          if (!Number.isFinite(clientId) || clientId <= 0 || !Number.isFinite(userId) || userId <= 0) continue;
+          const list = otherRepIdsByClient.get(clientId) || [];
+          list.push(userId);
+          otherRepIdsByClient.set(clientId, list);
+        }
+
+        const clientRows = await tx.clientItem.findMany({
+          where: {
+            clientId: { in: repClientIds },
+            inventoryItemId: { in: removedInventoryItemIds },
+          },
+          select: { id: true, clientId: true, inventoryItemId: true },
+        });
+
+        const clientItemIdsToDelete: number[] = [];
+        for (const row of clientRows) {
+          const clientId = Number(row.clientId);
+          const inventoryItemId = Number(row.inventoryItemId);
+          const otherUsers = otherRepIdsByClient.get(clientId) || [];
+          const hasOtherSupport = otherUsers.some((userId) => otherRepSupportSet.has(`${userId}::${inventoryItemId}`));
+          if (hasOtherSupport) {
+            preservedClientLinks += 1;
+            continue;
+          }
+          clientItemIdsToDelete.push(Number(row.id));
+        }
+
+        if (clientItemIdsToDelete.length > 0) {
+          removedClientLinks = (
+            await tx.clientItem.deleteMany({
+              where: { id: { in: clientItemIdsToDelete } },
+            })
+          ).count;
+        }
+      }
     });
 
     const okCount = results.filter((r) => r.success).length;
     const failCount = results.length - okCount;
-    return NextResponse.json({ ok: true, upserted: okCount, failed: failCount, results });
+    return NextResponse.json({
+      ok: true,
+      representative: { id: rep.id, doc: rep.doc ?? null },
+      upserted: okCount,
+      failed: failCount,
+      removedRepresentativeItems,
+      removedClientLinks,
+      preservedClientLinks,
+      results,
+    });
   } catch (err: any) {
     return NextResponse.json({ error: String(err?.message || err) }, { status: 500 });
   }
