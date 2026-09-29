@@ -268,13 +268,19 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
       }
     }
 
+    const previousCustomerDoc = normalizeDoc(String(orderExists.customerDoc || ''));
+
     const updated = await prisma.salesOrder.update({
       where: { id },
       data: allowed,
-      include: { items: { include: { inventoryItem: { include: { commercialFamily: true } } } } },
+      include: {
+        entity: true,
+        items: { include: { inventoryItem: { include: { commercialFamily: true } } } },
+      },
     });
 
-    if (Object.prototype.hasOwnProperty.call(allowed, 'customerDoc')) {
+    const currentCustomerDoc = normalizeDoc(String(updated.customerDoc || ''));
+    if (Object.prototype.hasOwnProperty.call(allowed, 'customerDoc') && currentCustomerDoc !== previousCustomerDoc) {
       for (const item of updated.items || []) {
         const clientItemCode = await resolveClientItemDimensionCode(prisma, {
           customerDoc: updated.customerDoc,

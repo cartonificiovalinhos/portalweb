@@ -326,6 +326,42 @@ function brToIsoDate(br: string): string | null {
   return `${String(yyyy).padStart(4, '0')}-${isoMm}-${isoDd}`;
 }
 
+function normalizeDoc(doc?: string | null): string {
+  return String(doc || '').replace(/\D+/g, '');
+}
+
+function normalizeDateOnly(value?: string | Date | null): string {
+  if (!value) return '';
+  const raw = String(value).trim();
+  const match = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (match) return `${match[1]}-${match[2]}-${match[3]}`;
+  const parsed = new Date(raw);
+  if (!Number.isFinite(parsed.getTime())) return '';
+  const yyyy = parsed.getFullYear();
+  const mm = String(parsed.getMonth() + 1).padStart(2, '0');
+  const dd = String(parsed.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+async function parseErrorMessage(res: Response, fallback: string): Promise<string> {
+  try {
+    const contentType = res.headers.get('content-type') || '';
+    if (contentType.includes('application/json')) {
+      const body = await res.json();
+      const message =
+        typeof body?.error === 'string' ? body.error
+          : typeof body?.message === 'string' ? body.message
+            : '';
+      return message || fallback;
+    }
+
+    const text = (await res.text()).trim();
+    return text || fallback;
+  } catch {
+    return fallback;
+  }
+}
+
 export default function SalesOrderMaintenancePage() {
   const params = useParams() as any;
   const idParam = Array.isArray(params?.id) ? params.id[0] : params?.id;
@@ -618,12 +654,22 @@ export default function SalesOrderMaintenancePage() {
 
   const saveHeader = async (partial: { paymentTerms?: string; deliveryDate?: string; customerName?: string; customerDoc?: string; clientOrderNumber?: string; triangularCustomerName?: string; triangularCustomerDoc?: string; clientId?: number | null }) => {
     if (!order) return;
+    const currentClientId = (order as any)?.clientId != null ? Number((order as any).clientId) : null;
+    const nextCustomerName = partial.customerName ?? order.customerName;
+    const nextCustomerDoc = partial.customerDoc ?? order.customerDoc;
+    const nextClientId = partial.clientId ?? hdrCustomerId ?? currentClientId;
+    const nextPaymentTerms = partial.paymentTerms ?? order.paymentTerms;
+    const nextDeliveryDate = partial.deliveryDate ?? order.deliveryDate;
+    const nextClientOrderNumber = partial.clientOrderNumber ?? order.clientOrderNumber ?? '';
+    const nextTriangularCustomerName = partial.triangularCustomerName ?? order.triangularCustomerName ?? '';
+    const nextTriangularCustomerDoc = partial.triangularCustomerDoc ?? order.triangularCustomerDoc ?? '';
+
     const validationError = validateSalesOrderForSave({
-      customerName: partial.customerName ?? order.customerName,
-      customerDoc: partial.customerDoc ?? order.customerDoc,
-      customerId: partial.clientId ?? hdrCustomerId ?? (order as any)?.clientId ?? null,
-      paymentTerms: partial.paymentTerms ?? order.paymentTerms,
-      deliveryDate: partial.deliveryDate ?? order.deliveryDate,
+      customerName: nextCustomerName,
+      customerDoc: nextCustomerDoc,
+      customerId: nextClientId,
+      paymentTerms: nextPaymentTerms,
+      deliveryDate: nextDeliveryDate,
       items: orderItems,
     });
     if (validationError) {
@@ -631,9 +677,26 @@ export default function SalesOrderMaintenancePage() {
       return;
     }
 
+    const payload: Record<string, unknown> = {};
+    if (String(nextCustomerName || '') !== String(order.customerName || '')) payload.customerName = nextCustomerName;
+    if (normalizeDoc(nextCustomerDoc) !== normalizeDoc(order.customerDoc)) payload.customerDoc = nextCustomerDoc;
+    if ((nextClientId ?? null) !== (currentClientId ?? null)) payload.clientId = nextClientId ?? null;
+    if (String(nextPaymentTerms || '') !== String(order.paymentTerms || '')) payload.paymentTerms = nextPaymentTerms;
+    if (normalizeDateOnly(nextDeliveryDate) !== normalizeDateOnly(order.deliveryDate)) payload.deliveryDate = nextDeliveryDate ?? '';
+    if (String(nextClientOrderNumber || '') !== String(order.clientOrderNumber || '')) payload.clientOrderNumber = nextClientOrderNumber;
+    if (String(nextTriangularCustomerName || '') !== String(order.triangularCustomerName || '')) payload.triangularCustomerName = nextTriangularCustomerName;
+    if (normalizeDoc(nextTriangularCustomerDoc) !== normalizeDoc(order.triangularCustomerDoc)) payload.triangularCustomerDoc = nextTriangularCustomerDoc;
+
+    if (Object.keys(payload).length === 0) {
+      setIsHeaderEditing(false);
+      return;
+    }
+
     try {
-      const res = await fetch(`/api/sales/orders/${order.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(partial) });
-      if (!res.ok) throw new Error('Falha ao salvar cabeçalho');
+      const res = await fetch(`/api/sales/orders/${order.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      if (!res.ok) {
+        throw new Error(await parseErrorMessage(res, 'Falha ao salvar cabeçalho'));
+      }
       const updated: SalesOrder = await res.json();
       setOrder(updated);
       setHdrCustomerId((updated as any)?.clientId != null ? Number((updated as any).clientId) : hdrCustomerId);
