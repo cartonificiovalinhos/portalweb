@@ -348,7 +348,7 @@ export async function POST(request: Request) {
     const rawItems = Array.isArray(items) ? items : [];
 
     const normalizedItems = await Promise.all(rawItems.map(async (it: any) => {
-      const qty = Number(it.quantity || 1);
+      const qty = it.quantity !== undefined ? Number(it.quantity) : 1;
       const price = Number(it.unitPrice || 0);
       const disc = Number(it.discountPct || 0);
       const inventoryItemId = it.inventoryItemId ? Number(it.inventoryItemId) : undefined;
@@ -357,9 +357,9 @@ export async function POST(request: Request) {
           quantity: qty,
           unitPrice: price,
           unit: it.unit || undefined,
-          width: it.width ? Number(it.width) : undefined,
-          length: it.length ? Number(it.length) : undefined,
-          grammage: it.grammage ? Number(it.grammage) : undefined,
+          width: it.width !== undefined ? Number(it.width) : undefined,
+          length: it.length !== undefined ? Number(it.length) : undefined,
+          grammage: it.grammage !== undefined ? Number(it.grammage) : undefined,
         },
       );
       const lineTotal = base * (1 - disc / 100);
@@ -371,11 +371,11 @@ export async function POST(request: Request) {
         unit: it.unit || undefined,
         unitPrice: price,
         discountPct: disc,
-        width: it.width ? Number(it.width) : undefined,
-        length: it.length ? Number(it.length) : undefined,
-        grammage: it.grammage ? Number(it.grammage) : undefined,
-        diameter: it.diameter ? Number(it.diameter) : undefined,
-        tube: it.tube ? Number(it.tube) : undefined,
+        width: it.width !== undefined ? Number(it.width) : undefined,
+        length: it.length !== undefined ? Number(it.length) : undefined,
+        grammage: it.grammage !== undefined ? Number(it.grammage) : undefined,
+        diameter: it.diameter !== undefined ? Number(it.diameter) : undefined,
+        tube: it.tube !== undefined ? Number(it.tube) : undefined,
         clientOrderNumber: typeof it.clientOrderNumber === 'string' ? String(it.clientOrderNumber).trim() || undefined : undefined,
         clientItemCode: it.clientItemCode || undefined,
         clientOrderItemNumber: it.clientOrderItemNumber ? Number(it.clientOrderItemNumber) : undefined,

@@ -10,8 +10,10 @@ export type CommercialFamilyDimensionLimits = {
 export type OrderItemWithDimensionLimits = {
   name?: string | null;
   sku?: string | null;
+  quantity?: number | null;
   width?: number | null;
   length?: number | null;
+  grammage?: number | null;
   inventoryItem?: {
     commercialFamily?: CommercialFamilyDimensionLimits | null;
   } | null;
@@ -38,6 +40,21 @@ function familyLabel(family?: CommercialFamilyDimensionLimits | null): string {
 
 function itemLabel(item: OrderItemWithDimensionLimits): string {
   return String(item.sku || item.name || 'item').trim();
+}
+
+function buildRequiredPositiveMessage(fieldLabel: string, item: OrderItemWithDimensionLimits): string {
+  return `${fieldLabel} do item "${itemLabel(item)}" é obrigatório e deve ser maior que zero.`;
+}
+
+function requiresSheetDimensions(item: OrderItemWithDimensionLimits): boolean {
+  const familyKey = inferCommercialFamilyKey(item);
+  if (familyKey === 'CHAPAS') return true;
+
+  return (
+    item.width !== undefined ||
+    item.length !== undefined ||
+    item.grammage !== undefined
+  );
 }
 
 export function inferCommercialFamilyKey(item: OrderItemWithDimensionLimits): string | null {
@@ -82,6 +99,28 @@ export function validateOrderItemDimensionField(
 }
 
 export function validateOrderItemDimensionLimits(item: OrderItemWithDimensionLimits): string | null {
+  const quantity = normalizeOptionalNumber(item.quantity);
+  if (quantity === null || quantity <= 0) {
+    return buildRequiredPositiveMessage('Quantidade', item);
+  }
+
+  if (requiresSheetDimensions(item)) {
+    const width = normalizeOptionalNumber(item.width);
+    if (width === null || width <= 0) {
+      return buildRequiredPositiveMessage('Largura', item);
+    }
+
+    const length = normalizeOptionalNumber(item.length);
+    if (length === null || length <= 0) {
+      return buildRequiredPositiveMessage('Comprimento', item);
+    }
+
+    const grammage = normalizeOptionalNumber(item.grammage);
+    if (grammage === null || grammage <= 0) {
+      return buildRequiredPositiveMessage('Gramatura', item);
+    }
+  }
+
   const widthError = validateOrderItemDimensionField(item, 'width', item.width);
   if (widthError) return widthError;
   return validateOrderItemDimensionField(item, 'length', item.length);
