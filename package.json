@@ -2,6 +2,12 @@
   "name": "cmms-cartonificio",
   "version": "1.0.0",
   "private": true,
+  "overrides": {
+    "mariadb": "3.5.4",
+    "prisma": {
+      "mysql2": "3.24.4"
+    }
+  },
   "scripts": {
     "dev": "next dev --webpack -p 3001",
     "build": "npm run prisma:generate && next build --webpack",
