@@ -30,10 +30,10 @@ export async function GET(request: Request) {
       SELECT id, name, abbrevName, email, doc
       FROM \`user\`
       WHERE
-        name COLLATE utf8mb4_general_ci LIKE ${like} ESCAPE '\\'
-        OR IFNULL(abbrevName, '') COLLATE utf8mb4_general_ci LIKE ${like} ESCAPE '\\'
-        OR IFNULL(email, '') COLLATE utf8mb4_general_ci LIKE ${like} ESCAPE '\\'
-        OR (${docDigits} <> '' AND IFNULL(doc, '') LIKE ${docLike} ESCAPE '\\')
+        name COLLATE utf8mb4_general_ci LIKE ${like}
+        OR IFNULL(abbrevName, '') COLLATE utf8mb4_general_ci LIKE ${like}
+        OR IFNULL(email, '') COLLATE utf8mb4_general_ci LIKE ${like}
+        OR (${docDigits} <> '' AND IFNULL(doc, '') LIKE ${docLike})
       ORDER BY name ASC
       LIMIT 50
     `;

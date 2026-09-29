@@ -17,7 +17,7 @@ async function generateNextSalesOrderCode(db: any): Promise<string> {
   const rows = await db.$queryRawUnsafe<any[]>(
     `SELECT code
        FROM salesorder
-      WHERE code COLLATE utf8mb4_unicode_ci LIKE ? ESCAPE '\\'
+      WHERE code COLLATE utf8mb4_unicode_ci LIKE ?
       ORDER BY code DESC
       LIMIT 1`,
     toMySqlStartsWithPattern(SALES_ORDER_CODE_PREFIX),

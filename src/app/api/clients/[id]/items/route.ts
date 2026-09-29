@@ -116,8 +116,8 @@ export async function GET(request: Request, props: { params: Promise<{ id: strin
              JOIN userinventoryitemprice u ON u.inventoryItemId = i.id
             WHERE u.userId IN (${repUserIds.map(() => '?').join(',')})
               AND (
-                i.name COLLATE utf8mb4_unicode_ci LIKE ? ESCAPE '\\'
-                OR i.sku COLLATE utf8mb4_unicode_ci LIKE ? ESCAPE '\\'
+                i.name COLLATE utf8mb4_unicode_ci LIKE ?
+                OR i.sku COLLATE utf8mb4_unicode_ci LIKE ?
               )`,
           ...repUserIds,
           toMySqlContainsPattern(q),

@@ -123,8 +123,8 @@ export async function GET(request: Request) {
       const matchedRows = await prisma.$queryRawUnsafe<any[]>(
         `SELECT id
            FROM inventoryitem
-          WHERE name COLLATE utf8mb4_unicode_ci LIKE ? ESCAPE '\\'
-             OR sku COLLATE utf8mb4_unicode_ci LIKE ? ESCAPE '\\'`,
+          WHERE name COLLATE utf8mb4_unicode_ci LIKE ?
+             OR sku COLLATE utf8mb4_unicode_ci LIKE ?`,
         toMySqlContainsPattern(qParam),
         toMySqlContainsPattern(qParam),
       );

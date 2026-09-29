@@ -24,8 +24,8 @@ export async function GET(request: Request, props: { params: Promise<{ id: strin
         WHERE u.userId = ?
           AND (
             ? = ''
-            OR i.name COLLATE utf8mb4_unicode_ci LIKE ? ESCAPE '\\'
-            OR i.sku COLLATE utf8mb4_unicode_ci LIKE ? ESCAPE '\\'
+            OR i.name COLLATE utf8mb4_unicode_ci LIKE ?
+            OR i.sku COLLATE utf8mb4_unicode_ci LIKE ?
           )
         ORDER BY u.inventoryItemId ASC, u.unit ASC
         LIMIT ?`,

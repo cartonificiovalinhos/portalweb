@@ -22,7 +22,7 @@ export async function GET(request: Request) {
       ? await prisma.$queryRawUnsafe<any[]>(
           `SELECT id, description, erpCode
              FROM commercialfamily
-            WHERE description COLLATE utf8mb4_unicode_ci LIKE ? ESCAPE '\\'
+            WHERE description COLLATE utf8mb4_unicode_ci LIKE ?
             ORDER BY description ASC`,
           toMySqlContainsPattern(q),
         )
