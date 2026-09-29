@@ -1,6 +1,7 @@
 "use client";
 import React, { useEffect, useMemo, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { validateSalesOrderForSave } from "@/lib/sales-order-save-validation";
 
 type InventoryItem = {
   id: number;
@@ -451,13 +452,16 @@ function NewSalesOrderContent() {
   };
 
   const saveOrder = async () => {
-    if (!order.customerName) {
-      alert('Informe o nome do cliente');
-      return;
-    }
-    const bad = (order.items || []).find((it) => Number(it.unitPrice ?? 0) <= 0);
-    if (bad) {
-      alert(`Não é permitido salvar item com preço zero: ${String(bad.sku || bad.name || 'Item')}`);
+    const validationError = validateSalesOrderForSave({
+      customerName: order.customerName,
+      customerDoc: order.customerDoc,
+      customerId: order.customerId,
+      paymentTerms: order.paymentTerms,
+      deliveryDate: order.deliveryDate,
+      items: order.items,
+    });
+    if (validationError) {
+      alert(validationError);
       return;
     }
     setLoading(true);

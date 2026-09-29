@@ -7,6 +7,7 @@ import { attachResolvedCommercialFamilies } from '@/lib/commercial-family-dimens
 import { resolveClientItemDimensionCode } from '@/lib/client-item-dimension-code';
 import { buildClientItemPriceFloorResolver } from '@/lib/client-item-price-floor';
 import { toMySqlStartsWithPattern } from '@/lib/mysql-like';
+import { validateSalesOrderForSave } from '@/lib/sales-order-save-validation';
 
 function normalizeDoc(doc: string): string {
   return (doc || '').replace(/\D+/g, '');
@@ -275,10 +276,6 @@ export async function POST(request: Request) {
       entityCnpj,
       entityDoc,
     } = body || {};
-    if (!customerName) {
-      return NextResponse.json({ error: 'customerName é obrigatório' }, { status: 400 });
-    }
-
     const customerDocNorm = typeof customerDoc === 'string' ? normalizeDoc(customerDoc) : undefined;
     const triangularCustomerDocNorm = typeof triangularCustomerDoc === 'string' ? normalizeDoc(triangularCustomerDoc) : undefined;
     const orderClientOrderNumber = typeof clientOrderNumber === 'string' ? clientOrderNumber.trim() || undefined : undefined;
@@ -440,6 +437,18 @@ export async function POST(request: Request) {
     }
 
     const resolvedItemsWithFamily = await attachResolvedCommercialFamilies(prisma, normalizedItemsWithFamily);
+    const orderValidationError = validateSalesOrderForSave({
+      customerName,
+      customerDoc: customerDocNorm,
+      customerId: clientId,
+      paymentTerms,
+      deliveryDate,
+      items: resolvedItemsWithFamily,
+    });
+    if (orderValidationError) {
+      return NextResponse.json({ error: orderValidationError }, { status: 400 });
+    }
+
     const dimensionInvalid = resolvedItemsWithFamily.find((it: any) => Boolean(validateOrderItemDimensionLimits(it)));
     if (dimensionInvalid) {
       return NextResponse.json(

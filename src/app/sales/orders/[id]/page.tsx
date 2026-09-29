@@ -3,6 +3,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { SalesOrderItemCard, SalesOrderItemRow, supportsSheetDims, supportsCoreDims } from "../components/SalesOrderItemRow";
+import { validateSalesOrderForSave } from "@/lib/sales-order-save-validation";
 
 type InventoryItem = {
   id: number;
@@ -617,23 +618,17 @@ export default function SalesOrderMaintenancePage() {
 
   const saveHeader = async (partial: { paymentTerms?: string; deliveryDate?: string; customerName?: string; customerDoc?: string; clientOrderNumber?: string; triangularCustomerName?: string; triangularCustomerDoc?: string; clientId?: number | null }) => {
     if (!order) return;
-
-    // Validate items: Sum of creases vs Width
-    for (let i = 0; i < orderItems.length; i++) {
-      const it = orderItems[i];
-      const w = it.width || 0;
-      if (w > 0) {
-        const creases = it.creases || {};
-        let sum = 0;
-        for (let k = 1; k <= 8; k++) {
-          sum += (Number(creases[k]) || 0);
-        }
-        
-        if (sum > w) {
-          alert(`A soma dos vincos está maior que a largura informada no item número ${i + 1}`);
-          return;
-        }
-      }
+    const validationError = validateSalesOrderForSave({
+      customerName: partial.customerName ?? order.customerName,
+      customerDoc: partial.customerDoc ?? order.customerDoc,
+      customerId: partial.clientId ?? hdrCustomerId ?? (order as any)?.clientId ?? null,
+      paymentTerms: partial.paymentTerms ?? order.paymentTerms,
+      deliveryDate: partial.deliveryDate ?? order.deliveryDate,
+      items: orderItems,
+    });
+    if (validationError) {
+      alert(validationError);
+      return;
     }
 
     try {

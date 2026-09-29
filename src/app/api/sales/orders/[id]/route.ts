@@ -7,6 +7,7 @@ import { attachResolvedCommercialFamilies } from '@/lib/commercial-family-dimens
 import { resolveClientItemDimensionCode } from '@/lib/client-item-dimension-code';
 import { normalizeOptionalText } from '@/lib/sales-order-client-fields';
 import { buildClientItemPriceFloorResolver } from '@/lib/client-item-price-floor';
+import { validateSalesOrderForSave } from '@/lib/sales-order-save-validation';
 
 function normalizeDoc(doc: string): string {
   return (doc || '').replace(/\D+/g, '');
@@ -169,7 +170,27 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
 
     const id = parsePositiveInt(params.id);
     if (!id) return NextResponse.json({ error: 'ID inválido' }, { status: 400 });
-    const orderExists = await prisma.salesOrder.findUnique({ where: { id }, select: { id: true, status: true, customerDoc: true, clientId: true } });
+    const orderExists = await prisma.salesOrder.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        status: true,
+        customerName: true,
+        customerDoc: true,
+        clientId: true,
+        paymentTerms: true,
+        deliveryDate: true,
+        items: {
+          include: {
+            inventoryItem: {
+              include: {
+                commercialFamily: true,
+              },
+            },
+          },
+        },
+      },
+    });
     if (!orderExists) return NextResponse.json({ error: 'Pedido não encontrado' }, { status: 404 });
 
     const previousStatus = String(orderExists.status ?? '').trim();
@@ -219,6 +240,32 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
 
     if (Object.keys(allowed).length === 0) {
       return NextResponse.json({ error: 'Nada para atualizar' }, { status: 400 });
+    }
+
+    const isHeaderSave =
+      Object.prototype.hasOwnProperty.call(allowed, 'paymentTerms') ||
+      Object.prototype.hasOwnProperty.call(allowed, 'deliveryDate') ||
+      Object.prototype.hasOwnProperty.call(allowed, 'customerName') ||
+      Object.prototype.hasOwnProperty.call(allowed, 'customerDoc') ||
+      Object.prototype.hasOwnProperty.call(allowed, 'clientId') ||
+      Object.prototype.hasOwnProperty.call(allowed, 'clientOrderNumber') ||
+      Object.prototype.hasOwnProperty.call(allowed, 'triangularCustomerName') ||
+      Object.prototype.hasOwnProperty.call(allowed, 'triangularCustomerDoc');
+
+    if (isHeaderSave) {
+      const orderValidationError = validateSalesOrderForSave({
+        customerName: Object.prototype.hasOwnProperty.call(allowed, 'customerName') ? allowed.customerName : orderExists.customerName,
+        customerDoc: Object.prototype.hasOwnProperty.call(allowed, 'customerDoc') ? allowed.customerDoc : orderExists.customerDoc,
+        customerId: Object.prototype.hasOwnProperty.call(allowed, 'clientId') ? allowed.clientId : orderExists.clientId,
+        paymentTerms: Object.prototype.hasOwnProperty.call(allowed, 'paymentTerms') ? allowed.paymentTerms : orderExists.paymentTerms,
+        deliveryDate: Object.prototype.hasOwnProperty.call(allowed, 'deliveryDate')
+          ? allowed.deliveryDate
+          : orderExists.deliveryDate,
+        items: orderExists.items,
+      });
+      if (orderValidationError) {
+        return NextResponse.json({ error: orderValidationError }, { status: 400 });
+      }
     }
 
     const updated = await prisma.salesOrder.update({
