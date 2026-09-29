@@ -13,28 +13,36 @@ export async function GET(request: Request, props: { params: Promise<{ id: strin
     const takeRaw = Number(url.searchParams.get('take') || 1000);
     const take = Number.isFinite(takeRaw) ? Math.min(2000, Math.max(1, takeRaw)) : 1000;
 
-    const rows = await prisma.$queryRawUnsafe<any[]>(
-      `SELECT u.inventoryItemId,
-              u.unit,
-              u.unitPrice,
-              i.sku,
-              i.name
-         FROM userinventoryitemprice u
-         LEFT JOIN inventoryitem i ON i.id = u.inventoryItemId
-        WHERE u.userId = ?
-          AND (
-            ? = ''
-            OR i.name COLLATE utf8mb4_unicode_ci LIKE ?
-            OR i.sku COLLATE utf8mb4_unicode_ci LIKE ?
-          )
-        ORDER BY u.inventoryItemId ASC, u.unit ASC
-        LIMIT ?`,
-      repUserId,
-      q,
-      toMySqlContainsPattern(q),
-      toMySqlContainsPattern(q),
-      take,
-    );
+    const baseSql = `SELECT u.inventoryItemId,
+                            u.unit,
+                            u.unitPrice,
+                            i.sku,
+                            i.name
+                       FROM userinventoryitemprice u
+                       LEFT JOIN inventoryitem i ON i.id = u.inventoryItemId
+                      WHERE u.userId = ?`;
+
+    const rows = q
+      ? await prisma.$queryRawUnsafe<any[]>(
+          `${baseSql}
+             AND (
+               i.name COLLATE utf8mb4_unicode_ci LIKE ?
+               OR i.sku COLLATE utf8mb4_unicode_ci LIKE ?
+             )
+           ORDER BY u.inventoryItemId ASC, u.unit ASC
+           LIMIT ?`,
+          repUserId,
+          toMySqlContainsPattern(q),
+          toMySqlContainsPattern(q),
+          take,
+        )
+      : await prisma.$queryRawUnsafe<any[]>(
+          `${baseSql}
+           ORDER BY u.inventoryItemId ASC, u.unit ASC
+           LIMIT ?`,
+          repUserId,
+          take,
+        );
 
     return NextResponse.json(
       rows.map((r) => ({
