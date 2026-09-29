@@ -5,14 +5,14 @@ const { parse } = require('url')
 const next = require('next')
 
 const dev = process.env.NODE_ENV !== 'production'
-const hostname = 'localhost'
+const hostname = dev ? 'localhost' : '0.0.0.0'
 const port = process.env.PORT || 3000
 // app inicializado
 const app = next({ dev, hostname, port })
 const handle = app.getRequestHandler()
 
 app.prepare().then(() => {
-  createServer(async (req, res) => {
+  const server = createServer(async (req, res) => {
     try {
       const parsedUrl = parse(req.url, true)
       const { pathname, query } = parsedUrl
@@ -30,7 +30,37 @@ app.prepare().then(() => {
       res.end('internal server error')
     }
   })
-    .listen(port, () => {
-      console.log(`> Ready on http://${hostname}:${port}`)
+  let shuttingDown = false
+
+  const closeServer = (signal) => {
+    if (shuttingDown) return
+    shuttingDown = true
+
+    if (!server.listening) {
+      console.warn(`> Shutdown requested by ${signal}, but server is already stopped`)
+      process.exit(0)
+      return
+    }
+
+    console.log(`> ${signal} received, closing HTTP server...`)
+    server.close((err) => {
+      if (err && err.code !== 'ERR_SERVER_NOT_RUNNING') {
+        console.error('> Error while closing HTTP server', err)
+        process.exit(1)
+        return
+      }
+      process.exit(0)
     })
+  }
+
+  server.on('error', (err) => {
+    console.error('> HTTP server error', err)
+  })
+
+  process.on('SIGTERM', () => closeServer('SIGTERM'))
+  process.on('SIGINT', () => closeServer('SIGINT'))
+
+  server.listen(port, hostname, () => {
+    console.log(`> Ready on http://${hostname}:${port}`)
+  })
 })
