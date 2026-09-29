@@ -14,6 +14,7 @@ export async function GET(request: Request) {
     const customerDocParam = url.searchParams.get('customerDoc');
     const customerNameParam = url.searchParams.get('customerName');
     const qParam = url.searchParams.get('q');
+    const skuParam = String(url.searchParams.get('sku') || '').trim();
     const idsParam = url.searchParams.get('ids');
 
     let filterClientId: number | null = null;
@@ -77,6 +78,11 @@ export async function GET(request: Request) {
         };
       });
       
+      if (skuParam) {
+        const exactSku = skuParam.toLowerCase();
+        items = items.filter((it) => String(it.sku || '').toLowerCase() === exactSku);
+      }
+
       if (qParam) {
         const lower = qParam.toLowerCase();
         items = items.filter(it => 
@@ -120,6 +126,9 @@ export async function GET(request: Request) {
     }
 
     const where: any = {};
+    if (skuParam) {
+      where.sku = skuParam;
+    }
     if (qParam) {
       const matchedRows = await prisma.$queryRawUnsafe<any[]>(
         `SELECT id
