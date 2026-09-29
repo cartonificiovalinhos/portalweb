@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '../../../../../lib/prisma';
 import { replaceClientItemDimensionCodes, syncClientItemDimensionCode } from '@/lib/client-item-dimension-code';
+import { toMySqlContainsPattern } from '@/lib/mysql-like';
 
 function normalizeDoc(doc: string): string {
   return (doc || '').replace(/\D+/g, '');
@@ -109,10 +110,24 @@ export async function GET(request: Request, props: { params: Promise<{ id: strin
         userInventoryItemPrices: { some: { userId: { in: repUserIds } } },
       };
       if (q) {
-        where.OR = [
-          { name: { contains: q, mode: 'insensitive' } },
-          { sku: { contains: q, mode: 'insensitive' } },
-        ];
+        const matchedRows = await prisma.$queryRawUnsafe<any[]>(
+          `SELECT DISTINCT i.id
+             FROM inventoryitem i
+             JOIN userinventoryitemprice u ON u.inventoryItemId = i.id
+            WHERE u.userId IN (${repUserIds.map(() => '?').join(',')})
+              AND (
+                i.name COLLATE utf8mb4_unicode_ci LIKE ? ESCAPE '\\'
+                OR i.sku COLLATE utf8mb4_unicode_ci LIKE ? ESCAPE '\\'
+              )`,
+          ...repUserIds,
+          toMySqlContainsPattern(q),
+          toMySqlContainsPattern(q),
+        );
+        const matchedIds = matchedRows
+          .map((row) => Number(row.id))
+          .filter((id) => Number.isFinite(id) && id > 0);
+        if (matchedIds.length === 0) return NextResponse.json([]);
+        where.id = { in: matchedIds };
       }
 
       const items = await prisma.inventoryItem.findMany({

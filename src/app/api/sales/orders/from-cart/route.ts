@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '../../../../../lib/prisma';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '../../../../../lib/auth';
+import { toMySqlStartsWithPattern } from '@/lib/mysql-like';
 
 const SALES_ORDER_CODE_PREFIX = 'PV';
 const SALES_ORDER_CODE_WIDTH = 6;
@@ -13,11 +14,15 @@ function formatSalesOrderCode(seq: number): string {
 }
 
 async function generateNextSalesOrderCode(db: any): Promise<string> {
-  const last = await db.salesOrder.findFirst({
-    where: { code: { startsWith: SALES_ORDER_CODE_PREFIX } },
-    orderBy: { code: 'desc' },
-    select: { code: true },
-  });
+  const rows = await db.$queryRawUnsafe<any[]>(
+    `SELECT code
+       FROM salesorder
+      WHERE code COLLATE utf8mb4_unicode_ci LIKE ? ESCAPE '\\'
+      ORDER BY code DESC
+      LIMIT 1`,
+    toMySqlStartsWithPattern(SALES_ORDER_CODE_PREFIX),
+  );
+  const last = Array.isArray(rows) ? rows[0] : null;
 
   const lastCode = typeof last?.code === 'string' ? last.code : '';
   const suffix = lastCode.startsWith(SALES_ORDER_CODE_PREFIX) ? lastCode.slice(SALES_ORDER_CODE_PREFIX.length) : '';

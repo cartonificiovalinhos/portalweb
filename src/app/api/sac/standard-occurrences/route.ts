@@ -1,15 +1,23 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '../../../../lib/prisma';
+import { toMySqlContainsPattern } from '@/lib/mysql-like';
 
 export async function GET(request: Request) {
   try {
     const url = new URL(request.url);
     const q = (url.searchParams.get('q') || '').trim();
-    const items = await prisma.standardOccurrence.findMany({
-      where: q ? { description: { contains: q } } : undefined,
-      orderBy: { description: 'asc' },
-      select: { id: true, description: true },
-    });
+    const items = q
+      ? await prisma.$queryRawUnsafe<any[]>(
+          `SELECT id, description
+             FROM standardoccurrence
+            WHERE description COLLATE utf8mb4_unicode_ci LIKE ? ESCAPE '\\'
+            ORDER BY description ASC`,
+          toMySqlContainsPattern(q),
+        )
+      : await prisma.standardOccurrence.findMany({
+          orderBy: { description: 'asc' },
+          select: { id: true, description: true },
+        });
     return NextResponse.json(items);
   } catch (err: any) {
     return NextResponse.json({ error: String(err?.message || err) }, { status: 500 });

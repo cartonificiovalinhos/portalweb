@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '../../../../../../lib/prisma';
+import { toMySqlContainsPattern } from '@/lib/mysql-like';
 
 export async function GET(request: Request, props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
@@ -12,33 +13,34 @@ export async function GET(request: Request, props: { params: Promise<{ id: strin
     const takeRaw = Number(url.searchParams.get('take') || 1000);
     const take = Number.isFinite(takeRaw) ? Math.min(2000, Math.max(1, takeRaw)) : 1000;
 
-    const where: any = { userId: repUserId };
-    if (q) {
-      where.inventoryItem = {
-        OR: [
-          { name: { contains: q, mode: 'insensitive' } },
-          { sku: { contains: q, mode: 'insensitive' } },
-        ],
-      };
-    }
-
-    const rows = await prisma.userInventoryItemPrice.findMany({
-      where,
-      select: {
-        inventoryItemId: true,
-        unit: true,
-        unitPrice: true,
-        inventoryItem: { select: { sku: true, name: true } },
-      },
-      orderBy: [{ inventoryItemId: 'asc' }, { unit: 'asc' }],
+    const rows = await prisma.$queryRawUnsafe<any[]>(
+      `SELECT u.inventoryItemId,
+              u.unit,
+              u.unitPrice,
+              i.sku,
+              i.name
+         FROM userinventoryitemprice u
+         LEFT JOIN inventoryitem i ON i.id = u.inventoryItemId
+        WHERE u.userId = ?
+          AND (
+            ? = ''
+            OR i.name COLLATE utf8mb4_unicode_ci LIKE ? ESCAPE '\\'
+            OR i.sku COLLATE utf8mb4_unicode_ci LIKE ? ESCAPE '\\'
+          )
+        ORDER BY u.inventoryItemId ASC, u.unit ASC
+        LIMIT ?`,
+      repUserId,
+      q,
+      toMySqlContainsPattern(q),
+      toMySqlContainsPattern(q),
       take,
-    });
+    );
 
     return NextResponse.json(
       rows.map((r) => ({
         inventoryItemId: r.inventoryItemId,
-        sku: r.inventoryItem?.sku ?? null,
-        name: r.inventoryItem?.name ?? null,
+        sku: r.sku ?? null,
+        name: r.name ?? null,
         unit: r.unit,
         unitPrice: r.unitPrice,
       }))

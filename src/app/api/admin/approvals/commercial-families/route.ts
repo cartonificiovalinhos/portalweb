@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '../../../../../lib/auth';
 import { prisma } from '../../../../../lib/prisma';
 import { isProgramAllowed } from '../../../../../lib/isProgramAllowed';
+import { toMySqlContainsPattern } from '@/lib/mysql-like';
 
 export async function GET(request: Request) {
   try {
@@ -17,11 +18,18 @@ export async function GET(request: Request) {
     const url = new URL(request.url);
     const q = (url.searchParams.get('q') || '').trim();
 
-    const rows = await prisma.commercialFamily.findMany({
-      where: q ? { description: { contains: q } } : undefined,
-      orderBy: { description: 'asc' },
-      select: { id: true, description: true, erpCode: true },
-    });
+    const rows = q
+      ? await prisma.$queryRawUnsafe<any[]>(
+          `SELECT id, description, erpCode
+             FROM commercialfamily
+            WHERE description COLLATE utf8mb4_unicode_ci LIKE ? ESCAPE '\\'
+            ORDER BY description ASC`,
+          toMySqlContainsPattern(q),
+        )
+      : await prisma.commercialFamily.findMany({
+          orderBy: { description: 'asc' },
+          select: { id: true, description: true, erpCode: true },
+        });
 
     return NextResponse.json({ families: rows });
   } catch (err: any) {

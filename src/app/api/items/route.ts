@@ -4,6 +4,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '../../../lib/auth';
 import { attachResolvedCommercialFamilies } from '@/lib/commercial-family-dimension-resolution';
 import { buildClientItemPriceFloorResolver } from '@/lib/client-item-price-floor';
+import { toMySqlContainsPattern } from '@/lib/mysql-like';
 
 export async function GET(request: Request) {
   try {
@@ -119,10 +120,19 @@ export async function GET(request: Request) {
 
     const where: any = {};
     if (qParam) {
-      where.OR = [
-        { name: { contains: qParam } },
-        { sku: { contains: qParam } }
-      ];
+      const matchedRows = await prisma.$queryRawUnsafe<any[]>(
+        `SELECT id
+           FROM inventoryitem
+          WHERE name COLLATE utf8mb4_unicode_ci LIKE ? ESCAPE '\\'
+             OR sku COLLATE utf8mb4_unicode_ci LIKE ? ESCAPE '\\'`,
+        toMySqlContainsPattern(qParam),
+        toMySqlContainsPattern(qParam),
+      );
+      const matchedIds = matchedRows
+        .map((row) => Number(row.id))
+        .filter((id) => Number.isFinite(id) && id > 0);
+      if (matchedIds.length === 0) return NextResponse.json([]);
+      where.id = { in: matchedIds };
     }
     const items = await prisma.inventoryItem.findMany({ 
       where,

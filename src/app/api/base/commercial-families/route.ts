@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '../../../../lib/prisma';
+import { toMySqlContainsPattern } from '@/lib/mysql-like';
 
 type ParsedOptionalInt = number | null | { error: string };
 
@@ -29,20 +30,27 @@ export async function GET(request: Request) {
     const url = new URL(request.url);
     const q = (url.searchParams.get('q') || '').trim();
 
-    const rows = await prisma.commercialFamily.findMany({
-      where: q ? { description: { contains: q } } : undefined,
-      orderBy: { description: 'asc' },
-      select: {
-        id: true,
-        description: true,
-        erpCode: true,
-        priceBy: true,
-        widthMin: true,
-        widthMax: true,
-        lengthMin: true,
-        lengthMax: true,
-      },
-    });
+    const rows = q
+      ? await prisma.$queryRawUnsafe<any[]>(
+          `SELECT id, description, erpCode, priceBy, widthMin, widthMax, lengthMin, lengthMax
+             FROM commercialfamily
+            WHERE description COLLATE utf8mb4_unicode_ci LIKE ? ESCAPE '\\'
+            ORDER BY description ASC`,
+          toMySqlContainsPattern(q),
+        )
+      : await prisma.commercialFamily.findMany({
+          orderBy: { description: 'asc' },
+          select: {
+            id: true,
+            description: true,
+            erpCode: true,
+            priceBy: true,
+            widthMin: true,
+            widthMax: true,
+            lengthMin: true,
+            lengthMax: true,
+          },
+        });
 
     return NextResponse.json(rows);
   } catch (err: any) {
