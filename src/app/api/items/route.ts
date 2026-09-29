@@ -5,6 +5,7 @@ import { authOptions } from '../../../lib/auth';
 import { attachResolvedCommercialFamilies } from '@/lib/commercial-family-dimension-resolution';
 import { buildClientItemPriceFloorResolver } from '@/lib/client-item-price-floor';
 import { toMySqlContainsPattern } from '@/lib/mysql-like';
+import { resolveInventoryItemLookupSku, buildInventoryItemPatchData } from '@/lib/inventory-item-write';
 
 export async function GET(request: Request) {
   try {
@@ -155,16 +156,28 @@ export async function POST(request: Request) {
   if (body.length !== undefined) data.length = Number(body.length);
   if (body.grammage !== undefined) data.grammage = Number(body.grammage);
   if (body.commercialFamilyId !== undefined) {
-    const cfidNum = Number(body.commercialFamilyId);
-    if (Number.isFinite(cfidNum) && cfidNum > 0) {
-      const exists = await prisma.commercialFamily.findUnique({ where: { id: cfidNum } });
-      data.commercialFamilyId = exists ? cfidNum : null;
-    } else {
-      data.commercialFamilyId = null;
-    }
+    const patchData = await buildInventoryItemPatchData(prisma, { commercialFamilyId: body.commercialFamilyId });
+    data.commercialFamilyId = patchData.commercialFamilyId ?? null;
   }
   const created = await prisma.inventoryItem.create({ data });
   return NextResponse.json(created, { status: 201 });
+}
+
+export async function PATCH(request: Request) {
+  try {
+    const body = await request.json();
+    const sku = await resolveInventoryItemLookupSku(body, request.url);
+    if (!sku) return NextResponse.json({ error: 'SKU obrigatório' }, { status: 400 });
+
+    const exists = await prisma.inventoryItem.findUnique({ where: { sku } });
+    if (!exists) return NextResponse.json({ error: 'Item não encontrado' }, { status: 404 });
+
+    const data = await buildInventoryItemPatchData(prisma, body);
+    const updated = await prisma.inventoryItem.update({ where: { sku }, data });
+    return NextResponse.json(updated);
+  } catch (err: any) {
+    return NextResponse.json({ error: String(err?.message || err) }, { status: 500 });
+  }
 }
 
 export async function DELETE(request: Request) {
