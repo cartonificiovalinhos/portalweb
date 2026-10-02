@@ -82,24 +82,30 @@ export function validateSalesOrderItemsForSave(items: SalesOrderSaveItem[] | nul
   }
 
   for (let index = 0; index < items.length; index += 1) {
-    const item = items[index];
-    const itemError = validateOrderItemDimensionLimits(item);
+    const itemError = validateSalesOrderSingleItemForSave(items[index], index);
     if (itemError) return itemError;
+  }
 
-    if (Number(item.unitPrice ?? 0) <= 0) {
-      return `Não é permitido salvar item com preço zero: ${String(item.sku || item.name || `Item ${index + 1}`)}.`;
+  return null;
+}
+
+export function validateSalesOrderSingleItemForSave(item: SalesOrderSaveItem, index = 0): string | null {
+  const itemError = validateOrderItemDimensionLimits(item);
+  if (itemError) return itemError;
+
+  if (Number(item.unitPrice ?? 0) <= 0) {
+    return `Não é permitido salvar item com preço zero: ${String(item.sku || item.name || `Item ${index + 1}`)}.`;
+  }
+
+  const width = Number(item.width ?? 0);
+  if (width > 0) {
+    const creases = item.creases || {};
+    let creasesTotal = 0;
+    for (let creaseIndex = 1; creaseIndex <= 8; creaseIndex += 1) {
+      creasesTotal += Number(creases[String(creaseIndex)] ?? creases[creaseIndex] ?? 0);
     }
-
-    const width = Number(item.width ?? 0);
-    if (width > 0) {
-      const creases = item.creases || {};
-      let creasesTotal = 0;
-      for (let creaseIndex = 1; creaseIndex <= 8; creaseIndex += 1) {
-        creasesTotal += Number(creases[String(creaseIndex)] ?? creases[creaseIndex] ?? 0);
-      }
-      if (creasesTotal > width) {
-        return `A soma dos vincos está maior que a largura informada no item número ${index + 1}.`;
-      }
+    if (creasesTotal > width) {
+      return `A soma dos vincos está maior que a largura informada no item número ${index + 1}.`;
     }
   }
 

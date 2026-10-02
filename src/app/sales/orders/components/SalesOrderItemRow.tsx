@@ -1,6 +1,6 @@
 "use client";
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { validateOrderItemDimensionLimits } from "@/lib/order-item-dimension-limits";
+import { validateSalesOrderSingleItemForSave } from "@/lib/sales-order-save-validation";
 import { resolveItemClientOrderNumber } from "@/lib/sales-order-client-fields";
 
 export type OrderItem = {
@@ -398,9 +398,9 @@ export const SalesOrderItemRow = ({
       alert(unitPriceError);
       return;
     }
-    const dimensionError = validateOrderItemDimensionLimits(localItem);
-    if (dimensionError) {
-      alert(dimensionError);
+    const itemValidationError = validateSalesOrderSingleItemForSave(localItem);
+    if (itemValidationError) {
+      alert(itemValidationError);
       return;
     }
     if (onAutoSave) {
@@ -835,9 +835,9 @@ export const SalesOrderItemCard = ({
       alert(unitPriceError);
       return;
     }
-    const dimensionError = validateOrderItemDimensionLimits(localItem);
-    if (dimensionError) {
-      alert(dimensionError);
+    const itemValidationError = validateSalesOrderSingleItemForSave(localItem);
+    if (itemValidationError) {
+      alert(itemValidationError);
       return;
     }
     if (onAutoSave) {
