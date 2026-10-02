@@ -5,6 +5,19 @@ type InventoryItemWriteDb = {
   };
 };
 
+function parseOptionalBoolean(input: unknown): boolean | undefined {
+  if (input === undefined) return undefined;
+  if (input === null) return false;
+  if (typeof input === 'boolean') return input;
+  if (typeof input === 'number') return input !== 0;
+
+  const raw = String(input).trim().toLowerCase();
+  if (!raw) return false;
+  if (['true', '1', 'sim', 's', 'yes', 'y'].includes(raw)) return true;
+  if (['false', '0', 'nao', 'não', 'n', 'no'].includes(raw)) return false;
+  return Boolean(raw);
+}
+
 async function resolveCommercialFamilyId(
   db: InventoryItemWriteDb,
   input: unknown,
@@ -44,6 +57,7 @@ export async function buildInventoryItemPatchData(
   if (body.name !== undefined) data.name = String(body.name || '').trim();
   if (body.sku !== undefined) data.sku = String(body.sku || '').trim();
   if (body.unit !== undefined) data.unit = String(body.unit || '').trim();
+  if (body.active !== undefined) data.active = parseOptionalBoolean(body.active);
   if (body.width !== undefined) data.width = body.width === null || body.width === '' ? null : Number(body.width);
   if (body.length !== undefined) data.length = body.length === null || body.length === '' ? null : Number(body.length);
   if (body.grammage !== undefined) data.grammage = body.grammage === null || body.grammage === '' ? null : Number(body.grammage);

@@ -8,6 +8,7 @@ type InventoryItem = {
   sku?: string | null;
   name: string;
   unit?: string | null;
+  active?: boolean | null;
   priceUnit?: string | null;
   commercialFamily?: {
     id: number;
@@ -386,6 +387,7 @@ function NewSalesOrderContent() {
     try {
       const params = new URLSearchParams();
       params.set('q', term);
+      params.set('activeOnly', '1');
       if (order.customerId) {
         params.set('clientId', String(order.customerId));
       }
@@ -404,6 +406,10 @@ function NewSalesOrderContent() {
   };
 
   const addItemToOrder = (invItem: InventoryItem) => {
+    if (invItem.active === false) {
+      alert('Não é permitido adicionar item inativo ao pedido.');
+      return;
+    }
     const minUnitPrice = Number(invItem.minUnitPrice ?? invItem.unitPrice ?? 0);
     const basePrice = Number(invItem.unitPrice ?? 0);
     const effectiveUnitPrice = Math.max(basePrice, minUnitPrice);

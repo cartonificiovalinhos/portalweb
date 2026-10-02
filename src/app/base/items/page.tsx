@@ -6,6 +6,7 @@ type Item = {
   name: string;
   sku?: string | null;
   unit?: string | null;
+  active?: boolean | null;
   width?: number | null;
   length?: number | null;
   grammage?: number | null;
@@ -26,7 +27,7 @@ export default function BaseItemMaintenancePage() {
   // Formulário unificado (inclusão/alteração)
   const [formOpen, setFormOpen] = useState<boolean>(false);
   const [editingId, setEditingId] = useState<number | null>(null);
-  const [form, setForm] = useState<{ sku: string; name: string; unit: string; width: string; length: string; grammage: string; commercialFamilyId: number | null }>({ sku: "", name: "", unit: "", width: "", length: "", grammage: "", commercialFamilyId: null });
+  const [form, setForm] = useState<{ sku: string; name: string; unit: string; active: boolean; width: string; length: string; grammage: string; commercialFamilyId: number | null }>({ sku: "", name: "", unit: "", active: true, width: "", length: "", grammage: "", commercialFamilyId: null });
   const [saving, setSaving] = useState<boolean>(false);
   const [saveMsg, setSaveMsg] = useState<string>("");
   // Busca de família comercial
@@ -104,7 +105,7 @@ export default function BaseItemMaintenancePage() {
 
   const openAddForm = () => {
     setEditingId(null);
-    setForm({ sku: "", name: "", unit: "", width: "", length: "", grammage: "", commercialFamilyId: null });
+    setForm({ sku: "", name: "", unit: "", active: true, width: "", length: "", grammage: "", commercialFamilyId: null });
     setFamilyQuery("");
     setFamilySug([]);
     setShowFamilySug(false);
@@ -122,6 +123,7 @@ export default function BaseItemMaintenancePage() {
         sku: full?.sku || "",
         name: full?.name || "",
         unit: full?.unit || "",
+        active: full?.active !== false,
         width: full?.width != null ? String(full.width) : "",
         length: full?.length != null ? String(full.length) : "",
         grammage: full?.grammage != null ? String(full.grammage) : "",
@@ -132,6 +134,7 @@ export default function BaseItemMaintenancePage() {
         sku: item.sku || "",
         name: item.name || "",
         unit: item.unit || "",
+        active: item.active !== false,
         width: item.width != null ? String(item.width) : "",
         length: item.length != null ? String(item.length) : "",
         grammage: item.grammage != null ? String(item.grammage) : "",
@@ -151,7 +154,7 @@ export default function BaseItemMaintenancePage() {
   const cancelForm = () => {
     setFormOpen(false);
     setEditingId(null);
-    setForm({ sku: "", name: "", unit: "", width: "", length: "", grammage: "", commercialFamilyId: null });
+    setForm({ sku: "", name: "", unit: "", active: true, width: "", length: "", grammage: "", commercialFamilyId: null });
     setFamilyQuery("");
     setFamilySug([]);
     setShowFamilySug(false);
@@ -167,6 +170,7 @@ export default function BaseItemMaintenancePage() {
       sku: form.sku.trim(),
       name: form.name.trim(),
       unit: form.unit.trim(),
+      active: form.active,
       width: form.width.trim() === '' ? null : Number(form.width),
       length: form.length.trim() === '' ? null : Number(form.length),
       grammage: form.grammage.trim() === '' ? null : Number(form.grammage),
@@ -266,6 +270,17 @@ export default function BaseItemMaintenancePage() {
                 <div>
                   <label className="text-xs text-gray-600">Unidade de medida</label>
                   <input value={form.unit} onChange={(e)=>setForm((f)=>({ ...f, unit: e.target.value }))} className="w-full border rounded px-2 py-1 text-sm" />
+                </div>
+                <div className="flex items-end">
+                  <label className="inline-flex items-center gap-2 text-sm text-gray-700">
+                    <input
+                      type="checkbox"
+                      checked={form.active}
+                      onChange={(e) => setForm((f) => ({ ...f, active: e.target.checked }))}
+                      className="h-4 w-4 rounded border-gray-300"
+                    />
+                    Ativo
+                  </label>
                 </div>
                 <div>
                   <label className="text-xs text-gray-600">Largura</label>
@@ -418,6 +433,7 @@ export default function BaseItemMaintenancePage() {
                   <th className="p-2 border-b">Código</th>
                   <th className="p-2 border-b">Descrição</th>
                   <th className="p-2 border-b">Unidade</th>
+                  <th className="p-2 border-b text-center">Ativo</th>
                   <th className="p-2 border-b">Ações</th>
                 </tr>
               </thead>
@@ -429,6 +445,9 @@ export default function BaseItemMaintenancePage() {
                     <td className="p-2">{it.sku || ""}</td>
                     <td className="p-2">{it.name || ""}</td>
                     <td className="p-2">{it.unit || ""}</td>
+                    <td className="p-2 text-center">
+                      <input type="checkbox" checked={it.active !== false} readOnly className="h-4 w-4 rounded border-gray-300 pointer-events-none" />
+                    </td>
                     <td className="p-2">
                       <div className="flex items-center gap-2">
                         <button onClick={() => openEditForm(it)} disabled={formOpen} className="px-2 py-1 rounded bg-yellow-500 text-white disabled:opacity-50">Editar</button>
@@ -437,10 +456,10 @@ export default function BaseItemMaintenancePage() {
                   </tr>
                 ))}
                 {loading && (
-                  <tr><td colSpan={5} className="p-2 text-gray-500">Carregando...</td></tr>
+                  <tr><td colSpan={6} className="p-2 text-gray-500">Carregando...</td></tr>
                 )}
                 {!loading && filtered.length === 0 && (
-                  <tr><td colSpan={5} className="p-2 text-gray-500">Nenhum item encontrado</td></tr>
+                  <tr><td colSpan={6} className="p-2 text-gray-500">Nenhum item encontrado</td></tr>
                 )}
               </tbody>
             </table>

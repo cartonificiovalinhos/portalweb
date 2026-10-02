@@ -39,6 +39,7 @@ export async function POST(request: Request) {
         where: { id: payload.inventoryItemId },
         select: {
           id: true,
+          active: true,
           width: true,
           length: true,
           grammage: true,
@@ -55,6 +56,9 @@ export async function POST(request: Request) {
         },
       });
       if (invItem) {
+        if (!invItem.active) {
+          return NextResponse.json({ error: 'Não é permitido adicionar item inativo ao pedido.' }, { status: 400 });
+        }
         if (payload.width === undefined) payload.width = invItem.width;
         if (payload.length === undefined) payload.length = invItem.length;
         if (payload.grammage === undefined) payload.grammage = invItem.grammage;

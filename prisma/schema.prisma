@@ -79,6 +79,7 @@ model InventoryItem {
   sku                String?           @unique
   quantity           Int               @default(0)
   unit               String?
+  active             Boolean           @default(true)
   minStock           Int               @default(0)
   width              Int?
   length             Int?

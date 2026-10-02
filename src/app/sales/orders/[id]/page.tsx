@@ -10,6 +10,7 @@ type InventoryItem = {
   sku?: string | null;
   name: string;
   unit?: string | null;
+  active?: boolean | null;
   commercialFamily?: {
     id: number;
     description?: string | null;
@@ -468,6 +469,7 @@ export default function SalesOrderMaintenancePage() {
     try {
       const params = new URLSearchParams();
       params.set('q', term);
+      params.set('activeOnly', '1');
       if (order?.customerDoc) {
         params.set('customerDoc', order.customerDoc);
       } else if (order?.customerName) {
@@ -496,6 +498,10 @@ export default function SalesOrderMaintenancePage() {
 
   const addItemToOrder = async (item: InventoryItem) => {
     if (!order) return;
+    if (item.active === false) {
+      alert('Não é permitido adicionar item inativo ao pedido.');
+      return;
+    }
     try {
       const minUnitPrice = Number(item.minUnitPrice ?? item.unitPrice ?? 0);
       const payload = {

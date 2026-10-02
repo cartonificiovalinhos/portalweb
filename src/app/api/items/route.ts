@@ -10,6 +10,7 @@ import { resolveInventoryItemLookupSku, buildInventoryItemPatchData } from '@/li
 export async function GET(request: Request) {
   try {
     const url = new URL(request.url);
+    const activeOnly = ['1', 'true', 'yes', 'sim'].includes(String(url.searchParams.get('activeOnly') || '').trim().toLowerCase());
     const clientIdParam = url.searchParams.get('clientId');
     const customerDocParam = url.searchParams.get('customerDoc');
     const customerNameParam = url.searchParams.get('customerName');
@@ -49,6 +50,7 @@ export async function GET(request: Request) {
         where: {
           clientId: filterClientId,
           allowed: true,
+          ...(activeOnly ? { inventoryItem: { active: true } } : {}),
           ...(filterIds.length ? { inventoryItemId: { in: Array.from(new Set(filterIds)) } } : {}),
         },
         include: { 
@@ -119,13 +121,17 @@ export async function GET(request: Request) {
       if (itemIds.length === 0) return NextResponse.json([]);
 
       const items = await prisma.inventoryItem.findMany({
-        where: { id: { in: itemIds } },
+        where: {
+          id: { in: itemIds },
+          ...(activeOnly ? { active: true } : {}),
+        },
         include: { commercialFamily: true },
       });
       return NextResponse.json(await attachResolvedCommercialFamilies(prisma, items));
     }
 
     const where: any = {};
+    if (activeOnly) where.active = true;
     if (skuParam) {
       where.sku = skuParam;
     }
@@ -159,6 +165,7 @@ export async function POST(request: Request) {
   const data: any = { name: String(body.name || '').trim() };
   if (body.sku !== undefined) data.sku = String(body.sku || '').trim();
   if (body.unit !== undefined) data.unit = String(body.unit || '').trim();
+  if (body.active !== undefined) data.active = await buildInventoryItemPatchData(prisma, { active: body.active }).then((patch) => patch.active ?? true);
   if (body.quantity !== undefined) data.quantity = Number(body.quantity);
   if (body.minStock !== undefined) data.minStock = Number(body.minStock);
   if (body.width !== undefined) data.width = Number(body.width);

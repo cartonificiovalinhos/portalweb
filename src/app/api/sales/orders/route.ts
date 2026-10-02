@@ -412,6 +412,7 @@ export async function POST(request: Request) {
         where: { id: { in: invIdsForLimits } },
         select: {
           id: true,
+          active: true,
           commercialFamily: {
             select: {
               id: true,
@@ -425,8 +426,19 @@ export async function POST(request: Request) {
         },
       });
       const familyByItemId = new Map<number, any>();
+      const inactiveItemNames: string[] = [];
       for (const inv of inventoryItems) {
+        if (!inv.active) {
+          const source = normalizedItemsWithFamily.find((it: any) => Number(it.inventoryItemId) === Number(inv.id));
+          inactiveItemNames.push(String(source?.sku || source?.name || `Item ${inv.id}`));
+        }
         familyByItemId.set(Number(inv.id), inv.commercialFamily ?? null);
+      }
+      if (inactiveItemNames.length > 0) {
+        return NextResponse.json(
+          { error: `Não é permitido adicionar item inativo ao pedido: ${inactiveItemNames[0]}` },
+          { status: 400 }
+        );
       }
       for (const it of normalizedItemsWithFamily) {
         const invId = Number(it.inventoryItemId);
