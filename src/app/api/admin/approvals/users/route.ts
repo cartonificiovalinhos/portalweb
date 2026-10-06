@@ -3,10 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '../../../../../lib/auth';
 import { prisma } from '../../../../../lib/prisma';
 import { isProgramAllowed } from '../../../../../lib/isProgramAllowed';
-
-function escapeLike(v: string): string {
-  return String(v || '').replace(/[\\%_]/g, (m) => `\\${m}`);
-}
+import { toMySqlContainsPattern } from '@/lib/mysql-like';
 
 export async function GET(request: Request) {
   try {
@@ -22,21 +19,37 @@ export async function GET(request: Request) {
     const q = (url.searchParams.get('q') || '').trim();
     if (!q) return NextResponse.json({ users: [] });
 
-    const like = `%${escapeLike(q)}%`;
+    const like = toMySqlContainsPattern(q);
     const docDigits = q.replace(/\D+/g, '');
-    const docLike = `%${escapeLike(docDigits)}%`;
+    const docLike = toMySqlContainsPattern(docDigits);
 
-    const rows = await prisma.$queryRaw<any[]>`
-      SELECT id, name, abbrevName, email, doc
-      FROM \`user\`
-      WHERE
-        name COLLATE utf8mb4_general_ci LIKE ${like}
-        OR IFNULL(abbrevName, '') COLLATE utf8mb4_general_ci LIKE ${like}
-        OR IFNULL(email, '') COLLATE utf8mb4_general_ci LIKE ${like}
-        OR (${docDigits} <> '' AND IFNULL(doc, '') LIKE ${docLike})
-      ORDER BY name ASC
-      LIMIT 50
-    `;
+    const rows = docDigits
+      ? await prisma.$queryRawUnsafe<any[]>(
+          `SELECT id, name, abbrevName, email, doc
+             FROM \`user\`
+            WHERE name COLLATE utf8mb4_unicode_ci LIKE ?
+               OR IFNULL(abbrevName, '') COLLATE utf8mb4_unicode_ci LIKE ?
+               OR IFNULL(email, '') COLLATE utf8mb4_unicode_ci LIKE ?
+               OR IFNULL(doc, '') COLLATE utf8mb4_unicode_ci LIKE ?
+            ORDER BY name ASC
+            LIMIT 50`,
+          like,
+          like,
+          like,
+          docLike,
+        )
+      : await prisma.$queryRawUnsafe<any[]>(
+          `SELECT id, name, abbrevName, email, doc
+             FROM \`user\`
+            WHERE name COLLATE utf8mb4_unicode_ci LIKE ?
+               OR IFNULL(abbrevName, '') COLLATE utf8mb4_unicode_ci LIKE ?
+               OR IFNULL(email, '') COLLATE utf8mb4_unicode_ci LIKE ?
+            ORDER BY name ASC
+            LIMIT 50`,
+          like,
+          like,
+          like,
+        );
 
     return NextResponse.json({ users: rows });
   } catch (err: any) {

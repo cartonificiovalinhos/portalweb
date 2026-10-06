@@ -14,7 +14,6 @@ type ApprovalField = {
 };
 type ApprovalAssignment = {
   id: number;
-  canView: boolean;
   rangeFromValue: string | null;
   rangeToValue: string | null;
   approvalField: { id: number; label: string; fieldType: ApprovalFieldType };
@@ -85,7 +84,6 @@ function blankAssignmentForm() {
     approvalFieldId: null as number | null,
     rangeFromValue: "",
     rangeToValue: "",
-    canView: true,
   };
 }
 
@@ -155,6 +153,7 @@ export default function AdminApprovalsPage() {
   const [userQuery, setUserQuery] = useState("");
   const [userResults, setUserResults] = useState<UserSearchRow[]>([]);
   const [searchingUsers, setSearchingUsers] = useState(false);
+  const [userSearchTouched, setUserSearchTouched] = useState(false);
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const resetFieldForm = useCallback(() => setFieldForm(blankFieldForm()), []);
@@ -162,6 +161,7 @@ export default function AdminApprovalsPage() {
     setAssignmentForm(blankAssignmentForm());
     setUserQuery("");
     setUserResults([]);
+    setUserSearchTouched(false);
   }, []);
 
   const applySelectedTypeToForm = useCallback((approvalType: ApprovalType | null) => {
@@ -252,6 +252,10 @@ export default function AdminApprovalsPage() {
     }
     const q = userQuery.trim();
     if (!q) {
+      setUserResults([]);
+      return;
+    }
+    if (q.length < 2) {
       setUserResults([]);
       return;
     }
@@ -451,6 +455,7 @@ export default function AdminApprovalsPage() {
     }));
     setUserQuery(user.name);
     setUserResults([]);
+    setUserSearchTouched(false);
   };
 
   const handleSaveAssignment = async () => {
@@ -476,7 +481,6 @@ export default function AdminApprovalsPage() {
           approvalFieldId: assignmentForm.approvalFieldId,
           rangeFromValue: assignmentForm.rangeFromValue,
           rangeToValue: assignmentForm.rangeToValue,
-          canView: assignmentForm.canView,
         }),
       });
       const data = await res.json().catch(() => ({} as any));
@@ -499,10 +503,10 @@ export default function AdminApprovalsPage() {
       approvalFieldId: assignment.approvalField.id,
       rangeFromValue: assignment.rangeFromValue || "",
       rangeToValue: assignment.rangeToValue || "",
-      canView: assignment.canView,
     });
     setUserQuery(assignment.user.name);
     setUserResults([]);
+    setUserSearchTouched(false);
   };
 
   const handleDeleteAssignment = async (assignmentId: number) => {
@@ -763,24 +767,32 @@ export default function AdminApprovalsPage() {
                     value={userQuery}
                     onChange={(e) => {
                       setUserQuery(e.target.value);
+                      setUserSearchTouched(true);
                       setAssignmentForm((prev) => ({ ...prev, userId: null, userLabel: e.target.value }));
                     }}
                     placeholder="Pesquisar usuário da base do portal"
                     disabled={!selectedType}
+                    autoComplete="off"
                   />
+                  {userQuery.trim().length > 0 && userQuery.trim().length < 2 && (
+                    <div className="mt-1 text-xs text-gray-500">Digite pelo menos 2 caracteres para pesquisar.</div>
+                  )}
                   {searchingUsers && <div className="mt-1 text-xs text-gray-500">Pesquisando usuários...</div>}
-                  {!searchingUsers && userQuery.trim() && userResults.length > 0 && (
+                  {!searchingUsers && userQuery.trim().length >= 2 && (
                     <div className="mt-1 max-h-40 overflow-auto rounded border bg-white">
-                      {userResults.map((user) => (
+                      {userResults.length > 0 ? userResults.map((user) => (
                         <button
                           key={user.id}
+                          type="button"
                           className="block w-full border-b px-3 py-2 text-left last:border-b-0 hover:bg-gray-50"
                           onClick={() => handleSelectUser(user)}
                         >
                           <div className="text-sm font-medium">{user.name}</div>
                           <div className="text-xs text-gray-500">{user.abbrevName || "-"} • {user.email || "-"} • {user.doc || "-"}</div>
                         </button>
-                      ))}
+                      )) : (
+                        userSearchTouched ? <div className="px-3 py-2 text-sm text-gray-500">Nenhum usuário encontrado.</div> : null
+                      )}
                     </div>
                   )}
                 </div>
@@ -823,15 +835,7 @@ export default function AdminApprovalsPage() {
                   />
                 </div>
 
-                <div className="lg:col-span-1">
-                  <label className="mb-1 block text-sm font-medium">Visualiza</label>
-                  <label className="flex h-[42px] items-center gap-2 rounded border bg-white px-3 text-sm">
-                    <input type="checkbox" checked={assignmentForm.canView} onChange={(e) => setAssignmentForm((prev) => ({ ...prev, canView: e.target.checked }))} disabled={!selectedType} />
-                    Sim
-                  </label>
-                </div>
-
-                <div className="lg:col-span-1 flex items-end">
+                <div className="lg:col-span-2 flex items-end">
                   <button className="w-full rounded border border-blue-200 bg-blue-600 px-3 py-2 text-sm text-white hover:bg-blue-700 disabled:opacity-50" onClick={handleSaveAssignment} disabled={!selectedType || rangeFields.length === 0 || savingAssignment}>
                     {assignmentForm.id ? "Salvar" : "Vincular"}
                   </button>
@@ -853,7 +857,6 @@ export default function AdminApprovalsPage() {
                       <th className="px-3 py-2 text-left">Tipo</th>
                       <th className="px-3 py-2 text-right">De</th>
                       <th className="px-3 py-2 text-right">Até</th>
-                      <th className="px-3 py-2 text-center">Visualiza</th>
                       <th className="px-3 py-2 text-center">Ações</th>
                     </tr>
                   </thead>
@@ -871,11 +874,6 @@ export default function AdminApprovalsPage() {
                         <td className="px-3 py-2 text-right">{formatRangeValue(assignment.approvalField.fieldType, assignment.rangeFromValue)}</td>
                         <td className="px-3 py-2 text-right">{formatRangeValue(assignment.approvalField.fieldType, assignment.rangeToValue)}</td>
                         <td className="px-3 py-2 text-center">
-                          <span className={`rounded-full border px-2 py-1 text-xs ${assignment.canView ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-gray-200 bg-gray-100 text-gray-600"}`}>
-                            {assignment.canView ? "Sim" : "Não"}
-                          </span>
-                        </td>
-                        <td className="px-3 py-2 text-center">
                           <div className="flex justify-center gap-2">
                             <button className="rounded border px-2 py-1 text-xs hover:bg-gray-50" onClick={() => handleEditAssignment(assignment)}>Editar</button>
                             <button className="rounded border border-red-200 px-2 py-1 text-xs text-red-600 hover:bg-red-50" onClick={() => handleDeleteAssignment(assignment.id)}>Excluir</button>
@@ -884,7 +882,7 @@ export default function AdminApprovalsPage() {
                       </tr>
                     ))}
                     {selectedType && selectedType.assignments.length === 0 && (
-                      <tr><td colSpan={7} className="px-3 py-4 text-center text-gray-500">Nenhum usuário vinculado a este tipo.</td></tr>
+                      <tr><td colSpan={6} className="px-3 py-4 text-center text-gray-500">Nenhum usuário vinculado a este tipo.</td></tr>
                     )}
                   </tbody>
                 </table>

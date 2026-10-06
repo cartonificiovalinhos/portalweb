@@ -752,7 +752,6 @@ model CommercialFamilyApprovalTypeUser {
   approvalTypeId   Int
   approvalFieldId  Int
   userId           Int
-  canView          Boolean                      @default(true)
   rangeFromValue   String?
   rangeToValue     String?
   createdAt        DateTime                     @default(now())

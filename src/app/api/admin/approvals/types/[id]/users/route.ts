@@ -67,7 +67,6 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
     const assignmentId = Number(body?.assignmentId ?? 0);
     const userId = Number(body?.userId);
     const approvalFieldId = Number(body?.approvalFieldId);
-    const canView = body?.canView === undefined ? true : Boolean(body.canView);
 
     if (!Number.isFinite(userId) || userId <= 0) {
       return NextResponse.json({ error: "Usuário inválido." }, { status: 400 });
@@ -105,7 +104,6 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
           data: {
             approvalFieldId,
             userId,
-            canView,
             rangeFromValue: normalizedFrom.value,
             rangeToValue: normalizedTo.value,
           },
@@ -117,7 +115,6 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
       : await prisma.commercialFamilyApprovalTypeUser.upsert({
           where: { approvalTypeId_approvalFieldId_userId: { approvalTypeId: typeId, approvalFieldId, userId } },
           update: {
-            canView,
             rangeFromValue: normalizedFrom.value,
             rangeToValue: normalizedTo.value,
           },
@@ -125,7 +122,6 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
             approvalTypeId: typeId,
             approvalFieldId,
             userId,
-            canView,
             rangeFromValue: normalizedFrom.value,
             rangeToValue: normalizedTo.value,
           },
