@@ -29,6 +29,7 @@ model User {
   assignedWorkOrders WorkOrder[]
   userInventoryItemPrices UserInventoryItemPrice[]
   commercialFamilyApprovalUsers CommercialFamilyApprovalUser[]
+  commercialFamilyApprovalTypeUsers CommercialFamilyApprovalTypeUser[]
   trustedDevices     TrustedDevice[]
 
   // Gestão FinTI Relations
@@ -685,6 +686,7 @@ model CommercialFamily {
   inventoryItems InventoryItem[]
   standardOccurrenceFamilies StandardOccurrenceFamily[]
   approvalUsers  CommercialFamilyApprovalUser[]
+  approvalTypes  CommercialFamilyApprovalType[]
 
   @@index([description])
   @@index([erpCode])
@@ -707,6 +709,64 @@ model CommercialFamilyApprovalUser {
   @@unique([commercialFamilyId, userId])
   @@index([userId])
   @@map("commercialfamilyapprovaluser")
+}
+
+model CommercialFamilyApprovalType {
+  id                 Int                                @id @default(autoincrement())
+  commercialFamilyId Int
+  name               String
+  description        String?
+  sortOrder          Int                                @default(0)
+  isActive           Boolean                            @default(true)
+  createdAt          DateTime                           @default(now())
+  updatedAt          DateTime                           @updatedAt
+
+  commercialFamily CommercialFamily                     @relation(fields: [commercialFamilyId], references: [id], onDelete: Cascade)
+  fields           CommercialFamilyApprovalTypeField[]
+  assignments      CommercialFamilyApprovalTypeUser[]
+
+  @@unique([commercialFamilyId, name], map: "uq_cfat_family_name")
+  @@index([commercialFamilyId, sortOrder], map: "idx_cfat_family_sort")
+  @@map("commercialfamilyapprovaltype")
+}
+
+model CommercialFamilyApprovalTypeField {
+  id             Int                               @id @default(autoincrement())
+  approvalTypeId Int
+  label          String
+  fieldType      String
+  required       Boolean                           @default(true)
+  useRange       Boolean                           @default(false)
+  sortOrder      Int                               @default(0)
+  createdAt      DateTime                          @default(now())
+  updatedAt      DateTime                          @updatedAt
+
+  approvalType CommercialFamilyApprovalType        @relation(fields: [approvalTypeId], references: [id], onDelete: Cascade)
+  assignments  CommercialFamilyApprovalTypeUser[]
+
+  @@index([approvalTypeId, sortOrder], map: "idx_cfaf_type_sort")
+  @@map("commercialfamilyapprovaltypefield")
+}
+
+model CommercialFamilyApprovalTypeUser {
+  id               Int                          @id @default(autoincrement())
+  approvalTypeId   Int
+  approvalFieldId  Int
+  userId           Int
+  canView          Boolean                      @default(true)
+  rangeFromValue   String?
+  rangeToValue     String?
+  createdAt        DateTime                     @default(now())
+  updatedAt        DateTime                     @updatedAt
+
+  approvalType CommercialFamilyApprovalType     @relation(fields: [approvalTypeId], references: [id], onDelete: Cascade)
+  approvalField CommercialFamilyApprovalTypeField @relation(fields: [approvalFieldId], references: [id], onDelete: Cascade)
+  user         User                             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([approvalTypeId, approvalFieldId, userId], map: "uq_cfatu_type_field_user")
+  @@index([userId], map: "idx_cfatu_user")
+  @@index([approvalTypeId], map: "idx_cfatu_type")
+  @@map("commercialfamilyapprovaltypeuser")
 }
 
 model PaymentTerm {
