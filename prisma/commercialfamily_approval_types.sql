@@ -19,7 +19,6 @@ CREATE TABLE IF NOT EXISTS `commercialfamilyapprovaltypefield` (
   `label` VARCHAR(150) NOT NULL,
   `fieldType` VARCHAR(20) NOT NULL,
   `required` TINYINT(1) NOT NULL DEFAULT 1,
-  `useRange` TINYINT(1) NOT NULL DEFAULT 0,
   `sortOrder` INT NOT NULL DEFAULT 0,
   `createdAt` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `updatedAt` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -82,7 +81,6 @@ INSERT INTO `commercialfamilyapprovaltypefield` (
   `label`,
   `fieldType`,
   `required`,
-  `useRange`,
   `sortOrder`,
   `createdAt`,
   `updatedAt`
@@ -91,7 +89,6 @@ SELECT
   t.`id`,
   'Descto Comercial R$',
   'DECIMAL',
-  1,
   1,
   1,
   NOW(),

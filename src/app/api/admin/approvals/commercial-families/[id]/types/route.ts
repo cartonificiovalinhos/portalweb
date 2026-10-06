@@ -30,7 +30,7 @@ export async function GET(_request: Request, props: { params: Promise<{ id: stri
           orderBy: [{ id: "asc" }],
           include: {
             approvalField: {
-              select: { id: true, label: true, fieldType: true, useRange: true },
+              select: { id: true, label: true, fieldType: true },
             },
             user: {
               select: { id: true, name: true, abbrevName: true, email: true, doc: true },
@@ -92,7 +92,7 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
         assignments: {
           orderBy: { id: "asc" },
           include: {
-            approvalField: { select: { id: true, label: true, fieldType: true, useRange: true } },
+            approvalField: { select: { id: true, label: true, fieldType: true } },
             user: { select: { id: true, name: true, abbrevName: true, email: true, doc: true } },
           },
         },

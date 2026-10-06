@@ -43,7 +43,7 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
         assignments: {
           orderBy: { id: "asc" },
           include: {
-            approvalField: { select: { id: true, label: true, fieldType: true, useRange: true } },
+            approvalField: { select: { id: true, label: true, fieldType: true } },
             user: { select: { id: true, name: true, abbrevName: true, email: true, doc: true } },
           },
         },

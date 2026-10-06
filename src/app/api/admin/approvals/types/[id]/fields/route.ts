@@ -25,7 +25,6 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
     const label = normalizeText(body?.label);
     const fieldType = normalizeText(body?.fieldType).toUpperCase();
     const required = body?.required === undefined ? true : Boolean(body.required);
-    const useRange = body?.useRange === undefined ? false : Boolean(body.useRange);
 
     if (!label) {
       return NextResponse.json({ error: "Nome do campo é obrigatório." }, { status: 400 });
@@ -46,7 +45,6 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
         label,
         fieldType,
         required,
-        useRange,
         sortOrder: Number(maxSort._max.sortOrder ?? 0) + 1,
       },
     });

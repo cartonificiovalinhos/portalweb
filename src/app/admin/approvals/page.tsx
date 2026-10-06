@@ -10,7 +10,6 @@ type ApprovalField = {
   label: string;
   fieldType: ApprovalFieldType;
   required: boolean;
-  useRange: boolean;
   sortOrder: number;
 };
 type ApprovalAssignment = {
@@ -18,7 +17,7 @@ type ApprovalAssignment = {
   canView: boolean;
   rangeFromValue: string | null;
   rangeToValue: string | null;
-  approvalField: { id: number; label: string; fieldType: ApprovalFieldType; useRange: boolean };
+  approvalField: { id: number; label: string; fieldType: ApprovalFieldType };
   user: { id: number; name: string; abbrevName?: string | null; email?: string | null; doc?: string | null };
 };
 type ApprovalType = {
@@ -75,7 +74,7 @@ function blankTypeForm() {
 }
 
 function blankFieldForm() {
-  return { id: null as number | null, label: "", fieldType: "DECIMAL" as ApprovalFieldType, required: true, useRange: true };
+  return { id: null as number | null, label: "", fieldType: "DECIMAL" as ApprovalFieldType, required: true };
 }
 
 function blankAssignmentForm() {
@@ -283,7 +282,7 @@ export default function AdminApprovalsPage() {
   }, [assignmentForm.userId, assignmentForm.userLabel, userQuery]);
 
   const rangeFields = useMemo(
-    () => (selectedType?.fields || []).filter((field) => field.useRange),
+    () => selectedType?.fields || [],
     [selectedType],
   );
 
@@ -398,7 +397,6 @@ export default function AdminApprovalsPage() {
             label: fieldForm.label,
             fieldType: fieldForm.fieldType,
             required: fieldForm.required,
-            useRange: fieldForm.useRange,
           }),
         },
       );
@@ -442,7 +440,6 @@ export default function AdminApprovalsPage() {
       label: field.label,
       fieldType: field.fieldType,
       required: field.required,
-      useRange: field.useRange,
     });
   };
 
@@ -608,7 +605,7 @@ export default function AdminApprovalsPage() {
                     onClick={() => setSelectedTypeId(approvalType.id)}
                   >
                     <div className="min-w-0">
-                      <div className="truncate text-sm font-semibold">{approvalType.name}</div>
+                      <div className="truncate text-sm font-semibold">{approvalType.description || approvalType.name}</div>
                       <div className="mt-2 flex flex-wrap gap-2 text-[11px]">
                         <span className={`rounded-full border px-2 py-0.5 ${approvalType.isActive ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-gray-200 bg-gray-100 text-gray-600"}`}>
                           {approvalType.isActive ? "Ativo" : "Inativo"}
@@ -704,14 +701,7 @@ export default function AdminApprovalsPage() {
                     Sim
                   </label>
                 </div>
-                <div className="lg:col-span-2">
-                  <label className="mb-1 block text-sm font-medium">Usa faixa?</label>
-                  <label className="flex h-[42px] items-center gap-2 rounded border bg-white px-3 text-sm">
-                    <input type="checkbox" checked={fieldForm.useRange} onChange={(e) => setFieldForm((prev) => ({ ...prev, useRange: e.target.checked }))} disabled={!selectedType} />
-                    Sim
-                  </label>
-                </div>
-                <div className="lg:col-span-1 flex items-end gap-2">
+                <div className="lg:col-span-3 flex items-end gap-2">
                   <button className="w-full rounded border border-blue-200 bg-blue-600 px-3 py-2 text-sm text-white hover:bg-blue-700 disabled:opacity-50" onClick={handleSaveField} disabled={!selectedType || savingField}>
                     {fieldForm.id ? "Salvar" : "Adicionar"}
                   </button>
@@ -730,7 +720,6 @@ export default function AdminApprovalsPage() {
                       <th className="px-3 py-2 text-left">Campo</th>
                       <th className="px-3 py-2 text-left">Tipo</th>
                       <th className="px-3 py-2 text-center">Obrigatório</th>
-                      <th className="px-3 py-2 text-center">Faixa utilizada?</th>
                       <th className="px-3 py-2 text-center">Ações</th>
                     </tr>
                   </thead>
@@ -747,11 +736,6 @@ export default function AdminApprovalsPage() {
                           </span>
                         </td>
                         <td className="px-3 py-2 text-center">
-                          <span className={`rounded-full border px-2 py-1 text-xs ${field.useRange ? "border-blue-200 bg-blue-50 text-blue-700" : "border-gray-200 bg-gray-100 text-gray-600"}`}>
-                            {field.useRange ? "Sim" : "Não"}
-                          </span>
-                        </td>
-                        <td className="px-3 py-2 text-center">
                           <div className="flex justify-center gap-2">
                             <button className="rounded border px-2 py-1 text-xs hover:bg-gray-50" onClick={() => handleEditField(field)}>Editar</button>
                             <button className="rounded border border-red-200 px-2 py-1 text-xs text-red-600 hover:bg-red-50" onClick={() => handleDeleteField(field.id)}>Excluir</button>
@@ -760,7 +744,7 @@ export default function AdminApprovalsPage() {
                       </tr>
                     ))}
                     {selectedType && selectedType.fields.length === 0 && (
-                      <tr><td colSpan={5} className="px-3 py-4 text-center text-gray-500">Nenhum campo cadastrado para este tipo.</td></tr>
+                      <tr><td colSpan={4} className="px-3 py-4 text-center text-gray-500">Nenhum campo cadastrado para este tipo.</td></tr>
                     )}
                   </tbody>
                 </table>
@@ -815,7 +799,7 @@ export default function AdminApprovalsPage() {
                     ))}
                   </select>
                   {selectedType && rangeFields.length === 0 && (
-                    <div className="mt-1 text-xs text-amber-700">Cadastre pelo menos um campo marcado com "Usa faixa?" para vincular usuários.</div>
+                    <div className="mt-1 text-xs text-amber-700">Cadastre pelo menos um campo para vincular usuários.</div>
                   )}
                 </div>
 

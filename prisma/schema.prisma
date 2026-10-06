@@ -736,7 +736,6 @@ model CommercialFamilyApprovalTypeField {
   label          String
   fieldType      String
   required       Boolean                           @default(true)
-  useRange       Boolean                           @default(false)
   sortOrder      Int                               @default(0)
   createdAt      DateTime                          @default(now())
   updatedAt      DateTime                          @updatedAt

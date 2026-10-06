@@ -26,7 +26,6 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
     const label = normalizeText(body?.label);
     const fieldType = normalizeText(body?.fieldType).toUpperCase();
     const required = body?.required === undefined ? true : Boolean(body.required);
-    const useRange = body?.useRange === undefined ? false : Boolean(body.useRange);
 
     if (!label) {
       return NextResponse.json({ error: "Nome do campo é obrigatório." }, { status: 400 });
@@ -46,7 +45,7 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
 
     const field = await prisma.commercialFamilyApprovalTypeField.update({
       where: { id: fieldId },
-      data: { label, fieldType, required, useRange },
+      data: { label, fieldType, required },
     });
 
     return NextResponse.json({ ok: true, field });
