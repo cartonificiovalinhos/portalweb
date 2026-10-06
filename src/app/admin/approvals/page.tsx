@@ -156,6 +156,7 @@ export default function AdminApprovalsPage() {
   const [warning, setWarning] = useState<string | null>(null);
 
   const [typeMode, setTypeMode] = useState<"create" | "edit">("edit");
+  const [isTypeEditorOpen, setIsTypeEditorOpen] = useState(false);
   const [typeForm, setTypeForm] = useState(blankTypeForm());
   const [fieldForm, setFieldForm] = useState(blankFieldForm());
   const [assignmentForm, setAssignmentForm] = useState(blankAssignmentForm());
@@ -249,8 +250,9 @@ export default function AdminApprovalsPage() {
   }, [applySelectedTypeToForm, loadApprovalTypes, selectedFamilyId, tab]);
 
   useEffect(() => {
+    if (isTypeEditorOpen) return;
     applySelectedTypeToForm(selectedType);
-  }, [applySelectedTypeToForm, selectedType]);
+  }, [applySelectedTypeToForm, isTypeEditorOpen, selectedType]);
 
   useEffect(() => {
     if (!assignmentForm.userId && !userQuery.trim()) {
@@ -310,6 +312,23 @@ export default function AdminApprovalsPage() {
     setTypeForm(blankTypeForm());
     resetFieldForm();
     resetAssignmentForm();
+    setIsTypeEditorOpen(true);
+  };
+
+  const handleEditType = () => {
+    if (!selectedType) return;
+    setTypeMode("edit");
+    setTypeForm({
+      name: selectedType.name || "",
+      description: selectedType.description || "",
+      isActive: selectedType.isActive !== false,
+    });
+    setIsTypeEditorOpen(true);
+  };
+
+  const handleCancelTypeEditor = () => {
+    setIsTypeEditorOpen(false);
+    applySelectedTypeToForm(selectedType);
   };
 
   const handleSaveType = async () => {
@@ -340,6 +359,7 @@ export default function AdminApprovalsPage() {
       if (typeMode === "create" && data?.type?.id) {
         setSelectedTypeId(Number(data.type.id));
       }
+      setIsTypeEditorOpen(false);
     } catch (err: any) {
       setError(err?.message || String(err));
     } finally {
@@ -579,8 +599,8 @@ export default function AdminApprovalsPage() {
                   <button className="rounded border border-blue-200 bg-blue-600 px-3 py-2 text-sm text-white hover:bg-blue-700" onClick={handleCreateType}>
                     Novo Tipo
                   </button>
-                  <button className="rounded border px-3 py-2 text-sm hover:bg-gray-50 disabled:opacity-50" onClick={handleSaveType} disabled={savingType || !selectedFamilyId}>
-                    {savingType ? "Salvando..." : typeMode === "create" ? "Criar Tipo" : "Salvar Tipo"}
+                  <button className="rounded border px-3 py-2 text-sm hover:bg-gray-50 disabled:opacity-50" onClick={handleEditType} disabled={!selectedTypeId || savingType}>
+                    Editar
                   </button>
                   <button className="rounded border border-red-200 px-3 py-2 text-sm text-red-600 hover:bg-red-50 disabled:opacity-50" onClick={handleDeleteType} disabled={!selectedTypeId || savingType}>
                     Excluir
@@ -623,32 +643,46 @@ export default function AdminApprovalsPage() {
               {loadingTypes && <div className="mt-3 text-sm text-gray-500">Carregando tipos...</div>}
             </div>
 
-            <div className="rounded border bg-white p-3">
-              <h3 className="font-medium">Configuração do Tipo de Aprovação</h3>
-              <p className="mb-3 text-sm text-gray-500">Defina o nome e a finalidade do tipo selecionado. Isso ajuda o usuário a entender rapidamente o contexto da aprovação.</p>
-              <div className="grid grid-cols-1 gap-3 lg:grid-cols-12">
-                <div className="lg:col-span-5">
-                  <label className="mb-1 block text-sm font-medium">Nome do tipo</label>
-                  <input
-                    className="w-full rounded border px-3 py-2 text-sm"
-                    value={typeForm.name}
-                    onChange={(e) => setTypeForm((prev) => ({ ...prev, name: sanitizeApprovalTypeName(e.target.value) }))}
-                  />
-                  <div className="mt-1 text-xs text-gray-500">Use apenas letras e números, sem espaços e sem caracteres especiais.</div>
+            {isTypeEditorOpen && (
+              <div className="rounded border bg-white p-3">
+                <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <h3 className="font-medium">Configuração do Tipo de Aprovação</h3>
+                    <p className="text-sm text-gray-500">Defina o nome e a finalidade do tipo selecionado. Isso ajuda o usuário a entender rapidamente o contexto da aprovação.</p>
+                  </div>
+                  <div className="flex gap-2">
+                    <button className="rounded border px-3 py-2 text-sm hover:bg-gray-50 disabled:opacity-50" onClick={handleCancelTypeEditor} disabled={savingType}>
+                      Cancelar
+                    </button>
+                    <button className="rounded border border-blue-200 bg-blue-600 px-3 py-2 text-sm text-white hover:bg-blue-700 disabled:opacity-50" onClick={handleSaveType} disabled={savingType || !selectedFamilyId}>
+                      {savingType ? "Salvando..." : typeMode === "create" ? "Criar Tipo" : "Salvar Tipo"}
+                    </button>
+                  </div>
                 </div>
-                <div className="lg:col-span-5">
-                  <label className="mb-1 block text-sm font-medium">Descrição</label>
-                  <input className="w-full rounded border px-3 py-2 text-sm" value={typeForm.description} onChange={(e) => setTypeForm((prev) => ({ ...prev, description: e.target.value }))} />
-                </div>
-                <div className="lg:col-span-2">
-                  <label className="mb-1 block text-sm font-medium">Situação</label>
-                  <label className="flex h-[42px] items-center gap-2 rounded border px-3 text-sm">
-                    <input type="checkbox" checked={typeForm.isActive} onChange={(e) => setTypeForm((prev) => ({ ...prev, isActive: e.target.checked }))} />
-                    Ativo
-                  </label>
+                <div className="grid grid-cols-1 gap-3 lg:grid-cols-12">
+                  <div className="lg:col-span-5">
+                    <label className="mb-1 block text-sm font-medium">Nome do tipo</label>
+                    <input
+                      className="w-full rounded border px-3 py-2 text-sm"
+                      value={typeForm.name}
+                      onChange={(e) => setTypeForm((prev) => ({ ...prev, name: sanitizeApprovalTypeName(e.target.value) }))}
+                    />
+                    <div className="mt-1 text-xs text-gray-500">Use apenas letras e números, sem espaços e sem caracteres especiais.</div>
+                  </div>
+                  <div className="lg:col-span-5">
+                    <label className="mb-1 block text-sm font-medium">Descrição</label>
+                    <input className="w-full rounded border px-3 py-2 text-sm" value={typeForm.description} onChange={(e) => setTypeForm((prev) => ({ ...prev, description: e.target.value }))} />
+                  </div>
+                  <div className="lg:col-span-2">
+                    <label className="mb-1 block text-sm font-medium">Situação</label>
+                    <label className="flex h-[42px] items-center gap-2 rounded border px-3 text-sm">
+                      <input type="checkbox" checked={typeForm.isActive} onChange={(e) => setTypeForm((prev) => ({ ...prev, isActive: e.target.checked }))} />
+                      Ativo
+                    </label>
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
 
             <div className="rounded border bg-white p-3">
               <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
