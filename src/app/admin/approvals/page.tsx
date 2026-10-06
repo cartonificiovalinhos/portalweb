@@ -70,14 +70,6 @@ function formatRangeValue(fieldType: ApprovalFieldType, value: string | null | u
   return raw;
 }
 
-function buildTypeIcon(name: string) {
-  const upper = String(name || "").toUpperCase();
-  if (upper.includes("DESCONTO")) return "%";
-  if (upper.includes("DATA")) return "CAL";
-  if (upper.includes("PREÇO") || upper.includes("PRECO")) return "$";
-  return "AP";
-}
-
 function blankTypeForm() {
   return { name: "", description: "", isActive: true };
 }
@@ -615,20 +607,14 @@ export default function AdminApprovalsPage() {
                     className={`rounded border p-4 text-left transition ${selectedTypeId === approvalType.id ? "border-blue-300 bg-blue-50 shadow-sm" : "hover:bg-gray-50"}`}
                     onClick={() => setSelectedTypeId(approvalType.id)}
                   >
-                    <div className="flex items-start gap-3">
-                      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gray-100 text-sm font-semibold text-gray-700">
-                        {buildTypeIcon(approvalType.name)}
-                      </div>
-                      <div className="min-w-0">
-                        <div className="truncate text-sm font-semibold">{approvalType.name}</div>
-                        <div className="line-clamp-2 text-xs text-gray-500">{approvalType.description || "Sem descrição informada."}</div>
-                        <div className="mt-2 flex flex-wrap gap-2 text-[11px]">
-                          <span className={`rounded-full border px-2 py-0.5 ${approvalType.isActive ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-gray-200 bg-gray-100 text-gray-600"}`}>
-                            {approvalType.isActive ? "Ativo" : "Inativo"}
-                          </span>
-                          <span className="rounded-full border border-gray-200 bg-gray-50 px-2 py-0.5 text-gray-600">{approvalType.fields.length} campo(s)</span>
-                          <span className="rounded-full border border-gray-200 bg-gray-50 px-2 py-0.5 text-gray-600">{approvalType.assignments.length} vínculo(s)</span>
-                        </div>
+                    <div className="min-w-0">
+                      <div className="truncate text-sm font-semibold">{approvalType.name}</div>
+                      <div className="mt-2 flex flex-wrap gap-2 text-[11px]">
+                        <span className={`rounded-full border px-2 py-0.5 ${approvalType.isActive ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-gray-200 bg-gray-100 text-gray-600"}`}>
+                          {approvalType.isActive ? "Ativo" : "Inativo"}
+                        </span>
+                        <span className="rounded-full border border-gray-200 bg-gray-50 px-2 py-0.5 text-gray-600">{approvalType.fields.length} campo(s)</span>
+                        <span className="rounded-full border border-gray-200 bg-gray-50 px-2 py-0.5 text-gray-600">{approvalType.assignments.length} vínculo(s)</span>
                       </div>
                     </div>
                   </button>
