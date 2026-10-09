@@ -6,6 +6,11 @@ function normalizeDoc(doc: string): string {
   return (doc || '').replace(/\D+/g, '');
 }
 
+function normalizeOptionalEmail(email: unknown): string | null {
+  const value = String(email ?? '').trim();
+  return value || null;
+}
+
 export async function GET(_: Request, props: { params: Promise<{ doc: string }> }) {
   const params = await props.params;
   try {
@@ -32,7 +37,7 @@ export async function PATCH(request: Request, props: { params: Promise<{ doc: st
     const body = await request.json().catch(() => ({} as any));
     const data: any = {};
     if (body.name !== undefined) data.name = String(body.name);
-    if (body.email !== undefined) data.email = body.email == null ? null : String(body.email);
+    if (body.email !== undefined) data.email = normalizeOptionalEmail(body.email);
     if (body.doc !== undefined) data.doc = normalizeDoc(String(body.doc || '')) || null;
     if (body.salesRepAdmin !== undefined) data.salesRepAdmin = Boolean(body.salesRepAdmin);
     if (body.erpIntegrationMode !== undefined) data.erpIntegrationMode = String(body.erpIntegrationMode);

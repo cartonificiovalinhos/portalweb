@@ -7,6 +7,11 @@ function normalizeDoc(doc: string): string {
   return (doc || '').replace(/\D+/g, '');
 }
 
+function normalizeOptionalEmail(email: unknown): string | null {
+  const value = String(email ?? '').trim();
+  return value || null;
+}
+
 export async function GET(request: Request) {
   try {
     const url = new URL(request.url);
@@ -85,9 +90,10 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   const data = await request.json();
-  const { name, email, password, erpIntegrationMode, salesRepAdmin } = data || {};
+  const { name, password, erpIntegrationMode, salesRepAdmin } = data || {};
   const abbrevName = (data as any)?.abbrevName != null ? String((data as any).abbrevName).trim().slice(0, 15) : null;
   const doc = normalizeDoc(String((data as any)?.doc || '')) || null;
+  const email = normalizeOptionalEmail((data as any)?.email);
   const passwordStr = String(password || '');
   if (!passwordStr) return NextResponse.json({ error: 'password é obrigatório' }, { status: 400 });
   const hashed = await bcrypt.hash(passwordStr, 10);
@@ -107,7 +113,7 @@ export async function POST(request: Request) {
     const update: any = {
       name: String(name || ''),
       abbrevName,
-      email: finalEmail ?? null,
+      email: finalEmail,
       password: String(hashed),
       erpIntegrationMode: String(erpIntegrationMode || 'TEST'),
     };
@@ -116,7 +122,7 @@ export async function POST(request: Request) {
     const create: any = {
       name: String(name || ''),
       abbrevName,
-      email: finalEmail ?? null,
+      email: finalEmail,
       password: String(hashed),
       doc,
       salesRepAdmin: Boolean(salesRepAdmin),
@@ -144,7 +150,7 @@ export async function POST(request: Request) {
   }
   
   const created = await prisma.user.create({ 
-    data: { name, abbrevName, email: finalEmail, password: hashed, erpIntegrationMode: erpIntegrationMode || 'TEST', salesRepAdmin: Boolean(salesRepAdmin), isSalesAdmin: false }, 
+    data: { name, abbrevName, email: finalEmail, password: hashed, erpIntegrationMode: erpIntegrationMode || 'TEST', salesRepAdmin: Boolean(salesRepAdmin), isSalesAdmin: false },
     select: { id: true, name: true, abbrevName: true, email: true, createdAt: true, updatedAt: true, salesRepAdmin: true, isSalesAdmin: true, erpIntegrationMode: true } 
   });
   return NextResponse.json(created);
@@ -159,7 +165,7 @@ export async function PATCH(request: Request) {
     const update: any = {};
     if (body.name !== undefined) update.name = String(body.name);
     if (body.abbrevName !== undefined) update.abbrevName = body.abbrevName == null ? null : String(body.abbrevName).trim().slice(0, 15);
-    if (body.email !== undefined) update.email = body.email == null ? null : String(body.email);
+    if (body.email !== undefined) update.email = normalizeOptionalEmail(body.email);
     if (body.erpIntegrationMode !== undefined) update.erpIntegrationMode = String(body.erpIntegrationMode);
     if (body.salesRepAdmin !== undefined) update.salesRepAdmin = Boolean(body.salesRepAdmin);
     if (body.isSalesAdmin !== undefined) update.isSalesAdmin = Boolean(body.isSalesAdmin);

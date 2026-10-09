@@ -6,6 +6,11 @@ function normalizeDoc(doc: string): string {
   return (doc || '').replace(/\D+/g, '');
 }
 
+function normalizeOptionalEmail(email: unknown): string | null {
+  const value = String(email ?? '').trim();
+  return value || null;
+}
+
 // PATCH: Atualiza dados básicos do usuário
 export async function PATCH(request: Request, props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
@@ -15,7 +20,7 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
     const body = await request.json().catch(() => ({} as any));
     const update: any = {};
     if (body.name !== undefined) update.name = String(body.name);
-    if (body.email !== undefined) update.email = body.email == null ? null : String(body.email);
+    if (body.email !== undefined) update.email = normalizeOptionalEmail(body.email);
     if (body.erpIntegrationMode !== undefined) update.erpIntegrationMode = String(body.erpIntegrationMode);
     if (body.doc !== undefined) update.doc = normalizeDoc(String(body.doc || '')) || null;
     if (body.password !== undefined && String(body.password).length > 0) {

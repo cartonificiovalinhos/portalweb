@@ -64,7 +64,7 @@ export default function UsersPage() {
     setLoading(true); setErr(null);
     try {
       if (editingUserId) {
-        const res = await fetch(`/api/users`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: editingUserId, ...form }) });
+        const res = await fetch(`/api/users`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: editingUserId, ...form, email: form.email.trim() }) });
         const data = await res.json();
         if (!res.ok) throw new Error(data?.error || `Erro ${res.status}`);
         setEditingUserId(null);
@@ -72,7 +72,7 @@ export default function UsersPage() {
         await loadUsers();
         setSelectedUserId(data.id);
       } else {
-        const res = await fetch("/api/users", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(form) });
+        const res = await fetch("/api/users", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...form, email: form.email.trim() }) });
         const data = await res.json();
         if (!res.ok) throw new Error(data?.error || `Erro ${res.status}`);
         setForm({ name: "", abbrevName: "", email: "", password: "", doc: "" });
@@ -408,7 +408,7 @@ export default function UsersPage() {
             <input className="border rounded px-3 py-2" placeholder="Nome" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
             <input className="border rounded px-3 py-2" placeholder="Nome Abrev" maxLength={15} value={form.abbrevName} onChange={(e) => setForm({ ...form, abbrevName: e.target.value })} />
             <input className="border rounded px-3 py-2" placeholder="CPF/CNPJ" value={form.doc} onChange={(e) => setForm({ ...form, doc: e.target.value })} />
-            <input className="border rounded px-3 py-2" type="email" placeholder="E-mail" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} required />
+            <input className="border rounded px-3 py-2" type="email" placeholder="E-mail" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
             <input className="border rounded px-3 py-2" type="password" placeholder={editingUserId ? "Nova senha (opcional)" : "Senha"} value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} required={!editingUserId} />
             <div>
               <button className="px-4 py-2 bg-gray-800 text-white rounded mr-2">{editingUserId ? 'Atualizar' : 'Salvar'}</button>
