@@ -5,6 +5,157 @@ function normalizeDoc(doc: string): string {
   return (doc || '').replace(/\D+/g, '');
 }
 
+type ClientContactInput = {
+  id?: number | null;
+  description?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  isWhatsapp?: boolean | null;
+};
+
+function normalizePhone(phone: string): string {
+  return String(phone || '').replace(/\D+/g, '');
+}
+
+function normalizeEmail(email: string): string {
+  return String(email || '').trim().toLowerCase();
+}
+
+function toOptionalPositiveInt(value: unknown): number | null {
+  if (value === null || value === undefined) return null;
+  const digits = String(value).trim().replace(/\D/g, '');
+  if (!digits) return null;
+  const n = Number(digits);
+  return Number.isFinite(n) && n > 0 ? Math.trunc(n) : null;
+}
+
+function buildContactDescription(kind: 'phone' | 'email', index: number, value?: string | null, description?: string | null): string {
+  const label = String(description || '').trim();
+  if (label) return label.slice(0, 120);
+  const fallbackValue = String(value || '').trim();
+  if (fallbackValue) return `${kind === 'phone' ? 'Telefone' : 'E-mail'} ${index + 1}`;
+  return kind === 'phone' ? 'Telefone' : 'E-mail';
+}
+
+function extractClientContacts(body: any): ClientContactInput[] | null {
+  if (Array.isArray(body?.contacts)) {
+    return body.contacts;
+  }
+
+  const phones = Array.isArray(body?.phones) ? body.phones : null;
+  const emails = Array.isArray(body?.emails) ? body.emails : null;
+  if (!phones && !emails) return null;
+
+  const out: ClientContactInput[] = [];
+  if (phones) {
+    phones.forEach((item: any, index: number) => {
+      if (item && typeof item === 'object') {
+        out.push({
+          id: item.id,
+          description: item.description,
+          phone: item.phone,
+          isWhatsapp: item.isWhatsapp,
+        });
+        return;
+      }
+      out.push({ description: `Telefone ${index + 1}`, phone: String(item ?? '') });
+    });
+  }
+
+  if (emails) {
+    emails.forEach((item: any, index: number) => {
+      if (item && typeof item === 'object') {
+        out.push({
+          id: item.id,
+          description: item.description,
+          email: item.email,
+        });
+        return;
+      }
+      out.push({ description: `E-mail ${index + 1}`, email: String(item ?? '') });
+    });
+  }
+
+  return out;
+}
+
+function normalizeClientContacts(body: any): Array<{ id?: number; description: string; phone: string | null; email: string | null; isWhatsapp: boolean }> | null {
+  const input = extractClientContacts(body);
+  if (!input) return null;
+
+  const out: Array<{ id?: number; description: string; phone: string | null; email: string | null; isWhatsapp: boolean }> = [];
+  input.forEach((item, index) => {
+    const phone = normalizePhone(String(item?.phone || '')) || null;
+    const email = normalizeEmail(String(item?.email || '')) || null;
+    if (!phone && !email) return;
+
+    const id = toOptionalPositiveInt(item?.id);
+    const kind = phone ? 'phone' : 'email';
+    out.push({
+      ...(id ? { id } : {}),
+      description: buildContactDescription(kind, index, phone || email, item?.description),
+      phone,
+      email,
+      isWhatsapp: phone ? Boolean(item?.isWhatsapp) : false,
+    });
+  });
+
+  return out;
+}
+
+async function syncClientContacts(
+  tx: Omit<typeof prisma, '$connect' | '$disconnect' | '$on' | '$transaction' | '$use' | '$extends'>,
+  clientId: number,
+  contacts: Array<{ id?: number; description: string; phone: string | null; email: string | null; isWhatsapp: boolean }> | null,
+) {
+  if (contacts === null) return;
+
+  const existing = await tx.clientContact.findMany({
+    where: { clientId: Math.trunc(clientId) },
+    select: { id: true },
+  });
+  const existingIds = new Set(existing.map((item) => item.id));
+  const incomingIds = new Set<number>();
+
+  for (const contact of contacts) {
+    if (contact.id && existingIds.has(contact.id)) {
+      incomingIds.add(contact.id);
+      await tx.clientContact.update({
+        where: { id: contact.id },
+        data: {
+          description: contact.description,
+          phone: contact.phone,
+          email: contact.email,
+          isWhatsapp: contact.phone ? contact.isWhatsapp : false,
+        },
+      });
+      continue;
+    }
+
+    const created = await tx.clientContact.create({
+      data: {
+        clientId: Math.trunc(clientId),
+        description: contact.description,
+        phone: contact.phone,
+        email: contact.email,
+        isWhatsapp: contact.phone ? contact.isWhatsapp : false,
+      },
+      select: { id: true },
+    });
+    incomingIds.add(created.id);
+  }
+
+  const toDelete = existing.filter((item) => !incomingIds.has(item.id)).map((item) => item.id);
+  if (toDelete.length > 0) {
+    await tx.clientContact.deleteMany({
+      where: {
+        clientId: Math.trunc(clientId),
+        id: { in: toDelete },
+      },
+    });
+  }
+}
+
 async function computeInvoiceTotals(clientId: number) {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -168,6 +319,16 @@ export async function GET(_: Request, props: { params: Promise<{ id: string }> }
         titlesOverdue: true,
         paymentTermId: true,
         paymentTerm: { select: { code: true, description: true } },
+        contacts: {
+          select: {
+            id: true,
+            description: true,
+            phone: true,
+            email: true,
+            isWhatsapp: true,
+          },
+          orderBy: [{ description: 'asc' }, { id: 'asc' }],
+        },
       },
     });
     if (!client) return NextResponse.json({ error: 'Cliente não encontrado' }, { status: 404 });
@@ -178,6 +339,13 @@ export async function GET(_: Request, props: { params: Promise<{ id: string }> }
       titlesOverdue: totals.titlesOverdue,
       paymentTermCode: client.paymentTerm?.code ?? null,
       paymentTermDescription: client.paymentTerm?.description ?? null,
+      contacts: (client.contacts || []).map((contact) => ({
+        id: contact.id,
+        description: contact.description,
+        phone: contact.phone,
+        email: contact.email,
+        isWhatsapp: contact.isWhatsapp,
+      })),
     });
   } catch (err: any) {
     return NextResponse.json({ error: String(err?.message || err) }, { status: 500 });
@@ -227,6 +395,7 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
     if (body.bairro !== undefined) fields.bairro = String(body.bairro || '').trim() || null;
     if (body.cidade !== undefined) fields.cidade = String(body.cidade || '').trim() || null;
     if (body.estado !== undefined) fields.estado = String(body.estado || '').trim() || null;
+    const contacts = normalizeClientContacts(body);
     const paymentTermIds = await resolvePaymentTermIds(body);
     const listProvided = paymentTermIds !== null;
     const singleProvided = !listProvided && (body.paymentTermId !== undefined || body.paymentTermCode !== undefined || body.condPagto !== undefined || body.condPagtoCode !== undefined);
@@ -268,6 +437,16 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
           titlesOverdue: true,
           paymentTermId: true,
           paymentTerm: { select: { code: true, description: true } },
+          contacts: {
+            select: {
+              id: true,
+              description: true,
+              phone: true,
+              email: true,
+              isWhatsapp: true,
+            },
+            orderBy: [{ description: 'asc' }, { id: 'asc' }],
+          },
         },
       });
 
@@ -286,6 +465,8 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
         }
       }
 
+      await syncClientContacts(tx, row.id, contacts);
+
       return row;
     });
 
@@ -296,6 +477,13 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
       titlesOverdue: totals.titlesOverdue,
       paymentTermCode: updated.paymentTerm?.code ?? null,
       paymentTermDescription: updated.paymentTerm?.description ?? null,
+      contacts: (updated.contacts || []).map((contact) => ({
+        id: contact.id,
+        description: contact.description,
+        phone: contact.phone,
+        email: contact.email,
+        isWhatsapp: contact.isWhatsapp,
+      })),
     });
   } catch (err: any) {
     return NextResponse.json({ error: String(err?.message || err) }, { status: 500 });

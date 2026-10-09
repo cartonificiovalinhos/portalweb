@@ -12,6 +12,28 @@ function normalizeOptionalEmail(email: unknown): string | null {
   return value || null;
 }
 
+function validateUserIdentifier(doc: string | null, email: string | null): string | null {
+  if (!doc && !email) {
+    return 'Informe CPF/CNPJ ou E-mail.';
+  }
+  return null;
+}
+
+function mapUserWriteError(err: unknown): string | null {
+  const code = typeof err === 'object' && err !== null ? String((err as any).code || '') : '';
+  const message = String((err as any)?.message || err || '');
+  if (code === 'P2002' || message.includes('User_email_key')) {
+    const target = Array.isArray((err as any)?.meta?.target)
+      ? (err as any).meta.target.map((item: unknown) => String(item).toLowerCase())
+      : [];
+    if (target.includes('doc') || message.includes('User_doc_key')) {
+      return 'CPF/CNPJ já está vinculado a outro usuário.';
+    }
+    return 'E-mail já está vinculado a outro usuário.';
+  }
+  return null;
+}
+
 export async function GET(request: Request) {
   try {
     const url = new URL(request.url);
@@ -89,71 +111,71 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const data = await request.json();
-  const { name, password, erpIntegrationMode, salesRepAdmin } = data || {};
-  const abbrevName = (data as any)?.abbrevName != null ? String((data as any).abbrevName).trim().slice(0, 15) : null;
-  const doc = normalizeDoc(String((data as any)?.doc || '')) || null;
-  const email = normalizeOptionalEmail((data as any)?.email);
-  const passwordStr = String(password || '');
-  if (!passwordStr) return NextResponse.json({ error: 'password é obrigatório' }, { status: 400 });
-  const hashed = await bcrypt.hash(passwordStr, 10);
+  try {
+    const data = await request.json();
+    const { name, password, erpIntegrationMode, salesRepAdmin } = data || {};
+    const abbrevName = (data as any)?.abbrevName != null ? String((data as any).abbrevName).trim().slice(0, 15) : null;
+    const doc = normalizeDoc(String((data as any)?.doc || '')) || null;
+    const email = normalizeOptionalEmail((data as any)?.email);
+    const identifierError = validateUserIdentifier(doc, email);
+    if (identifierError) return NextResponse.json({ error: identifierError }, { status: 400 });
+    const passwordStr = String(password || '');
+    if (!passwordStr) return NextResponse.json({ error: 'password é obrigatório' }, { status: 400 });
+    const hashed = await bcrypt.hash(passwordStr, 10);
 
-  let finalEmail = email;
-  if (email) {
-    const found = await prisma.user
-      .findUnique({ where: { email: String(email) }, select: { doc: true } })
-      .catch(() => null);
-    if (found) {
-      const isSameUser = doc && found.doc === doc;
-      if (!isSameUser) finalEmail = null;
+    if (doc) {
+      const foundByDoc = await prisma.user.findUnique({
+        where: { doc },
+        select: { id: true },
+      }).catch(() => null);
+      if (foundByDoc) {
+        return NextResponse.json({ error: 'CPF/CNPJ já está vinculado a outro usuário.' }, { status: 400 });
+      }
     }
-  }
 
-  if (doc) {
-    const update: any = {
-      name: String(name || ''),
-      abbrevName,
-      email: finalEmail,
-      password: String(hashed),
-      erpIntegrationMode: String(erpIntegrationMode || 'TEST'),
-    };
-    if (salesRepAdmin !== undefined) update.salesRepAdmin = Boolean(salesRepAdmin);
+    const finalEmail = email;
+    if (email) {
+      const found = await prisma.user.findUnique({
+        where: { email: String(email) },
+        select: { id: true },
+      }).catch(() => null);
+      if (found) {
+        return NextResponse.json({ error: 'E-mail já está vinculado a outro usuário.' }, { status: 400 });
+      }
+    }
 
-    const create: any = {
-      name: String(name || ''),
-      abbrevName,
-      email: finalEmail,
-      password: String(hashed),
-      doc,
-      salesRepAdmin: Boolean(salesRepAdmin),
-      isSalesAdmin: false,
-      erpIntegrationMode: String(erpIntegrationMode || 'TEST'),
-    };
-    const upserted = await prisma.user.upsert({
-      where: { doc },
-      update,
-      create,
+    const created = await prisma.user.create({
+      data: {
+        name: String(name || ''),
+        abbrevName,
+        email: finalEmail,
+        password: hashed,
+        doc,
+        erpIntegrationMode: erpIntegrationMode || 'TEST',
+        salesRepAdmin: Boolean(salesRepAdmin),
+        isSalesAdmin: false,
+      },
       select: {
         id: true,
         name: true,
         abbrevName: true,
         email: true,
         doc: true,
+        createdAt: true,
+        updatedAt: true,
         salesRepAdmin: true,
         isSalesAdmin: true,
         erpIntegrationMode: true,
-        createdAt: true,
-        updatedAt: true,
-      },
+      }
     });
-    return NextResponse.json(upserted);
+    return NextResponse.json(created);
+  } catch (err: any) {
+    const mappedError = mapUserWriteError(err);
+    if (mappedError) {
+      return NextResponse.json({ error: mappedError }, { status: 400 });
+    }
+    return NextResponse.json({ error: String(err?.message || err) }, { status: 500 });
   }
-  
-  const created = await prisma.user.create({ 
-    data: { name, abbrevName, email: finalEmail, password: hashed, erpIntegrationMode: erpIntegrationMode || 'TEST', salesRepAdmin: Boolean(salesRepAdmin), isSalesAdmin: false },
-    select: { id: true, name: true, abbrevName: true, email: true, createdAt: true, updatedAt: true, salesRepAdmin: true, isSalesAdmin: true, erpIntegrationMode: true } 
-  });
-  return NextResponse.json(created);
 }
 
 export async function PATCH(request: Request) {
@@ -161,6 +183,12 @@ export async function PATCH(request: Request) {
     const body = await request.json().catch(() => ({} as any));
     const id = Number(body?.id);
     if (!id || Number.isNaN(id)) return NextResponse.json({ error: 'ID inválido' }, { status: 400 });
+
+    const current = await prisma.user.findUnique({
+      where: { id },
+      select: { id: true, doc: true, email: true },
+    });
+    if (!current) return NextResponse.json({ error: 'Usuário não encontrado' }, { status: 404 });
 
     const update: any = {};
     if (body.name !== undefined) update.name = String(body.name);
@@ -173,6 +201,31 @@ export async function PATCH(request: Request) {
     if (body.doc !== undefined) update.doc = normalizeDoc(String(body.doc || '')) || null;
     if (body.password !== undefined && String(body.password).length > 0) {
       update.password = await bcrypt.hash(String(body.password), 10);
+    }
+
+    const nextDoc = update.doc !== undefined ? update.doc : current.doc;
+    const nextEmail = update.email !== undefined ? update.email : current.email;
+    const identifierError = validateUserIdentifier(nextDoc, nextEmail);
+    if (identifierError) return NextResponse.json({ error: identifierError }, { status: 400 });
+
+    if (update.doc) {
+      const found = await prisma.user.findUnique({
+        where: { doc: String(update.doc) },
+        select: { id: true },
+      }).catch(() => null);
+      if (found && found.id !== id) {
+        return NextResponse.json({ error: 'CPF/CNPJ já está vinculado a outro usuário.' }, { status: 400 });
+      }
+    }
+
+    if (update.email) {
+      const found = await prisma.user.findUnique({
+        where: { email: String(update.email) },
+        select: { id: true },
+      }).catch(() => null);
+      if (found && found.id !== id) {
+        return NextResponse.json({ error: 'E-mail já está vinculado a outro usuário.' }, { status: 400 });
+      }
     }
 
     const updated = await prisma.user.update({
@@ -195,6 +248,10 @@ export async function PATCH(request: Request) {
     });
     return NextResponse.json({ ...updated, hasTwoFactorSecret: updated.twoFactorSecret != null });
   } catch (err: any) {
+    const mappedError = mapUserWriteError(err);
+    if (mappedError) {
+      return NextResponse.json({ error: mappedError }, { status: 400 });
+    }
     return NextResponse.json({ error: String(err?.message || err) }, { status: 500 });
   }
 }

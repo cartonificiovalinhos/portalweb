@@ -22,6 +22,7 @@ type SalesOrder = {
   status: string;
   orderDate: string;
   customerName: string;
+  clientOrderNumber?: string | null;
   entity?: { name: string };
   createdBy?: { id: number; name: string; abbrevName?: string | null } | null;
   subtotal: number;
@@ -260,7 +261,7 @@ export default function SalesOrdersPage() {
   const downloadVisibleGridAsExcel = useCallback(() => {
     const headers =
       viewMode === "order"
-        ? ["Número", "Entidade", "Cliente", "Data", "Peso KG", "Total em R$", "Situação", "Repres"]
+        ? ["Número", "Entidade", "Cliente", "Pedido/OC Cliente", "Data", "Peso KG", "Total em R$", "Situação", "Repres"]
         : ["Número", "Entidade", "Cliente", "Data", "SKU", "Descrição do item", "Medidas", "Quantidade", "Peso KG", "Total em R$", "Repres"];
 
     const rows =
@@ -269,6 +270,7 @@ export default function SalesOrdersPage() {
             order.code || order.id,
             order.entity?.name || "-",
             order.customerName || "-",
+            order.clientOrderNumber || "-",
             order.orderDate ? new Date(order.orderDate).toLocaleDateString("pt-BR") : "-",
             fmtWeight(displayOrderWeightKg(order)),
             fmtCurrency(displayTotalWithTax(order)),
@@ -570,7 +572,8 @@ export default function SalesOrdersPage() {
                 <div className="min-w-0">
                   <div className="font-mono text-xs text-gray-700">{o.code || o.id}</div>
                   <div className="text-sm font-medium text-gray-900 truncate">{o.customerName || '-'}</div>
-              <div className="text-xs text-gray-600 truncate">{String((o as any)?.createdBy?.abbrevName || '-')}</div>
+                  <div className="text-xs text-gray-600 truncate">Pedido/OC Cliente: {o.clientOrderNumber || '-'}</div>
+                  <div className="text-xs text-gray-600 truncate">{String((o as any)?.createdBy?.abbrevName || '-')}</div>
                   <div className="text-xs text-gray-600 truncate">{o.entity?.name || '-'}</div>
                 </div>
                 <span className={`shrink-0 px-2 py-0.5 rounded text-xs ${statusColor(statusLabelPt(o.status))}`}>{statusLabelPt(o.status)}</span>
@@ -667,6 +670,7 @@ export default function SalesOrdersPage() {
                     <th className="text-right px-3 py-2">Quantidade</th>
                   </>
                 )}
+                {viewMode === "order" && <th className="text-left px-3 py-2">Pedido/OC Cliente</th>}
                 {viewMode === "order" && <th className="text-left px-3 py-2">Data</th>}
                 <th className="text-right px-3 py-2">Peso KG</th>
                 <th className="text-right px-3 py-2">Total em R$</th>
@@ -677,16 +681,17 @@ export default function SalesOrdersPage() {
             </thead>
             <tbody>
               {loading && (
-                <tr><td colSpan={viewMode === "order" ? 8 : 11} className="px-3 py-4 text-center text-gray-500">Carregando...</td></tr>
+                <tr><td colSpan={viewMode === "order" ? 9 : 11} className="px-3 py-4 text-center text-gray-500">Carregando...</td></tr>
               )}
               {!loading && visibleCount === 0 && (
-                <tr><td colSpan={viewMode === "order" ? 8 : 11} className="px-3 py-4 text-center text-gray-500">Nenhum pedido encontrado.</td></tr>
+                <tr><td colSpan={viewMode === "order" ? 9 : 11} className="px-3 py-4 text-center text-gray-500">Nenhum pedido encontrado.</td></tr>
               )}
               {!loading && viewMode === "order" && pageOrders.map((o) => (
                 <tr key={o.id} className="border-t hover:bg-gray-50">
                   <td className="px-3 py-2 font-mono text-xs">{o.code || o.id}</td>
                   <td className="px-3 py-2 text-xs text-gray-600">{o.entity?.name || '-'}</td>
                   <td className="px-3 py-2">{o.customerName || '-'}</td>
+                  <td className="px-3 py-2 text-xs text-gray-700">{o.clientOrderNumber || '-'}</td>
                   <td className="px-3 py-2">{o.orderDate ? new Date(o.orderDate).toLocaleDateString('pt-BR') : '-'}</td>
                   <td className="px-3 py-2 text-right">{fmtWeight(displayOrderWeightKg(o))}</td>
                   <td className="px-3 py-2 text-right">

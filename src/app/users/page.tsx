@@ -44,6 +44,13 @@ export default function UsersPage() {
   }, [users, userQuery]);
   const allVisibleSelected = useMemo(() => filteredUsers.length > 0 && filteredUsers.every((u:any) => selectedIds.includes(u.id)), [filteredUsers, selectedIds]);
 
+  const validateIdentifier = useCallback(() => {
+    const doc = form.doc.replace(/\D+/g, "");
+    const email = form.email.trim();
+    if (!doc && !email) return "Informe CPF/CNPJ ou E-mail.";
+    return null;
+  }, [form.doc, form.email]);
+
   const loadUsers = useCallback(async () => {
     setLoading(true); setErr(null);
     try {
@@ -61,6 +68,11 @@ export default function UsersPage() {
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    const identifierError = validateIdentifier();
+    if (identifierError) {
+      setErr(identifierError);
+      return;
+    }
     setLoading(true); setErr(null);
     try {
       if (editingUserId) {
@@ -220,7 +232,7 @@ export default function UsersPage() {
       if (!res.ok) throw new Error(data?.error || `Erro ${res.status}`);
       setSelectedIds([]);
       setEditingUserId(null);
-      setForm({ name: "", email: "", password: "", doc: "" });
+      setForm({ name: "", abbrevName: "", email: "", password: "", doc: "" });
       await loadUsers();
       setSelectedUserId(null);
       setEntities([]);
@@ -415,6 +427,9 @@ export default function UsersPage() {
               {editingUserId && (
                 <button type="button" onClick={cancelEdit} className="px-4 py-2 border rounded">Cancelar</button>
               )}
+            </div>
+            <div className="text-xs text-gray-600 md:col-span-4">
+              Informe pelo menos um identificador: CPF/CNPJ ou E-mail.
             </div>
           </form>
         </div>

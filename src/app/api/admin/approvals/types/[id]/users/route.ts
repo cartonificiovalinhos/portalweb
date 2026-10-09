@@ -6,6 +6,27 @@ function normalizeText(value: unknown): string {
   return String(value || "").trim();
 }
 
+function isLeapYear(year: number): boolean {
+  if (year % 400 === 0) return true;
+  if (year % 100 === 0) return false;
+  return year % 4 === 0;
+}
+
+function isValidIsoDate(raw: string): boolean {
+  const match = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return false;
+
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+
+  if (!Number.isInteger(year) || !Number.isInteger(month) || !Number.isInteger(day)) return false;
+  if (month < 1 || month > 12) return false;
+
+  const daysInMonth = [31, isLeapYear(year) ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  return day >= 1 && day <= daysInMonth[month - 1];
+}
+
 function normalizeRangeValue(fieldType: string, value: unknown): { value: string | null; error?: string } {
   const raw = normalizeText(value);
   if (!raw) return { value: null };
@@ -21,14 +42,7 @@ function normalizeRangeValue(fieldType: string, value: unknown): { value: string
       return { value: String(numeric) };
     }
     case "DATE": {
-      const match = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-      if (!match) return { value: null, error: "Faixa deve ser uma data válida." };
-      const dt = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
-      if (
-        dt.getFullYear() !== Number(match[1]) ||
-        dt.getMonth() !== Number(match[2]) - 1 ||
-        dt.getDate() !== Number(match[3])
-      ) {
+      if (!isValidIsoDate(raw)) {
         return { value: null, error: "Faixa deve ser uma data válida." };
       }
       return { value: raw };
