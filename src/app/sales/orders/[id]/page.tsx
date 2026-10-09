@@ -89,6 +89,15 @@ type SalesOrderInvoice = {
   xmlFileName?: string | null;
 };
 
+type ClientContact = {
+  id: number;
+  description: string;
+  phone?: string | null;
+  isWhatsapp?: boolean;
+  email?: string | null;
+  statuses?: string[];
+};
+
 const parseCalendarDate = (value?: string | null) => {
   if (!value) return null;
   const raw = String(value).trim();
@@ -331,6 +340,10 @@ function normalizeDoc(doc?: string | null): string {
   return String(doc || '').replace(/\D+/g, '');
 }
 
+function normalizePhone(phone?: string | null): string {
+  return String(phone || '').replace(/\D+/g, '');
+}
+
 function normalizeDateOnly(value?: string | Date | null): string {
   if (!value) return '';
   const raw = String(value).trim();
@@ -387,6 +400,12 @@ export default function SalesOrderMaintenancePage() {
   const [integrating, setIntegrating] = useState(false);
   const [checkingEdit, setCheckingEdit] = useState(false);
   const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
+  const [clientContacts, setClientContacts] = useState<ClientContact[]>([]);
+  const [loadingContacts, setLoadingContacts] = useState(false);
+  const [shareChannel, setShareChannel] = useState<"email" | "whatsapp" | null>(null);
+  const [shareRecipient, setShareRecipient] = useState('');
+  const [shareError, setShareError] = useState<string | null>(null);
+  const [sendingShare, setSendingShare] = useState(false);
 
   const canEditOrder = isEditableStatus(order?.status);
 
@@ -629,6 +648,120 @@ export default function SalesOrderMaintenancePage() {
     };
   }, [idKey]);
 
+  useEffect(() => {
+    const clientId = Number(order?.clientId ?? 0);
+    if (!Number.isFinite(clientId) || clientId <= 0) {
+      setClientContacts([]);
+      return;
+    }
+
+    let cancelled = false;
+    setLoadingContacts(true);
+    fetch(`/api/clients/${clientId}/contacts`, { cache: 'no-store' })
+      .then(async (res) => {
+        const data = await res.json().catch(() => ([] as ClientContact[]));
+        if (!cancelled) {
+          setClientContacts(Array.isArray(data) ? data : []);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setClientContacts([]);
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingContacts(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [order?.clientId]);
+
+  const emailContacts = useMemo(
+    () => clientContacts.filter((contact) => String(contact.email || '').trim().length > 0),
+    [clientContacts],
+  );
+
+  const whatsappContacts = useMemo(
+    () => clientContacts.filter((contact) => normalizePhone(contact.phone).length > 0),
+    [clientContacts],
+  );
+
+  const closeShareModal = () => {
+    setShareChannel(null);
+    setShareRecipient('');
+    setShareError(null);
+    setSendingShare(false);
+  };
+
+  const openShareModal = (channel: "email" | "whatsapp") => {
+    setShareChannel(channel);
+    setShareError(null);
+    setShareRecipient(
+      channel === 'email'
+        ? String(emailContacts[0]?.email || '')
+        : String(whatsappContacts[0]?.phone || ''),
+    );
+  };
+
+  const handleShareMirror = async () => {
+    if (!order?.id || !shareChannel) return;
+
+    if (shareChannel === 'email') {
+      const to = String(shareRecipient || '').trim();
+      if (!to) {
+        setShareError('Informe o e-mail de destino.');
+        return;
+      }
+
+      setSendingShare(true);
+      setShareError(null);
+      try {
+        const res = await fetch(`/api/sales/orders/${order.id}/send-mirror-email`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ to }),
+        });
+        const data = await res.json().catch(() => ({} as any));
+        if (!res.ok) {
+          throw new Error(data?.error || `Erro ${res.status}`);
+        }
+        alert(`Espelho enviado por e-mail para ${to}.`);
+        closeShareModal();
+      } catch (err: any) {
+        setShareError(err?.message || String(err));
+      } finally {
+        setSendingShare(false);
+      }
+      return;
+    }
+
+    const phone = normalizePhone(shareRecipient);
+    if (!phone) {
+      setShareError('Informe um número de WhatsApp válido.');
+      return;
+    }
+
+    setSendingShare(true);
+    setShareError(null);
+    try {
+      const res = await fetch(`/api/sales/orders/${order.id}/mirror-share`, { cache: 'no-store' });
+      const data = await res.json().catch(() => ({} as any));
+      if (!res.ok) {
+        throw new Error(data?.error || `Erro ${res.status}`);
+      }
+
+      const text =
+        `Olá, segue o espelho do pedido ${order.code || order.id}.\n` +
+        `Cliente: ${order.customerName || '-'}\n` +
+        `Link seguro: ${String(data?.url || '')}`;
+      window.open(`https://wa.me/${phone}?text=${encodeURIComponent(text)}`, '_blank', 'noopener,noreferrer');
+      closeShareModal();
+    } catch (err: any) {
+      setShareError(err?.message || String(err));
+      setSendingShare(false);
+    }
+  };
+
   const fmtCurrency = (n: number | undefined) => (n ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
   const fmtNumber = (n: number | undefined) => (n ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const fmtInt = (n: number | undefined) => Math.round(n ?? 0).toLocaleString('pt-BR', { maximumFractionDigits: 0 });
@@ -818,6 +951,94 @@ export default function SalesOrderMaintenancePage() {
         </div>
       )}
 
+      {shareChannel && order && (
+        <div className="fixed inset-0 z-50 bg-black bg-opacity-30 flex items-center justify-center p-4" onClick={closeShareModal}>
+          <div
+            className="bg-white w-full max-w-lg rounded shadow-lg"
+            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-label={shareChannel === 'email' ? 'Enviar espelho por e-mail' : 'Enviar espelho por WhatsApp'}
+          >
+            <div className="px-4 py-3 border-b flex items-center">
+              <div className="font-semibold">
+                {shareChannel === 'email' ? 'Enviar espelho por e-mail' : 'Enviar espelho por WhatsApp'}
+              </div>
+              <button className="ml-auto text-gray-500 hover:text-black" onClick={closeShareModal} aria-label="Fechar">×</button>
+            </div>
+            <div className="p-4 space-y-4">
+              <div className="text-sm text-gray-700">
+                {shareChannel === 'email'
+                  ? `O espelho do pedido ${order.code || order.id} será enviado em PDF, com link seguro no corpo do e-mail.`
+                  : `O WhatsApp abrirá com uma mensagem pronta contendo o link seguro do espelho do pedido ${order.code || order.id}.`}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  {shareChannel === 'email' ? 'E-mail de destino' : 'Número de WhatsApp'}
+                </label>
+                <input
+                  className="w-full border rounded px-3 py-2"
+                  type={shareChannel === 'email' ? 'email' : 'text'}
+                  inputMode={shareChannel === 'email' ? 'email' : 'tel'}
+                  placeholder={shareChannel === 'email' ? 'nome@empresa.com.br' : '5511999999999'}
+                  value={shareRecipient}
+                  onChange={(e) => setShareRecipient(e.target.value)}
+                />
+              </div>
+
+              <div>
+                <div className="text-xs font-medium text-gray-600 mb-2">Sugestões dos contatos do cliente</div>
+                {loadingContacts ? (
+                  <div className="text-xs text-gray-500">Carregando contatos...</div>
+                ) : (shareChannel === 'email' ? emailContacts : whatsappContacts).length === 0 ? (
+                  <div className="text-xs text-gray-500">Nenhum contato compatível encontrado para este cliente.</div>
+                ) : (
+                  <div className="flex flex-wrap gap-2">
+                    {(shareChannel === 'email' ? emailContacts : whatsappContacts).map((contact) => {
+                      const value = shareChannel === 'email'
+                        ? String(contact.email || '')
+                        : String(contact.phone || '');
+                      return (
+                        <button
+                          key={contact.id}
+                          type="button"
+                          className="px-2 py-1 text-xs border rounded bg-white hover:bg-gray-50 text-left"
+                          onClick={() => setShareRecipient(value)}
+                        >
+                          {contact.description}: {value}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {shareError && (
+                <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded px-3 py-2">{shareError}</div>
+              )}
+
+              {shareChannel === 'whatsapp' && (
+                <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-3 py-2">
+                  Neste primeiro passo, o WhatsApp compartilha o link seguro do espelho. O envio automatizado pelo mesmo caminho do `chatboot`
+                  depende da decisão sobre reaproveitar a Evolution API centralizada.
+                </div>
+              )}
+            </div>
+            <div className="px-4 py-3 border-t flex items-center justify-end gap-2">
+              <button className="px-3 py-1.5 border rounded hover:bg-gray-100" onClick={closeShareModal}>Cancelar</button>
+              <button
+                className={`px-3 py-1.5 rounded text-white ${shareChannel === 'email' ? 'bg-blue-600 hover:bg-blue-700' : 'bg-green-600 hover:bg-green-700'} ${sendingShare ? 'opacity-60 cursor-not-allowed' : ''}`}
+                onClick={handleShareMirror}
+                disabled={sendingShare}
+              >
+                {sendingShare ? 'Enviando...' : shareChannel === 'email' ? 'Enviar e-mail' : 'Abrir WhatsApp'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {order && (
         <div className="space-y-3">
           {/* Header do pedido com ícones à direita */}
@@ -847,6 +1068,27 @@ export default function SalesOrderMaintenancePage() {
                         <path d="M6 9V3h12v6"></path>
                         <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
                         <rect x="6" y="14" width="12" height="8"></rect>
+                      </svg>
+                    </button>
+                    <button
+                      className={ICON_BTN}
+                      title="Enviar espelho por e-mail"
+                      aria-label="Enviar espelho por e-mail"
+                      onClick={() => openShareModal('email')}
+                    >
+                      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z"></path>
+                        <path d="m22 6-10 7L2 6"></path>
+                      </svg>
+                    </button>
+                    <button
+                      className={ICON_BTN}
+                      title="Enviar espelho por WhatsApp"
+                      aria-label="Enviar espelho por WhatsApp"
+                      onClick={() => openShareModal('whatsapp')}
+                    >
+                      <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                        <path d="M20.52 3.48A11.8 11.8 0 0 0 12.12 0C5.54 0 .2 5.34.2 11.92c0 2.1.55 4.16 1.59 5.98L0 24l6.27-1.64a11.84 11.84 0 0 0 5.85 1.49h.01c6.58 0 11.92-5.34 11.92-11.92 0-3.18-1.24-6.17-3.53-8.45Zm-8.4 18.39h-.01a9.86 9.86 0 0 1-5.02-1.38l-.36-.21-3.72.97 1-3.63-.24-.37a9.85 9.85 0 0 1-1.53-5.33c0-5.46 4.43-9.89 9.89-9.89 2.64 0 5.12 1.03 6.99 2.9a9.82 9.82 0 0 1 2.9 6.99c0 5.45-4.44 9.89-9.9 9.89Zm5.42-7.42c-.3-.15-1.77-.88-2.05-.98-.27-.1-.47-.15-.67.15-.2.3-.77.98-.95 1.18-.17.2-.35.22-.65.08-.3-.15-1.26-.46-2.4-1.48-.89-.79-1.49-1.77-1.66-2.07-.17-.3-.02-.46.13-.61.14-.14.3-.35.45-.52.15-.17.2-.3.3-.5.1-.2.05-.37-.03-.52-.08-.15-.67-1.62-.92-2.23-.24-.58-.48-.5-.67-.5h-.57c-.2 0-.52.08-.8.37-.27.3-1.04 1.02-1.04 2.48s1.07 2.87 1.22 3.07c.15.2 2.1 3.2 5.08 4.48.71.31 1.26.49 1.69.63.71.22 1.36.19 1.87.11.57-.08 1.77-.72 2.02-1.42.25-.7.25-1.3.17-1.42-.07-.12-.27-.2-.57-.35Z"></path>
                       </svg>
                     </button>
                     <button className={`${ICON_BTN} ${integrating || !isEditableStatus(order?.status) || isHeaderEditing ? 'opacity-50 cursor-not-allowed' : ''}`} title="Enviar para ERP" aria-label="Enviar para ERP" disabled={integrating || !isEditableStatus(order?.status) || isHeaderEditing} style={{ opacity: integrating || !isEditableStatus(order?.status) || isHeaderEditing ? 0.5 : 1, pointerEvents: integrating || !isEditableStatus(order?.status) || isHeaderEditing ? 'none' : 'auto' }} onClick={async () => {

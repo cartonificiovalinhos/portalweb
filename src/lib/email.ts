@@ -1,7 +1,16 @@
 import nodemailer from 'nodemailer';
 import { prisma } from './prisma';
 
-export async function sendEmail(options: { to: string; subject: string; html: string }) {
+export async function sendEmail(options: {
+  to: string;
+  subject: string;
+  html: string;
+  attachments?: Array<{
+    filename: string;
+    content: Buffer | string;
+    contentType?: string;
+  }>;
+}) {
   // Fetch SMTP settings
   const settings = await prisma.systemSetting.findMany({
     where: {
@@ -17,6 +26,9 @@ export async function sendEmail(options: { to: string; subject: string; html: st
     console.log(`To: ${options.to}`);
     console.log(`Subject: ${options.subject}`);
     console.log(`Content: ${options.html}`);
+    if (options.attachments?.length) {
+      console.log(`Attachments: ${options.attachments.map((item) => item.filename).join(', ')}`);
+    }
     return false;
   }
 
@@ -38,7 +50,8 @@ export async function sendEmail(options: { to: string; subject: string; html: st
       from: config.senderEmail || config.smtpUser,
       to: options.to,
       subject: options.subject,
-      html: options.html
+      html: options.html,
+      attachments: options.attachments,
     });
     console.log('[Email] Enviado:', info.messageId);
     return true;
