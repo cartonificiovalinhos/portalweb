@@ -715,11 +715,14 @@ export default function SalesOrderMaintenancePage() {
 
       setSendingShare(true);
       setShareError(null);
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 30000);
       try {
         const res = await fetch(`/api/sales/orders/${order.id}/send-mirror-email`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ to }),
+          signal: controller.signal,
         });
         const data = await res.json().catch(() => ({} as any));
         if (!res.ok) {
@@ -728,8 +731,13 @@ export default function SalesOrderMaintenancePage() {
         alert(`Espelho enviado por e-mail para ${to}.`);
         closeShareModal();
       } catch (err: any) {
-        setShareError(err?.message || String(err));
+        if (err?.name === 'AbortError') {
+          setShareError('O envio do e-mail excedeu o tempo limite. Verifique a configuração SMTP e tente novamente.');
+        } else {
+          setShareError(err?.message || String(err));
+        }
       } finally {
+        clearTimeout(timeout);
         setSendingShare(false);
       }
       return;

@@ -3,6 +3,27 @@ import net from 'node:net';
 import nodemailer from 'nodemailer';
 import { prisma } from './prisma';
 
+const SMTP_DNS_TIMEOUT_MS = 5000;
+const SMTP_CONNECTION_TIMEOUT_MS = 10000;
+const SMTP_GREETING_TIMEOUT_MS = 10000;
+const SMTP_SOCKET_TIMEOUT_MS = 20000;
+
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number, errorMessage: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(errorMessage)), timeoutMs);
+    promise.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (error) => {
+        clearTimeout(timer);
+        reject(error);
+      },
+    );
+  });
+}
+
 async function resolveSmtpConnectionTarget(host: string): Promise<{ connectHost: string; tlsServername?: string; family?: 4 }> {
   const trimmedHost = String(host || '').trim();
   if (!trimmedHost) {
@@ -18,7 +39,11 @@ async function resolveSmtpConnectionTarget(host: string): Promise<{ connectHost:
   }
 
   try {
-    const ipv4List = await dns.resolve4(trimmedHost);
+    const ipv4List = await withTimeout(
+      dns.resolve4(trimmedHost),
+      SMTP_DNS_TIMEOUT_MS,
+      'Timeout ao resolver o host SMTP.',
+    );
     const preferredIpv4 = ipv4List.find((item) => String(item || '').trim().length > 0);
     if (preferredIpv4) {
       return {
@@ -72,6 +97,10 @@ export async function sendEmail(options: {
     port: Number(config.smtpPort) || 587,
     secure: config.smtpSsl === 'true',
     family: target.family,
+    connectionTimeout: SMTP_CONNECTION_TIMEOUT_MS,
+    greetingTimeout: SMTP_GREETING_TIMEOUT_MS,
+    socketTimeout: SMTP_SOCKET_TIMEOUT_MS,
+    dnsTimeout: SMTP_DNS_TIMEOUT_MS,
     auth: {
       user: config.smtpUser,
       pass: config.smtpPass
@@ -83,18 +112,24 @@ export async function sendEmail(options: {
   });
 
   try {
-    const info = await transport.sendMail({
-      from: config.senderEmail || config.smtpUser,
-      to: options.to,
-      subject: options.subject,
-      html: options.html,
-      attachments: options.attachments,
-    });
+    const info = await withTimeout(
+      transport.sendMail({
+        from: config.senderEmail || config.smtpUser,
+        to: options.to,
+        subject: options.subject,
+        html: options.html,
+        attachments: options.attachments,
+      }),
+      SMTP_SOCKET_TIMEOUT_MS + 2000,
+      'Timeout ao enviar e-mail. Verifique a configuração SMTP e tente novamente.',
+    );
     console.log('[Email] Enviado:', info.messageId);
     return true;
   } catch (err) {
     console.error('[Email] Erro ao enviar:', err);
     throw err;
+  } finally {
+    transport.close();
   }
 }
 
