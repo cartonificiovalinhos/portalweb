@@ -8,12 +8,39 @@ import { makeSalesOrderPublicMirrorCode, salesOrderMirrorInclude } from '../../.
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
+const DEBUG_EMAIL_RECIPIENT = 'ti@cartonificiovalinhos.com.br';
 
 function isValidEmail(value: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 }
 
+function formatEmailSendError(err: any): string {
+  const lines: string[] = [];
+  const message = String(err?.message || err || 'Erro ao enviar espelho por e-mail').trim();
+  lines.push(message);
+
+  const details: Array<[string, unknown]> = [
+    ['code', err?.code],
+    ['command', err?.command],
+    ['responseCode', err?.responseCode],
+    ['response', err?.response],
+    ['errno', err?.errno],
+    ['syscall', err?.syscall],
+    ['address', err?.address],
+    ['port', err?.port],
+  ];
+
+  for (const [label, value] of details) {
+    if (value !== undefined && value !== null && String(value).trim() !== '') {
+      lines.push(`${label}: ${String(value)}`);
+    }
+  }
+
+  return lines.join('\n');
+}
+
 export async function POST(request: Request, props: { params: Promise<{ id: string }> }) {
+  let to = '';
   try {
     const params = await props.params;
     const session = await getServerSession(authOptions);
@@ -25,7 +52,7 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
     }
 
     const body = await request.json().catch(() => ({} as any));
-    const to = String(body?.to || '').trim().toLowerCase();
+    to = String(body?.to || '').trim().toLowerCase();
     if (!to || !isValidEmail(to)) {
       return Response.json({ error: 'Informe um e-mail válido.' }, { status: 400 });
     }
@@ -75,6 +102,10 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
 
     return Response.json({ ok: true, to, fileName, publicUrl });
   } catch (err: any) {
-    return Response.json({ error: String(err?.message || err || 'Erro ao enviar espelho por e-mail') }, { status: 500 });
+    const error =
+      to === DEBUG_EMAIL_RECIPIENT
+        ? formatEmailSendError(err)
+        : String(err?.message || err || 'Erro ao enviar espelho por e-mail');
+    return Response.json({ error }, { status: 500 });
   }
 }
