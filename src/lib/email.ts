@@ -91,11 +91,15 @@ export async function sendEmail(options: {
   }
 
   const target = await resolveSmtpConnectionTarget(config.smtpHost);
+  const useSsl = config.smtpSsl === 'true';
+  const useTls = config.smtpTls === 'true';
 
   const transport = nodemailer.createTransport({
     host: target.connectHost || config.smtpHost,
     port: Number(config.smtpPort) || 587,
-    secure: config.smtpSsl === 'true',
+    secure: useSsl,
+    requireTLS: !useSsl && useTls,
+    ignoreTLS: !useSsl && !useTls,
     family: target.family,
     connectionTimeout: SMTP_CONNECTION_TIMEOUT_MS,
     greetingTimeout: SMTP_GREETING_TIMEOUT_MS,
