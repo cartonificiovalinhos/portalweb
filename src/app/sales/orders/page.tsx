@@ -22,6 +22,7 @@ type SalesOrder = {
   status: string;
   orderDate: string;
   customerName: string;
+  erpOrderNumber?: string | null;
   clientOrderNumber?: string | null;
   entity?: { name: string };
   createdBy?: { id: number; name: string; abbrevName?: string | null } | null;
@@ -261,13 +262,14 @@ export default function SalesOrdersPage() {
   const downloadVisibleGridAsExcel = useCallback(() => {
     const headers =
       viewMode === "order"
-        ? ["Número", "Entidade", "Cliente", "Pedido/OC Cliente", "Data", "Peso KG", "Total em R$", "Situação", "Repres"]
-        : ["Número", "Entidade", "Cliente", "Data", "SKU", "Descrição do item", "Medidas", "Quantidade", "Peso KG", "Total em R$", "Repres"];
+        ? ["Número", "Pedido ERP", "Entidade", "Cliente", "Pedido/OC Cliente", "Data", "Peso KG", "Total em R$", "Situação", "Repres"]
+        : ["Número", "Pedido ERP", "Entidade", "Cliente", "Data", "SKU", "Descrição do item", "Medidas", "Quantidade", "Peso KG", "Total em R$", "Repres"];
 
     const rows =
       viewMode === "order"
         ? pageOrders.map((order) => [
             order.code || order.id,
+            order.erpOrderNumber || "-",
             order.entity?.name || "-",
             order.customerName || "-",
             order.clientOrderNumber || "-",
@@ -279,6 +281,7 @@ export default function SalesOrdersPage() {
           ])
         : pageItemRows.map((row) => [
             row.order.code || row.order.id,
+            row.order.erpOrderNumber || "-",
             row.order.entity?.name || "-",
             row.order.customerName || "-",
             row.order.orderDate ? new Date(row.order.orderDate).toLocaleDateString("pt-BR") : "-",
@@ -572,6 +575,7 @@ export default function SalesOrdersPage() {
                 <div className="min-w-0">
                   <div className="font-mono text-xs text-gray-700">{o.code || o.id}</div>
                   <div className="text-sm font-medium text-gray-900 truncate">{o.customerName || '-'}</div>
+                  <div className="text-xs text-gray-600 truncate">Pedido ERP: {o.erpOrderNumber || '-'}</div>
                   <div className="text-xs text-gray-600 truncate">Pedido/OC Cliente: {o.clientOrderNumber || '-'}</div>
                   <div className="text-xs text-gray-600 truncate">{String((o as any)?.createdBy?.abbrevName || '-')}</div>
                   <div className="text-xs text-gray-600 truncate">{o.entity?.name || '-'}</div>
@@ -636,6 +640,7 @@ export default function SalesOrdersPage() {
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <div className="font-mono text-xs text-gray-700">{row.order.code || row.order.id}</div>
+                  <div className="text-xs text-gray-600 truncate">Pedido ERP: {row.order.erpOrderNumber || '-'}</div>
                   <div className="text-xs text-gray-600 truncate">{row.order.customerName || '-'}</div>
                   <div className="text-xs text-gray-600 truncate">{String((row.order as any)?.createdBy?.abbrevName || '-')}</div>
                   <div className="text-xs text-gray-600 truncate">{row.order.orderDate ? new Date(row.order.orderDate).toLocaleDateString('pt-BR') : '-'}</div>
@@ -659,6 +664,7 @@ export default function SalesOrdersPage() {
             <thead className="bg-gray-100 text-gray-700">
               <tr>
                 <th className="text-left px-3 py-2">Número</th>
+                <th className="text-left px-3 py-2">Pedido ERP</th>
                 <th className="text-left px-3 py-2">Entidade</th>
                 <th className="text-left px-3 py-2">Cliente</th>
                 {viewMode === "item" && (
@@ -681,14 +687,15 @@ export default function SalesOrdersPage() {
             </thead>
             <tbody>
               {loading && (
-                <tr><td colSpan={viewMode === "order" ? 9 : 11} className="px-3 py-4 text-center text-gray-500">Carregando...</td></tr>
+                <tr><td colSpan={viewMode === "order" ? 10 : 12} className="px-3 py-4 text-center text-gray-500">Carregando...</td></tr>
               )}
               {!loading && visibleCount === 0 && (
-                <tr><td colSpan={viewMode === "order" ? 9 : 11} className="px-3 py-4 text-center text-gray-500">Nenhum pedido encontrado.</td></tr>
+                <tr><td colSpan={viewMode === "order" ? 10 : 12} className="px-3 py-4 text-center text-gray-500">Nenhum pedido encontrado.</td></tr>
               )}
               {!loading && viewMode === "order" && pageOrders.map((o) => (
                 <tr key={o.id} className="border-t hover:bg-gray-50">
                   <td className="px-3 py-2 font-mono text-xs">{o.code || o.id}</td>
+                  <td className="px-3 py-2 font-mono text-xs">{o.erpOrderNumber || '-'}</td>
                   <td className="px-3 py-2 text-xs text-gray-600">{o.entity?.name || '-'}</td>
                   <td className="px-3 py-2">{o.customerName || '-'}</td>
                   <td className="px-3 py-2 text-xs text-gray-700">{o.clientOrderNumber || '-'}</td>
@@ -748,6 +755,7 @@ export default function SalesOrdersPage() {
               {!loading && viewMode === "item" && pageItemRows.map((row) => (
                 <tr key={row.rowId} className="border-t hover:bg-gray-50">
                   <td className="px-3 py-2 font-mono text-xs">{row.order.code || row.order.id}</td>
+                  <td className="px-3 py-2 font-mono text-xs">{row.order.erpOrderNumber || '-'}</td>
                   <td className="px-3 py-2 text-xs text-gray-600">{row.order.entity?.name || '-'}</td>
                   <td className="px-3 py-2">{row.order.customerName || '-'}</td>
                   <td className="px-3 py-2">{row.order.orderDate ? new Date(row.order.orderDate).toLocaleDateString('pt-BR') : '-'}</td>
