@@ -1026,12 +1026,6 @@ export default function SalesOrderMaintenancePage() {
                 <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded px-3 py-2">{shareError}</div>
               )}
 
-              {shareChannel === 'whatsapp' && (
-                <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-3 py-2">
-                  Neste primeiro passo, o WhatsApp compartilha o link seguro do espelho. O envio automatizado pelo mesmo caminho do `chatboot`
-                  depende da decisão sobre reaproveitar a Evolution API centralizada.
-                </div>
-              )}
             </div>
             <div className="px-4 py-3 border-t flex items-center justify-end gap-2">
               <button className="px-3 py-1.5 border rounded hover:bg-gray-100" onClick={closeShareModal}>Cancelar</button>
