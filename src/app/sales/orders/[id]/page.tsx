@@ -529,7 +529,7 @@ export default function SalesOrderMaintenancePage() {
         name: item.name,
         sku: item.sku,
         unit: item.unit,
-        quantity: 1,
+        quantity: 0,
         unitPrice: Math.max(Number(item.unitPrice ?? 0), minUnitPrice),
         discountPct: 0,
         width: item.width,
@@ -753,7 +753,7 @@ export default function SalesOrderMaintenancePage() {
       const text =
         `Olá, segue o espelho do pedido ${order.code || order.id}.\n` +
         `Cliente: ${order.customerName || '-'}\n` +
-        `Link seguro: ${String(data?.url || '')}`;
+        `Abrir Espelho Pedido:\n${String(data?.url || '')}`;
       window.open(`https://wa.me/${phone}?text=${encodeURIComponent(text)}`, '_blank', 'noopener,noreferrer');
       closeShareModal();
     } catch (err: any) {
@@ -1057,41 +1057,9 @@ export default function SalesOrderMaintenancePage() {
                     </button>
                   </div>
 
-                  <div className="flex items-center gap-2 sm:justify-end">
-                    <button
-                      className={ICON_BTN}
-                      title="Imprimir pedido"
-                      aria-label="Imprimir pedido"
-                      onClick={openMirrorPdf}
-                    >
-                      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M6 9V3h12v6"></path>
-                        <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
-                        <rect x="6" y="14" width="12" height="8"></rect>
-                      </svg>
-                    </button>
-                    <button
-                      className={ICON_BTN}
-                      title="Enviar espelho por e-mail"
-                      aria-label="Enviar espelho por e-mail"
-                      onClick={() => openShareModal('email')}
-                    >
-                      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z"></path>
-                        <path d="m22 6-10 7L2 6"></path>
-                      </svg>
-                    </button>
-                    <button
-                      className={ICON_BTN}
-                      title="Enviar espelho por WhatsApp"
-                      aria-label="Enviar espelho por WhatsApp"
-                      onClick={() => openShareModal('whatsapp')}
-                    >
-                      <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
-                        <path d="M20.52 3.48A11.8 11.8 0 0 0 12.12 0C5.54 0 .2 5.34.2 11.92c0 2.1.55 4.16 1.59 5.98L0 24l6.27-1.64a11.84 11.84 0 0 0 5.85 1.49h.01c6.58 0 11.92-5.34 11.92-11.92 0-3.18-1.24-6.17-3.53-8.45Zm-8.4 18.39h-.01a9.86 9.86 0 0 1-5.02-1.38l-.36-.21-3.72.97 1-3.63-.24-.37a9.85 9.85 0 0 1-1.53-5.33c0-5.46 4.43-9.89 9.89-9.89 2.64 0 5.12 1.03 6.99 2.9a9.82 9.82 0 0 1 2.9 6.99c0 5.45-4.44 9.89-9.9 9.89Zm5.42-7.42c-.3-.15-1.77-.88-2.05-.98-.27-.1-.47-.15-.67.15-.2.3-.77.98-.95 1.18-.17.2-.35.22-.65.08-.3-.15-1.26-.46-2.4-1.48-.89-.79-1.49-1.77-1.66-2.07-.17-.3-.02-.46.13-.61.14-.14.3-.35.45-.52.15-.17.2-.3.3-.5.1-.2.05-.37-.03-.52-.08-.15-.67-1.62-.92-2.23-.24-.58-.48-.5-.67-.5h-.57c-.2 0-.52.08-.8.37-.27.3-1.04 1.02-1.04 2.48s1.07 2.87 1.22 3.07c.15.2 2.1 3.2 5.08 4.48.71.31 1.26.49 1.69.63.71.22 1.36.19 1.87.11.57-.08 1.77-.72 2.02-1.42.25-.7.25-1.3.17-1.42-.07-.12-.27-.2-.57-.35Z"></path>
-                      </svg>
-                    </button>
-                    <button className={`${ICON_BTN} ${integrating || !isEditableStatus(order?.status) || isHeaderEditing ? 'opacity-50 cursor-not-allowed' : ''}`} title="Enviar para ERP" aria-label="Enviar para ERP" disabled={integrating || !isEditableStatus(order?.status) || isHeaderEditing} style={{ opacity: integrating || !isEditableStatus(order?.status) || isHeaderEditing ? 0.5 : 1, pointerEvents: integrating || !isEditableStatus(order?.status) || isHeaderEditing ? 'none' : 'auto' }} onClick={async () => {
+                  <div className="flex flex-col items-stretch sm:items-end gap-2">
+                    <div className="flex items-center gap-2 sm:justify-end border border-gray-200 rounded-md bg-gray-50 px-2 py-2 shadow-sm">
+                      <button className={`${ICON_BTN} ${integrating || !isEditableStatus(order?.status) || isHeaderEditing ? 'opacity-50 cursor-not-allowed' : ''}`} title="Enviar para ERP" aria-label="Enviar para ERP" disabled={integrating || !isEditableStatus(order?.status) || isHeaderEditing} style={{ opacity: integrating || !isEditableStatus(order?.status) || isHeaderEditing ? 0.5 : 1, pointerEvents: integrating || !isEditableStatus(order?.status) || isHeaderEditing ? 'none' : 'auto' }} onClick={async () => {
                   if (!order) return;
                   try {
                     const hasDiscount = (orderItems || []).some((it) => Number((it as any)?.discountPct ?? 0) > 0);
@@ -1272,6 +1240,43 @@ export default function SalesOrderMaintenancePage() {
                     )}
                   </button>
                     )}
+                    </div>
+
+                    <div className="flex items-center gap-2 sm:justify-end border border-gray-200 rounded-md bg-gray-50 px-2 py-2 shadow-sm">
+                      <button
+                        className={ICON_BTN}
+                        title="Imprimir pedido"
+                        aria-label="Imprimir pedido"
+                        onClick={openMirrorPdf}
+                      >
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M6 9V3h12v6"></path>
+                          <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
+                          <rect x="6" y="14" width="12" height="8"></rect>
+                        </svg>
+                      </button>
+                      <button
+                        className={ICON_BTN}
+                        title="Enviar espelho por e-mail"
+                        aria-label="Enviar espelho por e-mail"
+                        onClick={() => openShareModal('email')}
+                      >
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z"></path>
+                          <path d="m22 6-10 7L2 6"></path>
+                        </svg>
+                      </button>
+                      <button
+                        className={ICON_BTN}
+                        title="Enviar espelho por WhatsApp"
+                        aria-label="Enviar espelho por WhatsApp"
+                        onClick={() => openShareModal('whatsapp')}
+                      >
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                          <path d="M20.52 3.48A11.8 11.8 0 0 0 12.12 0C5.54 0 .2 5.34.2 11.92c0 2.1.55 4.16 1.59 5.98L0 24l6.27-1.64a11.84 11.84 0 0 0 5.85 1.49h.01c6.58 0 11.92-5.34 11.92-11.92 0-3.18-1.24-6.17-3.53-8.45Zm-8.4 18.39h-.01a9.86 9.86 0 0 1-5.02-1.38l-.36-.21-3.72.97 1-3.63-.24-.37a9.85 9.85 0 0 1-1.53-5.33c0-5.46 4.43-9.89 9.89-9.89 2.64 0 5.12 1.03 6.99 2.9a9.82 9.82 0 0 1 2.9 6.99c0 5.45-4.44 9.89-9.9 9.89Zm5.42-7.42c-.3-.15-1.77-.88-2.05-.98-.27-.1-.47-.15-.67.15-.2.3-.77.98-.95 1.18-.17.2-.35.22-.65.08-.3-.15-1.26-.46-2.4-1.48-.89-.79-1.49-1.77-1.66-2.07-.17-.3-.02-.46.13-.61.14-.14.3-.35.45-.52.15-.17.2-.3.3-.5.1-.2.05-.37-.03-.52-.08-.15-.67-1.62-.92-2.23-.24-.58-.48-.5-.67-.5h-.57c-.2 0-.52.08-.8.37-.27.3-1.04 1.02-1.04 2.48s1.07 2.87 1.22 3.07c.15.2 2.1 3.2 5.08 4.48.71.31 1.26.49 1.69.63.71.22 1.36.19 1.87.11.57-.08 1.77-.72 2.02-1.42.25-.7.25-1.3.17-1.42-.07-.12-.27-.2-.57-.35Z"></path>
+                        </svg>
+                      </button>
+                    </div>
                   </div>
                 </div>
                 <div className="mt-2 sm:hidden">

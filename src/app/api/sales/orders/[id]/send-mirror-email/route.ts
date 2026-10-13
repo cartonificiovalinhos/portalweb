@@ -2,6 +2,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '../../../../../../lib/auth';
 import { sendEmail } from '../../../../../../lib/email';
 import { prisma } from '../../../../../../lib/prisma';
+import { buildPublicUrl } from '../../../../../../lib/public-url';
 import { renderSalesOrderPdf, salesOrderPdfFileName } from '../../../../../../lib/sales-order-pdf';
 import { makeSalesOrderPublicMirrorCode, salesOrderMirrorInclude } from '../../../../../../lib/sales-order-share';
 
@@ -40,7 +41,7 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
     const pdf = await renderSalesOrderPdf(order);
     const fileName = salesOrderPdfFileName(order);
     const publicCode = makeSalesOrderPublicMirrorCode(Math.trunc(id));
-    const publicUrl = new URL(`/${publicCode}`, request.url).toString();
+    const publicUrl = buildPublicUrl(request, `/${publicCode}`);
 
     const subject = `Espelho do pedido ${order.code || order.id}`;
     const customerName = String(order.customerName || '').trim() || '-';
@@ -59,8 +60,8 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
             <strong>Data do pedido:</strong> ${orderDate}<br />
             <strong>Total:</strong> ${total}
           </p>
-          <p>Se preferir, você também pode acessar o espelho por este link seguro:</p>
-          <p><a href="${publicUrl}">${publicUrl}</a></p>
+          <p>Se preferir, você também pode acessar o espelho pelo link abaixo:</p>
+          <p><a href="${publicUrl}">Abrir Espelho Pedido</a></p>
         </div>
       `,
       attachments: [

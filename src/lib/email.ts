@@ -1,5 +1,38 @@
+import dns from 'node:dns/promises';
+import net from 'node:net';
 import nodemailer from 'nodemailer';
 import { prisma } from './prisma';
+
+async function resolveSmtpConnectionTarget(host: string): Promise<{ connectHost: string; tlsServername?: string; family?: 4 }> {
+  const trimmedHost = String(host || '').trim();
+  if (!trimmedHost) {
+    return { connectHost: '' };
+  }
+
+  if (net.isIP(trimmedHost) === 4) {
+    return { connectHost: trimmedHost, family: 4 };
+  }
+
+  if (net.isIP(trimmedHost) === 6) {
+    return { connectHost: trimmedHost };
+  }
+
+  try {
+    const ipv4List = await dns.resolve4(trimmedHost);
+    const preferredIpv4 = ipv4List.find((item) => String(item || '').trim().length > 0);
+    if (preferredIpv4) {
+      return {
+        connectHost: preferredIpv4,
+        tlsServername: trimmedHost,
+        family: 4,
+      };
+    }
+  } catch {
+    // If DNS resolution fails here, keep the original host and let nodemailer surface the real error.
+  }
+
+  return { connectHost: trimmedHost, tlsServername: trimmedHost };
+}
 
 export async function sendEmail(options: {
   to: string;
@@ -32,16 +65,20 @@ export async function sendEmail(options: {
     return false;
   }
 
+  const target = await resolveSmtpConnectionTarget(config.smtpHost);
+
   const transport = nodemailer.createTransport({
-    host: config.smtpHost,
+    host: target.connectHost || config.smtpHost,
     port: Number(config.smtpPort) || 587,
     secure: config.smtpSsl === 'true',
+    family: target.family,
     auth: {
       user: config.smtpUser,
       pass: config.smtpPass
     },
     tls: {
-      rejectUnauthorized: false
+      rejectUnauthorized: false,
+      ...(target.tlsServername ? { servername: target.tlsServername } : {}),
     }
   });
 

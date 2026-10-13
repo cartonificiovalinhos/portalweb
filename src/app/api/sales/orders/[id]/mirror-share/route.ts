@@ -1,6 +1,7 @@
 import { getServerSession } from 'next-auth';
 import { authOptions } from '../../../../../../lib/auth';
 import { prisma } from '../../../../../../lib/prisma';
+import { buildPublicUrl } from '../../../../../../lib/public-url';
 import { makeSalesOrderPublicMirrorCode } from '../../../../../../lib/sales-order-share';
 
 export const runtime = 'nodejs';
@@ -26,7 +27,7 @@ export async function GET(request: Request, props: { params: Promise<{ id: strin
     }
 
     const shareCode = makeSalesOrderPublicMirrorCode(Math.trunc(id));
-    const url = new URL(`/${shareCode}`, request.url).toString();
+    const url = buildPublicUrl(request, `/${shareCode}`);
 
     return Response.json({
       orderId: order.id,

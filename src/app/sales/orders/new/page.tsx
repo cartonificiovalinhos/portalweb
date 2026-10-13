@@ -418,7 +418,7 @@ function NewSalesOrderContent() {
       name: invItem.name,
       sku: invItem.sku,
       unit: invItem.priceUnit ?? invItem.unit,
-      quantity: 1,
+      quantity: 0,
       unitPrice: effectiveUnitPrice,
       discountPct: 0,
       minUnitPrice,

@@ -64,13 +64,15 @@ const FormattedIntInput = ({
   onChange, 
   disabled, 
   className,
-  placeholder 
+  placeholder,
+  inputProps,
 }: { 
   value?: number | null, 
   onChange: (val: number | null) => void, 
   disabled?: boolean, 
   className?: string,
-  placeholder?: string
+  placeholder?: string,
+  inputProps?: React.InputHTMLAttributes<HTMLInputElement>,
 }) => {
   const [str, setStr] = useState(value !== undefined && value !== null ? value.toLocaleString('pt-BR') : '');
 
@@ -110,6 +112,7 @@ const FormattedIntInput = ({
       placeholder={placeholder}
       value={str}
       onChange={handleChange}
+      {...inputProps}
     />
   );
 };
@@ -120,12 +123,14 @@ const FormattedMoneyInput = ({
   disabled,
   className,
   placeholder,
+  inputProps,
 }: {
   value?: number | null;
   onChange: (val: number | null) => void;
   disabled?: boolean;
   className?: string;
   placeholder?: string;
+  inputProps?: React.InputHTMLAttributes<HTMLInputElement>;
 }) => {
   const formatMoney = (n: number) => n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const [str, setStr] = useState(value !== undefined && value !== null ? formatMoney(value) : '');
@@ -165,9 +170,58 @@ const FormattedMoneyInput = ({
       value={str}
       onChange={handleChange}
       inputMode="decimal"
+      {...inputProps}
     />
   );
 };
+
+function shouldMoveArrowFocus(event: React.KeyboardEvent<HTMLInputElement>, direction: -1 | 1): boolean {
+  if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return false;
+  if (direction !== -1 && direction !== 1) return false;
+
+  const input = event.currentTarget;
+  const type = String(input.type || 'text').toLowerCase();
+
+  if (type === 'checkbox' || type === 'date' || type === 'number') {
+    return true;
+  }
+
+  const hasSelection = input.selectionStart !== null && input.selectionEnd !== null;
+  if (!hasSelection) return true;
+
+  const start = input.selectionStart ?? 0;
+  const end = input.selectionEnd ?? 0;
+  const length = input.value.length;
+
+  if (direction === -1) {
+    return start === 0 && end === 0;
+  }
+
+  return start === length && end === length;
+}
+
+function focusArrowSiblingField(groupId: string, current: HTMLElement, direction: -1 | 1) {
+  const selector = `[data-arrow-nav="true"][data-arrow-nav-group="${groupId}"]:not([disabled])`;
+  const fields = Array.from(document.querySelectorAll<HTMLElement>(selector)).filter((element) => {
+    const html = element as HTMLElement & { disabled?: boolean };
+    return !html.disabled && html.offsetParent !== null;
+  });
+
+  const currentIndex = fields.indexOf(current);
+  if (currentIndex < 0) return;
+
+  const next = fields[currentIndex + direction];
+  if (!next) return;
+
+  next.focus();
+  if (next instanceof HTMLInputElement && next.type !== 'checkbox') {
+    const len = next.value.length;
+    try {
+      next.setSelectionRange(direction < 0 ? 0 : len, direction < 0 ? 0 : len);
+    } catch {
+    }
+  }
+}
 
 function getMinAllowedUnitPrice(item: OrderItem, fallbackMinUnitPrice?: number | null): number {
   const minUnitPrice = Number(item.minUnitPrice ?? fallbackMinUnitPrice ?? 0);
@@ -480,6 +534,19 @@ export const SalesOrderItemRow = ({
         : 0
       : (localItem.unitPrice ?? 0);
   const effectiveClientOrderNumber = resolveItemClientOrderNumber(localItem.clientOrderNumber, headerClientOrderNumber) ?? '';
+  const arrowNavGroup = `sales-order-item-${localItem.id}`;
+  const handleArrowNav = useCallback((event: React.KeyboardEvent<HTMLInputElement>) => {
+    const direction = event.key === 'ArrowLeft' ? -1 : event.key === 'ArrowRight' ? 1 : 0;
+    if (!direction) return;
+    if (!shouldMoveArrowFocus(event, direction)) return;
+    event.preventDefault();
+    focusArrowSiblingField(arrowNavGroup, event.currentTarget, direction);
+  }, [arrowNavGroup]);
+  const arrowNavProps = {
+    'data-arrow-nav': 'true',
+    'data-arrow-nav-group': arrowNavGroup,
+    onKeyDown: handleArrowNav,
+  } satisfies React.InputHTMLAttributes<HTMLInputElement>;
 
   return (
     <>
@@ -500,6 +567,7 @@ export const SalesOrderItemRow = ({
                         disabled={!canEdit}
                         value={localItem.width}
                         onChange={(val) => handleChange('width', val)}
+                        inputProps={arrowNavProps}
                     />
                 ) : '-'}</td>
                 <td className="p-2">{showWidthLengthGram ? (
@@ -508,6 +576,7 @@ export const SalesOrderItemRow = ({
                         disabled={!canEdit}
                         value={localItem.length}
                         onChange={(val) => handleChange('length', val)}
+                        inputProps={arrowNavProps}
                     />
                 ) : '-'}</td>
                 <td className="p-2">{showWidthLengthGram ? (
@@ -530,6 +599,7 @@ export const SalesOrderItemRow = ({
                         disabled={!canEdit}
                         value={localItem.diameter ?? ''} 
                         onChange={(e) => handleChange('diameter', e.target.value ? parseInt(e.target.value, 10) : null)} 
+                        {...arrowNavProps}
                     />
                 ) : '-'}</td>
                 <td className="p-2">{showDiameterTube ? (
@@ -539,6 +609,7 @@ export const SalesOrderItemRow = ({
                         disabled={!canEdit}
                         value={localItem.tube ?? ''} 
                         onChange={(e) => handleChange('tube', e.target.value ? parseInt(e.target.value, 10) : null)} 
+                        {...arrowNavProps}
                     />
                 ) : '-'}</td>
             </>
@@ -551,6 +622,7 @@ export const SalesOrderItemRow = ({
                 disabled={!canEdit}
                 value={localItem.quantity} 
                 onChange={(val) => handleChange('quantity', val ?? 0)} 
+                inputProps={arrowNavProps}
             />
         </td>
         <td className="p-2">
@@ -565,6 +637,7 @@ export const SalesOrderItemRow = ({
                     setIsEditingWeight(false);
                     setWeightInput(fmtInt(computeWeightKg(localItem)));
                 }}
+                {...arrowNavProps}
             />
         </td>
         <td className="p-2">{String(localItem.unit || '').trim() || '-'}</td>
@@ -574,6 +647,7 @@ export const SalesOrderItemRow = ({
               disabled={!canEditPrice}
               value={localItem.unitPrice}
               onChange={(val) => handleChange('unitPrice', val)}
+              inputProps={arrowNavProps}
             />
         </td>
         <td className="p-2">
@@ -591,6 +665,7 @@ export const SalesOrderItemRow = ({
                 disabled={!canEdit}
                 value={discountInput} 
                 onChange={(e) => handleDiscountChange(e.target.value)} 
+                {...arrowNavProps}
             />
         </td>
         <td className="p-2">
@@ -643,6 +718,7 @@ export const SalesOrderItemRow = ({
                                 const newCreases = { ...(localItem.creases || {}), [n]: val === null ? 0 : val };
                                 handleChange('creases', newCreases);
                             }}
+                            inputProps={arrowNavProps}
                         />
                     </div>
                     ))}
@@ -657,6 +733,7 @@ export const SalesOrderItemRow = ({
                     disabled={!canEdit}
                     checked={localItem.internalResin ?? false}
                     onChange={(e) => handleChange('internalResin', e.target.checked)}
+                    {...arrowNavProps}
                 />
                 <label htmlFor={`res-in-${localItem.id}`} className={`text-sm whitespace-nowrap ${!canEdit ? 'text-gray-500' : 'text-gray-700'}`}>Resina interna</label>
                 </div>
@@ -668,6 +745,7 @@ export const SalesOrderItemRow = ({
                     disabled={!canEdit}
                     checked={localItem.externalResin ?? false}
                     onChange={(e) => handleChange('externalResin', e.target.checked)}
+                    {...arrowNavProps}
                 />
                 <label htmlFor={`res-out-${localItem.id}`} className={`text-sm whitespace-nowrap ${!canEdit ? 'text-gray-500' : 'text-gray-700'}`}>Resina externa</label>
                 </div>
@@ -681,6 +759,7 @@ export const SalesOrderItemRow = ({
                     disabled={!canEdit}
                     value={effectiveClientOrderNumber}
                     onChange={(e) => handleChange('clientOrderNumber', e.target.value || null)}
+                    {...arrowNavProps}
                 />
                 </div>
                 <div className="space-y-1">
@@ -691,6 +770,7 @@ export const SalesOrderItemRow = ({
                     disabled={!canEdit}
                     value={localItem.clientOrderItemNumber ?? ''}
                     onChange={(e) => handleChange('clientOrderItemNumber', e.target.value ? Number(e.target.value) : null)}
+                    {...arrowNavProps}
                 />
                 </div>
                 <div className="space-y-1">
@@ -701,6 +781,7 @@ export const SalesOrderItemRow = ({
                     disabled={!canEdit}
                     value={localItem.clientItemCode ?? ''}
                     onChange={(e) => handleChange('clientItemCode', e.target.value || null)}
+                    {...arrowNavProps}
                 />
                 </div>
                 <div className="space-y-1">
@@ -711,6 +792,7 @@ export const SalesOrderItemRow = ({
                     disabled={!canEdit}
                     value={localItem.itemDeliveryDate ? new Date(localItem.itemDeliveryDate).toISOString().split('T')[0] : ''}
                     onChange={(e) => handleChange('itemDeliveryDate', e.target.value ? new Date(e.target.value) : null)}
+                    {...arrowNavProps}
                 />
                 </div>
                 </div>
@@ -915,6 +997,19 @@ export const SalesOrderItemCard = ({
         : 0
       : (localItem.unitPrice ?? 0);
   const effectiveClientOrderNumber = resolveItemClientOrderNumber(localItem.clientOrderNumber, headerClientOrderNumber) ?? '';
+  const arrowNavGroup = `sales-order-card-item-${localItem.id}`;
+  const handleArrowNav = useCallback((event: React.KeyboardEvent<HTMLInputElement>) => {
+    const direction = event.key === 'ArrowLeft' ? -1 : event.key === 'ArrowRight' ? 1 : 0;
+    if (!direction) return;
+    if (!shouldMoveArrowFocus(event, direction)) return;
+    event.preventDefault();
+    focusArrowSiblingField(arrowNavGroup, event.currentTarget, direction);
+  }, [arrowNavGroup]);
+  const arrowNavProps = {
+    'data-arrow-nav': 'true',
+    'data-arrow-nav-group': arrowNavGroup,
+    onKeyDown: handleArrowNav,
+  } satisfies React.InputHTMLAttributes<HTMLInputElement>;
 
   return (
     <div className={`p-3 ${isSaving ? 'bg-blue-50' : ''}`}>
@@ -968,6 +1063,7 @@ export const SalesOrderItemCard = ({
             disabled={!canEdit}
             value={localItem.quantity} 
             onChange={(val) => handleChange('quantity', val ?? 0)} 
+            inputProps={arrowNavProps}
           />
         </div>
         <div>
@@ -983,6 +1079,7 @@ export const SalesOrderItemCard = ({
                 setIsEditingWeight(false);
                 setWeightInput(fmtInt(computeWeightKg(localItem)));
             }}
+            {...arrowNavProps}
           />
         </div>
         <div>
@@ -1001,6 +1098,7 @@ export const SalesOrderItemCard = ({
             disabled={!canEditPrice}
             value={localItem.unitPrice}
             onChange={(val) => handleChange('unitPrice', val)}
+            inputProps={arrowNavProps}
           />
         </div>
         <div>
@@ -1020,6 +1118,7 @@ export const SalesOrderItemCard = ({
             disabled={!canEdit}
             value={discountInput}
             onChange={(e) => handleDiscountChange(e.target.value)}
+            {...arrowNavProps}
           />
         </div>
         {hasSheetCol && showWidthLengthGram && (
@@ -1031,6 +1130,7 @@ export const SalesOrderItemCard = ({
                 disabled={!canEdit}
                 value={localItem.width}
                 onChange={(val) => handleChange('width', val)}
+                inputProps={arrowNavProps}
               />
             </div>
             <div>
@@ -1040,6 +1140,7 @@ export const SalesOrderItemCard = ({
                 disabled={!canEdit}
                 value={localItem.length}
                 onChange={(val) => handleChange('length', val)}
+                inputProps={arrowNavProps}
               />
             </div>
             <div className="col-span-2">
@@ -1063,6 +1164,7 @@ export const SalesOrderItemCard = ({
                 disabled={!canEdit}
                 value={localItem.diameter ?? ''} 
                 onChange={(e) => handleChange('diameter', e.target.value ? parseInt(e.target.value, 10) : null)} 
+                {...arrowNavProps}
               />
             </div>
             <div>
@@ -1073,6 +1175,7 @@ export const SalesOrderItemCard = ({
                 disabled={!canEdit}
                 value={localItem.tube ?? ''} 
                 onChange={(e) => handleChange('tube', e.target.value ? parseInt(e.target.value, 10) : null)} 
+                {...arrowNavProps}
               />
             </div>
           </>
@@ -1099,6 +1202,7 @@ export const SalesOrderItemCard = ({
                             const newCreases = { ...(localItem.creases || {}), [n]: val === null ? 0 : val };
                             handleChange('creases', newCreases);
                         }}
+                        inputProps={arrowNavProps}
                       />
                     </div>
                   ))}
@@ -1113,6 +1217,7 @@ export const SalesOrderItemCard = ({
                     disabled={!canEdit}
                     value={effectiveClientOrderNumber}
                     onChange={(e) => handleChange('clientOrderNumber', e.target.value || null)}
+                    {...arrowNavProps}
                   />
                 </div>
                 <div className="space-y-1">
@@ -1123,6 +1228,7 @@ export const SalesOrderItemCard = ({
                     disabled={!canEdit}
                     value={localItem.clientItemCode ?? ''}
                     onChange={(e) => handleChange('clientItemCode', e.target.value || null)}
+                    {...arrowNavProps}
                   />
                 </div>
                 <div className="grid grid-cols-2 gap-3">
@@ -1134,6 +1240,7 @@ export const SalesOrderItemCard = ({
                       disabled={!canEdit}
                       value={localItem.clientOrderItemNumber ?? ''}
                       onChange={(e) => handleChange('clientOrderItemNumber', e.target.value ? Number(e.target.value) : null)}
+                      {...arrowNavProps}
                     />
                   </div>
                   <div className="space-y-1">
@@ -1144,6 +1251,7 @@ export const SalesOrderItemCard = ({
                       disabled={!canEdit}
                       value={localItem.itemDeliveryDate ? new Date(localItem.itemDeliveryDate).toISOString().split('T')[0] : ''}
                       onChange={(e) => handleChange('itemDeliveryDate', e.target.value ? new Date(e.target.value) : null)}
+                      {...arrowNavProps}
                     />
                   </div>
                 </div>
@@ -1156,6 +1264,7 @@ export const SalesOrderItemCard = ({
                       disabled={!canEdit}
                       checked={localItem.internalResin ?? false}
                       onChange={(e) => handleChange('internalResin', e.target.checked)}
+                      {...arrowNavProps}
                     />
                     <label htmlFor={`res-in-${localItem.id}`} className={`text-sm ${!canEdit ? 'text-gray-500' : 'text-gray-700'}`}>Resina interna</label>
                   </div>
@@ -1167,6 +1276,7 @@ export const SalesOrderItemCard = ({
                       disabled={!canEdit}
                       checked={localItem.externalResin ?? false}
                       onChange={(e) => handleChange('externalResin', e.target.checked)}
+                      {...arrowNavProps}
                     />
                     <label htmlFor={`res-out-${localItem.id}`} className={`text-sm ${!canEdit ? 'text-gray-500' : 'text-gray-700'}`}>Resina externa</label>
                   </div>
