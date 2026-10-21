@@ -1064,22 +1064,6 @@ export default function SalesOrderMaintenancePage() {
                       <button className={`${ICON_BTN} ${integrating || !isEditableStatus(order?.status) || isHeaderEditing ? 'opacity-50 cursor-not-allowed' : ''}`} title="Enviar para ERP" aria-label="Enviar para ERP" disabled={integrating || !isEditableStatus(order?.status) || isHeaderEditing} style={{ opacity: integrating || !isEditableStatus(order?.status) || isHeaderEditing ? 0.5 : 1, pointerEvents: integrating || !isEditableStatus(order?.status) || isHeaderEditing ? 'none' : 'auto' }} onClick={async () => {
                   if (!order) return;
                   try {
-                    const hasDiscount = (orderItems || []).some((it) => Number((it as any)?.discountPct ?? 0) > 0);
-                    if (hasDiscount) {
-                      const ok = confirm('Pedido possui desconto e será enviado para aprovação comercial. Deseja continuar?');
-                      if (!ok) return;
-                      setIntegrating(true);
-                      const patch = await fetch(`/api/sales/orders/${order.id}`, {
-                        method: 'PATCH',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ status: 'Em Aprovação Comercial' }),
-                      });
-                      const patchBody = await patch.json().catch(() => ({} as any));
-                      if (!patch.ok) throw new Error(patchBody?.error || 'Falha ao enviar para aprovação comercial');
-                      await refreshOrder();
-                      return;
-                    }
-
                     if (!confirm('Confirma enviar este pedido para o ERP?')) return;
                     setIntegrating(true);
                     const res = await fetch(`/api/sales/orders/${order.id}/integrate`, {
@@ -1163,10 +1147,10 @@ export default function SalesOrderMaintenancePage() {
                       </>
                     ) : (
                       <button 
-                        className={`${ICON_BTN} ${(!isEditableStatus(order?.status) && statusLabelPt(order?.status) !== 'Integrado') || checkingEdit ? 'opacity-50 cursor-not-allowed' : ''}`} 
+                        className={`${ICON_BTN} ${(!isEditableStatus(order?.status) && !['Integrado', 'Em Aprovação Comercial'].includes(statusLabelPt(order?.status))) || checkingEdit ? 'opacity-50 cursor-not-allowed' : ''}`}
                         title="Editar" 
                         aria-label="Editar" 
-                        disabled={(!isEditableStatus(order?.status) && statusLabelPt(order?.status) !== 'Integrado') || checkingEdit} 
+                        disabled={(!isEditableStatus(order?.status) && !['Integrado', 'Em Aprovação Comercial'].includes(statusLabelPt(order?.status))) || checkingEdit}
                         onClick={async () => {
                         const status = statusLabelPt(order?.status);
                         if (status === 'Integrado') {
@@ -1222,6 +1206,23 @@ export default function SalesOrderMaintenancePage() {
                                 } else {
                                     alert(errorDescription || 'Erro: Não foi possível verificar a edição do pedido (ErrorSubType inválido ou ausente).');
                                 }
+                            } catch (e: any) {
+                                alert(e.message || String(e));
+                            } finally {
+                                setCheckingEdit(false);
+                            }
+                        } else if (status === 'Em Aprovação Comercial') {
+                            setCheckingEdit(true);
+                            try {
+                                const patchRes = await fetch(`/api/sales/orders/${order!.id}`, {
+                                    method: 'PATCH',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ status: 'Orçamento' })
+                                });
+                                const patchBody = await patchRes.json().catch(() => ({} as any));
+                                if (!patchRes.ok) throw new Error(patchBody?.error || 'Falha ao reverter status para Orçamento');
+                                await refreshOrder();
+                                setIsHeaderEditing(true);
                             } catch (e: any) {
                                 alert(e.message || String(e));
                             } finally {

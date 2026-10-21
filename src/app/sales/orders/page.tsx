@@ -250,11 +250,6 @@ export default function SalesOrdersPage() {
     return Number.isFinite(computed) ? computed : 0;
   };
 
-  const hasAnyDiscount = (o: SalesOrder) => {
-    const items = Array.isArray((o as any)?.items) ? ((o as any).items as any[]) : [];
-    return items.some((it) => Number(it?.discountPct ?? 0) > 0);
-  };
-
   const displayOrderWeightKg = useCallback((o: SalesOrder) => {
     return (o.items || []).reduce((acc, item) => acc + computeItemWeightKg(item), 0);
   }, [computeItemWeightKg]);
@@ -319,27 +314,6 @@ export default function SalesOrdersPage() {
   }, [displayOrderWeightKg, displayTotalWithTax, fmtCurrency, fmtWeight, formatItemMeasures, pageItemRows, pageOrders, statusLabelPt, viewMode]);
 
   const sendOrderToErp = async (o: SalesOrder) => {
-    if (hasAnyDiscount(o)) {
-      const ok = confirm('Pedido possui desconto e será enviado para aprovação comercial. Deseja continuar?');
-      if (!ok) return;
-      setIntegratingId(o.id);
-      try {
-        const res = await fetch(`/api/sales/orders/${o.id}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ status: 'Em Aprovação Comercial' }),
-        });
-        const data = await res.json().catch(() => ({} as any));
-        if (!res.ok) throw new Error(data?.error || 'Falha ao enviar para aprovação comercial');
-        await reloadOrders();
-      } catch (e: any) {
-        alert(e?.message || String(e));
-      } finally {
-        setIntegratingId(null);
-      }
-      return;
-    }
-
     if (!confirm('Confirma enviar este pedido para o ERP?')) return;
     setIntegratingId(o.id);
     try {

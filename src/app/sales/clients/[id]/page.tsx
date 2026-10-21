@@ -318,65 +318,31 @@ export default function ClientDetailsPage() {
 
   const PAGE_SIZE = 20;
 
-  const orderHasAnyDiscount = async (o: SalesOrder): Promise<boolean> => {
-    const items = Array.isArray((o as any)?.items) ? ((o as any).items as any[]) : [];
-    if (items.length > 0) return items.some((it) => Number(it?.discountPct ?? 0) > 0);
-    try {
-      const r = await fetch(`/api/sales/orders/${o.id}`, { cache: 'no-store' });
-      if (!r.ok) return false;
-      const full = await r.json().catch(() => ({} as any));
-      const fullItems = Array.isArray(full?.items) ? (full.items as any[]) : [];
-      return fullItems.some((it) => Number(it?.discountPct ?? 0) > 0);
-    } catch {
-      return false;
-    }
-  };
-
   const handleSendToErp = async (o: SalesOrder) => {
-    const hasDiscount = await orderHasAnyDiscount(o);
-    if (hasDiscount) {
-      const ok = confirm('Pedido possui desconto e será enviado para aprovação comercial. Deseja continuar?');
-      if (!ok) return;
-      setIntegratingId(o.id);
-      try {
-        const patch = await fetch(`/api/sales/orders/${o.id}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ status: 'Em Aprovação Comercial' }),
-        });
-        const body = await patch.json().catch(() => ({} as any));
-        if (!patch.ok) throw new Error(body?.error || 'Falha ao enviar para aprovação comercial');
-      } catch (e: any) {
-        alert(e?.message || String(e));
-      } finally {
-        setIntegratingId(null);
+    if (!confirm('Confirma enviar este pedido para o ERP?')) return;
+    setIntegratingId(o.id);
+    try {
+      const res = await fetch(`/api/sales/orders/${o.id}/integrate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Falha ao enviar para ERP');
       }
-    } else {
-      if (!confirm('Confirma enviar este pedido para o ERP?')) return;
-      setIntegratingId(o.id);
-      try {
-        const res = await fetch(`/api/sales/orders/${o.id}/integrate`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' }
-        });
-        if (!res.ok) {
-          const err = await res.json();
-          throw new Error(err.error || 'Falha ao enviar para ERP');
-        }
-        const data = await res.json();
+      const data = await res.json();
 
-        if (data.newStatus === 'Erro na integração') {
-          alert('Houve erros na integração. Verifique o histórico de situação.');
-        } else if (data.newStatus === 'Integrado') {
-          alert('Pedido integrado com sucesso!');
-        } else {
-          alert('Envio realizado. Verifique o status atual.');
-        }
-      } catch (e: any) {
-        alert(e?.message || String(e));
-      } finally {
-        setIntegratingId(null);
+      if (data.newStatus === 'Erro na integração') {
+        alert('Houve erros na integração. Verifique o histórico de situação.');
+      } else if (data.newStatus === 'Integrado') {
+        alert('Pedido integrado com sucesso!');
+      } else {
+        alert('Envio realizado. Verifique o status atual.');
       }
+    } catch (e: any) {
+      alert(e?.message || String(e));
+    } finally {
+      setIntegratingId(null);
     }
 
     const c = client;
