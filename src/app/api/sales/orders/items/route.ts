@@ -5,6 +5,7 @@ import { resolveCommercialFamilyForItem } from '@/lib/commercial-family-dimensio
 import { resolveClientItemDimensionCode } from '@/lib/client-item-dimension-code';
 import { normalizeOptionalText } from '@/lib/sales-order-client-fields';
 import { buildClientItemPriceFloorResolver } from '@/lib/client-item-price-floor';
+import { markOrderAsPendingApproval, triggerApprovalDocumentsForEvent } from '@/lib/approval-runtime';
 
 export async function POST(request: Request) {
   try {
@@ -142,6 +143,21 @@ export async function POST(request: Request) {
         creases: payload.creases ?? null,
       },
     });
+
+    const approvalResult = await triggerApprovalDocumentsForEvent(prisma, {
+      moduleCode: 'SALES',
+      entityName: 'SALES_ORDER_ITEM',
+      actionName: 'CREATE',
+      entityKey: created.id,
+      rootEntityName: 'SALES_ORDER',
+      rootEntityKey: orderId,
+      entityRecord: created,
+    });
+
+    if (approvalResult.triggered) {
+      await markOrderAsPendingApproval(prisma, Math.trunc(orderId), approvalResult.message || 'APROVACAO AUTOMATICA');
+    }
+
     return NextResponse.json(created, { status: 201 });
   } catch (err: any) {
     return NextResponse.json({ error: String(err?.message || err) }, { status: 500 });

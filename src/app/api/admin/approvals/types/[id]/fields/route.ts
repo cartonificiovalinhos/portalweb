@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { getApprovalFieldDefinition } from "@/lib/approval-documents";
 import { ensureAdminApprovalAccess, isMissingApprovalConfigTableError } from "@/lib/admin-approvals-auth";
 
 const VALID_FIELD_TYPES = new Set(["INTEGER", "CHAR", "DATE", "DECIMAL"]);
@@ -21,30 +22,62 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
       return NextResponse.json({ error: "ID inválido" }, { status: 400 });
     }
 
+    const approvalType = await prisma.approvalDocumentType.findUnique({
+      where: { id: typeId },
+      select: {
+        id: true,
+        approvalDocument: {
+          select: {
+            entityName: true,
+          },
+        },
+      },
+    });
+    if (!approvalType) {
+      return NextResponse.json({ error: "Tipo de aprovacao nao encontrado." }, { status: 404 });
+    }
+
     const body = await request.json().catch(() => ({} as any));
-    const label = normalizeText(body?.label);
-    const fieldType = normalizeText(body?.fieldType).toUpperCase();
     const required = body?.required === undefined ? true : Boolean(body.required);
 
-    if (!label) {
-      return NextResponse.json({ error: "Nome do campo é obrigatório." }, { status: 400 });
+    let label = normalizeText(body?.label);
+    let fieldType = normalizeText(body?.fieldType).toUpperCase();
+    let sourceType = normalizeText(body?.sourceType).toUpperCase() || "MANUAL";
+    let entityFieldKey = normalizeText(body?.entityFieldKey) || null;
+
+    if (approvalType.approvalDocument?.entityName) {
+      const definition = getApprovalFieldDefinition(approvalType.approvalDocument.entityName, entityFieldKey);
+      if (!definition) {
+        return NextResponse.json({ error: "Selecione um campo valido da entidade." }, { status: 400 });
+      }
+      label = definition.label;
+      fieldType = definition.fieldType;
+      sourceType = "ENTITY";
+      entityFieldKey = definition.key;
+    } else {
+      if (!label) {
+        return NextResponse.json({ error: "Nome do campo e obrigatorio." }, { status: 400 });
+      }
+      if (!VALID_FIELD_TYPES.has(fieldType)) {
+        return NextResponse.json({ error: "Tipo de campo invalido." }, { status: 400 });
+      }
+      sourceType = "MANUAL";
+      entityFieldKey = null;
     }
 
-    if (!VALID_FIELD_TYPES.has(fieldType)) {
-      return NextResponse.json({ error: "Tipo de campo inválido." }, { status: 400 });
-    }
-
-    const maxSort = await prisma.commercialFamilyApprovalTypeField.aggregate({
+    const maxSort = await prisma.approvalDocumentTypeField.aggregate({
       where: { approvalTypeId: typeId },
       _max: { sortOrder: true },
     });
 
-    const field = await prisma.commercialFamilyApprovalTypeField.create({
+    const field = await prisma.approvalDocumentTypeField.create({
       data: {
         approvalTypeId: typeId,
         label,
         fieldType,
         required,
+        sourceType,
+        entityFieldKey,
         sortOrder: Number(maxSort._max.sortOrder ?? 0) + 1,
       },
     });

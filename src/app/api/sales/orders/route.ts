@@ -7,6 +7,7 @@ import { attachResolvedCommercialFamilies } from '@/lib/commercial-family-dimens
 import { resolveClientItemDimensionCode } from '@/lib/client-item-dimension-code';
 import { buildClientItemPriceFloorResolver } from '@/lib/client-item-price-floor';
 import { toMySqlStartsWithPattern } from '@/lib/mysql-like';
+import { countUserPendingApprovalsForOrders, markOrderAsPendingApproval, triggerApprovalDocumentsForEvent } from '@/lib/approval-runtime';
 import { validateSalesOrderForSave } from '@/lib/sales-order-save-validation';
 
 function normalizeDoc(doc: string): string {
@@ -49,6 +50,50 @@ function isUniqueSalesOrderCodeError(err: any): boolean {
   }
   const msg = String(err?.message || err || '');
   return msg.toLowerCase().includes('duplicate') && msg.toLowerCase().includes('code');
+}
+
+async function applyOrderCreateApproval(orderId: number) {
+  const order = await prisma.salesOrder.findUnique({
+    where: { id: Math.trunc(orderId) },
+    select: {
+      id: true,
+      code: true,
+      status: true,
+      customerName: true,
+      customerDoc: true,
+      clientOrderNumber: true,
+      paymentTerms: true,
+      carrier: true,
+      deliveryDate: true,
+      subtotal: true,
+      discountTotal: true,
+      total: true,
+      totalWithTax: true,
+      totalInvoiced: true,
+      erpOrderNumber: true,
+      items: true,
+    },
+  });
+  if (!order) return null;
+
+  const approvalResult = await triggerApprovalDocumentsForEvent(prisma, {
+    moduleCode: 'SALES',
+    entityName: 'SALES_ORDER',
+    actionName: 'CREATE',
+    entityKey: order.id,
+    rootEntityName: 'SALES_ORDER',
+    rootEntityKey: order.id,
+    entityRecord: order,
+  });
+
+  if (approvalResult.triggered) {
+    await markOrderAsPendingApproval(prisma, order.id, approvalResult.message || 'APROVACAO AUTOMATICA');
+  }
+
+  return prisma.salesOrder.findUnique({
+    where: { id: Math.trunc(orderId) },
+    include: { items: true },
+  });
 }
 
 async function resolveEntityIdFromDoc(raw: unknown): Promise<number | undefined> {
@@ -209,43 +254,15 @@ export async function GET(request: Request) {
     };
 
     const rows = Array.isArray(data) ? data : [];
-    const familyIdsSet = new Set<number>();
-    for (const o of rows) {
-      const items = Array.isArray((o as any)?.items) ? (o as any).items : [];
-      for (const it of items) {
-        const inv = (it as any)?.inventoryItem;
-        const fidRaw = (inv as any)?.commercialFamilyId ?? (inv as any)?.commercialFamily?.id;
-        const fid = Number(fidRaw);
-        if (Number.isFinite(fid) && fid > 0) familyIdsSet.add(Math.trunc(fid));
-      }
-    }
-
-    const eligibleFamilyIds = new Set<number>();
-    if (familyIdsSet.size > 0) {
-      const approvals = await prisma.commercialFamilyApprovalUser.findMany({
-        where: { userId: Math.trunc(userId as number), commercialFamilyId: { in: Array.from(familyIdsSet) }, canView: true },
-        select: { commercialFamilyId: true },
-      });
-      for (const a of approvals) {
-        const fid = Number((a as any)?.commercialFamilyId);
-        if (Number.isFinite(fid) && fid > 0) eligibleFamilyIds.add(Math.trunc(fid));
-      }
-    }
+    const pendingApprovals = await countUserPendingApprovalsForOrders(
+      prisma,
+      Math.trunc(userId as number),
+      rows.map((row: any) => row?.id),
+    );
 
     for (const o of rows) {
       const inApproval = isCommercialApprovalStatus((o as any)?.status);
-      let hasEligibleFamily = false;
-      const items = Array.isArray((o as any)?.items) ? (o as any).items : [];
-      for (const it of items) {
-        const inv = (it as any)?.inventoryItem;
-        const fidRaw = (inv as any)?.commercialFamilyId ?? (inv as any)?.commercialFamily?.id;
-        const fid = Number(fidRaw);
-        if (Number.isFinite(fid) && fid > 0 && eligibleFamilyIds.has(Math.trunc(fid))) {
-          hasEligibleFamily = true;
-          break;
-        }
-      }
-      (o as any).canApproveCommercial = Boolean(inApproval && hasEligibleFamily);
+      (o as any).canApproveCommercial = Boolean(inApproval && pendingApprovals.has(String((o as any)?.id ?? '')));
     }
 
     return NextResponse.json(rows);
@@ -593,7 +610,8 @@ export async function POST(request: Request) {
           data: orderCreateData,
           include: { items: true },
         });
-        return NextResponse.json(created, { status: 201 });
+        const finalOrder = await applyOrderCreateApproval(created.id);
+        return NextResponse.json(finalOrder || created, { status: 201 });
       } catch (e: any) {
         if (isUniqueSalesOrderCodeError(e)) continue;
 
@@ -675,7 +693,8 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'Falha ao obter ID do pedido após criação (fallback)' }, { status: 500 });
           }
 
-          return NextResponse.json({ id: createdId }, { status: 201 });
+          const finalOrder = await applyOrderCreateApproval(Math.trunc(createdId));
+          return NextResponse.json(finalOrder || { id: createdId }, { status: 201 });
         } catch (fallbackErr: any) {
           if (isUniqueSalesOrderCodeError(fallbackErr)) continue;
           throw fallbackErr;

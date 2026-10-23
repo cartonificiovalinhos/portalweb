@@ -90,7 +90,7 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
       return NextResponse.json({ error: "Campo de faixa é obrigatório." }, { status: 400 });
     }
 
-    const field = await prisma.commercialFamilyApprovalTypeField.findFirst({
+    const field = await prisma.approvalDocumentTypeField.findFirst({
       where: { id: approvalFieldId, approvalTypeId: typeId },
       select: { id: true, fieldType: true, label: true },
     });
@@ -113,7 +113,7 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
     }
 
     const saved = assignmentId > 0
-      ? await prisma.commercialFamilyApprovalTypeUser.update({
+      ? await prisma.approvalDocumentTypeUser.update({
           where: { id: assignmentId },
           data: {
             approvalFieldId,
@@ -122,11 +122,11 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
             rangeToValue: normalizedTo.value,
           },
           include: {
-            approvalField: { select: { id: true, label: true, fieldType: true } },
+            approvalField: { select: { id: true, label: true, fieldType: true, sourceType: true, entityFieldKey: true } },
             user: { select: { id: true, name: true, abbrevName: true, email: true, doc: true } },
           },
         })
-      : await prisma.commercialFamilyApprovalTypeUser.upsert({
+      : await prisma.approvalDocumentTypeUser.upsert({
           where: { approvalTypeId_approvalFieldId_userId: { approvalTypeId: typeId, approvalFieldId, userId } },
           update: {
             rangeFromValue: normalizedFrom.value,
@@ -140,7 +140,7 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
             rangeToValue: normalizedTo.value,
           },
           include: {
-            approvalField: { select: { id: true, label: true, fieldType: true } },
+            approvalField: { select: { id: true, label: true, fieldType: true, sourceType: true, entityFieldKey: true } },
             user: { select: { id: true, name: true, abbrevName: true, email: true, doc: true } },
           },
         });
@@ -168,7 +168,7 @@ export async function DELETE(request: Request, props: { params: Promise<{ id: st
       return NextResponse.json({ error: "assignmentId inválido." }, { status: 400 });
     }
 
-    await prisma.commercialFamilyApprovalTypeUser.delete({
+    await prisma.approvalDocumentTypeUser.delete({
       where: { id: assignmentId },
     });
 

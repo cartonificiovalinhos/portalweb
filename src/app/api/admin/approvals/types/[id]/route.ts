@@ -31,7 +31,7 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
       return NextResponse.json({ error: "Nome do tipo deve conter apenas letras e números, sem espaços ou caracteres especiais." }, { status: 400 });
     }
 
-    const saved = await prisma.commercialFamilyApprovalType.update({
+    const saved = await prisma.approvalDocumentType.update({
       where: { id: typeId },
       data: {
         name,
@@ -43,7 +43,7 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
         assignments: {
           orderBy: { id: "asc" },
           include: {
-            approvalField: { select: { id: true, label: true, fieldType: true } },
+            approvalField: { select: { id: true, label: true, fieldType: true, sourceType: true, entityFieldKey: true } },
             user: { select: { id: true, name: true, abbrevName: true, email: true, doc: true } },
           },
         },
@@ -72,7 +72,7 @@ export async function DELETE(_request: Request, props: { params: Promise<{ id: s
       return NextResponse.json({ error: "ID inválido" }, { status: 400 });
     }
 
-    await prisma.commercialFamilyApprovalType.delete({
+    await prisma.approvalDocumentType.delete({
       where: { id: typeId },
     });
 

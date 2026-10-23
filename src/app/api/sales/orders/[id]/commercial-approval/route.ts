@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { prisma } from '../../../../../../lib/prisma';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '../../../../../../lib/auth';
+import { APPROVAL_PENDING_ROW_STATUS } from '@/lib/approval-documents';
+import { finalizeRootApprovalPendings } from '@/lib/approval-runtime';
 import { sendOrderStatusChangeNotification } from '../../../../../../lib/email';
 
 function isCommercialApprovalStatus(status: any): boolean {
@@ -30,39 +32,20 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
 
     const order = await prisma.salesOrder.findUnique({
       where: { id: Math.trunc(orderId) },
-      select: {
-        id: true,
-        status: true,
-        items: {
-          select: {
-            inventoryItem: {
-              select: {
-                commercialFamilyId: true,
-                commercialFamily: { select: { id: true, description: true } },
-              },
-            },
-          },
-        },
-      },
+      select: { id: true, status: true },
     });
     if (!order) return NextResponse.json({ error: 'Pedido não encontrado' }, { status: 404 });
     if (!isCommercialApprovalStatus(order.status)) {
       return NextResponse.json({ error: 'Pedido não está em aprovação comercial' }, { status: 400 });
     }
 
-    const familyIdsSet = new Set<number>();
-    for (const it of order.items || []) {
-      const inv: any = (it as any)?.inventoryItem;
-      const fidRaw = inv?.commercialFamilyId ?? inv?.commercialFamily?.id;
-      const fid = Number(fidRaw);
-      if (Number.isFinite(fid) && fid > 0) familyIdsSet.add(Math.trunc(fid));
-    }
-    if (familyIdsSet.size === 0) {
-      return NextResponse.json({ error: 'Pedido sem família comercial vinculada' }, { status: 400 });
-    }
-
-    const allowed = await prisma.commercialFamilyApprovalUser.findFirst({
-      where: { userId: Math.trunc(userId), commercialFamilyId: { in: Array.from(familyIdsSet) }, canView: true },
+    const allowed = await prisma.approvalPending.findFirst({
+      where: {
+        userId: Math.trunc(userId),
+        rootEntityName: 'SALES_ORDER',
+        rootEntityKey: String(Math.trunc(orderId)),
+        status: APPROVAL_PENDING_ROW_STATUS.PENDING,
+      },
       select: { id: true },
     });
     if (!allowed) return NextResponse.json({ error: 'Sem permissão para aprovar este pedido' }, { status: 403 });
@@ -86,6 +69,7 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
           where: { id: Math.trunc(orderId) },
           data: { status: 'Reprovado', erpOrderNumber: null },
         });
+        await finalizeRootApprovalPendings(tx, 'SALES_ORDER', Math.trunc(orderId), APPROVAL_PENDING_ROW_STATUS.REJECTED);
       });
       await sendOrderStatusChangeNotification({ orderId: Math.trunc(orderId), status: 'Reprovado' });
       return NextResponse.json({ ok: true, status: 'Reprovado' });
@@ -111,6 +95,7 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
     if (!integrateRes.ok) {
       return NextResponse.json({ error: integrateJson?.error || `Falha ao enviar para ERP (${integrateRes.status})` }, { status: integrateRes.status });
     }
+    await finalizeRootApprovalPendings(prisma, 'SALES_ORDER', Math.trunc(orderId), APPROVAL_PENDING_ROW_STATUS.APPROVED);
     return NextResponse.json({ ok: true, integrated: true, result: integrateJson });
   } catch (err: any) {
     return NextResponse.json({ error: String(err?.message || err) }, { status: 500 });

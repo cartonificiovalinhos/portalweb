@@ -25,7 +25,12 @@ export function isMissingApprovalConfigTableError(err: unknown): boolean {
   return (
     msg.includes("commercialfamilyapprovaltype") ||
     msg.includes("commercialfamilyapprovaltypefield") ||
-    msg.includes("commercialfamilyapprovaltypeuser")
+    msg.includes("commercialfamilyapprovaltypeuser") ||
+    msg.includes("approvaldocument") ||
+    msg.includes("approvaldocumenttype") ||
+    msg.includes("approvaldocumenttypefield") ||
+    msg.includes("approvaldocumenttypeuser") ||
+    msg.includes("approvalpending")
   ) && (
     msg.includes("doesn't exist") ||
     msg.includes("does not exist") ||

@@ -7,6 +7,7 @@ import { attachResolvedCommercialFamilies } from '@/lib/commercial-family-dimens
 import { resolveClientItemDimensionCode } from '@/lib/client-item-dimension-code';
 import { normalizeOptionalText } from '@/lib/sales-order-client-fields';
 import { buildClientItemPriceFloorResolver } from '@/lib/client-item-price-floor';
+import { markOrderAsPendingApproval, triggerApprovalDocumentsForEvent } from '@/lib/approval-runtime';
 import { validateSalesOrderForSave } from '@/lib/sales-order-save-validation';
 
 function normalizeDoc(doc: string): string {
@@ -322,6 +323,31 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
         await sendOrderStatusChangeNotification({ orderId: id, status: nextStatus });
       }
     }
+
+    if (isHeaderSave) {
+      const approvalResult = await triggerApprovalDocumentsForEvent(prisma, {
+        moduleCode: 'SALES',
+        entityName: 'SALES_ORDER',
+        actionName: 'UPDATE',
+        entityKey: id,
+        rootEntityName: 'SALES_ORDER',
+        rootEntityKey: id,
+        entityRecord: updated,
+      });
+
+      if (approvalResult.triggered) {
+        await markOrderAsPendingApproval(prisma, id, approvalResult.message || 'APROVACAO AUTOMATICA');
+        const refreshed = await prisma.salesOrder.findUnique({
+          where: { id },
+          include: {
+            entity: true,
+            items: { include: { inventoryItem: { include: { commercialFamily: true } } } },
+          },
+        });
+        return NextResponse.json(refreshed || updated);
+      }
+    }
+
     return NextResponse.json(updated);
   } catch (err: any) {
     return NextResponse.json({ error: String(err?.message || err) }, { status: 500 });

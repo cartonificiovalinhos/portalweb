@@ -5,6 +5,7 @@ import { resolveCommercialFamilyForItem } from '@/lib/commercial-family-dimensio
 import { resolveClientItemDimensionCode } from '@/lib/client-item-dimension-code';
 import { normalizeOptionalText } from '@/lib/sales-order-client-fields';
 import { buildClientItemPriceFloorResolver } from '@/lib/client-item-price-floor';
+import { markOrderAsPendingApproval, triggerApprovalDocumentsForEvent } from '@/lib/approval-runtime';
 
 function parseIdParam(raw: unknown): number | null {
   const s = String(raw ?? '').trim();
@@ -61,6 +62,7 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
       where: { id },
       select: {
         id: true,
+        orderId: true,
         sku: true,
         name: true,
         quantity: true,
@@ -192,6 +194,21 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
       });
       return { ...saved, commercialFamilyId };
     });
+
+    const approvalResult = await triggerApprovalDocumentsForEvent(prisma, {
+      moduleCode: 'SALES',
+      entityName: 'SALES_ORDER_ITEM',
+      actionName: 'UPDATE',
+      entityKey: updated.id,
+      rootEntityName: 'SALES_ORDER',
+      rootEntityKey: current.orderId,
+      entityRecord: updated,
+    });
+
+    if (approvalResult.triggered) {
+      await markOrderAsPendingApproval(prisma, Math.trunc(current.orderId), approvalResult.message || 'APROVACAO AUTOMATICA');
+    }
+
     return NextResponse.json(updated);
   } catch (err: any) {
     return NextResponse.json({ error: String(err?.message || err) }, { status: 500 });
@@ -203,6 +220,32 @@ export async function DELETE(request: Request, props: { params: Promise<{ id: st
   try {
     const id = parseIdParam(params.id);
     if (!id) return NextResponse.json({ error: 'ID inválido' }, { status: 400 });
+
+    const deletedItemSnapshot = await prisma.salesOrderItem.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        orderId: true,
+        sku: true,
+        name: true,
+        quantity: true,
+        unit: true,
+        unitPrice: true,
+        discountPct: true,
+        lineTotal: true,
+        width: true,
+        length: true,
+        grammage: true,
+        diameter: true,
+        tube: true,
+        weightKg: true,
+        clientOrderNumber: true,
+        clientItemCode: true,
+        clientOrderItemNumber: true,
+        itemDeliveryDate: true,
+      },
+    });
+    if (!deletedItemSnapshot) return NextResponse.json({ error: 'Item não encontrado' }, { status: 404 });
 
     await prisma.$transaction(async (tx) => {
       const item = await tx.salesOrderItem.findUnique({
@@ -249,6 +292,20 @@ export async function DELETE(request: Request, props: { params: Promise<{ id: st
         }
       });
     });
+
+    const approvalResult = await triggerApprovalDocumentsForEvent(prisma, {
+      moduleCode: 'SALES',
+      entityName: 'SALES_ORDER_ITEM',
+      actionName: 'DELETE',
+      entityKey: deletedItemSnapshot.id,
+      rootEntityName: 'SALES_ORDER',
+      rootEntityKey: deletedItemSnapshot.orderId,
+      entityRecord: deletedItemSnapshot,
+    });
+
+    if (approvalResult.triggered) {
+      await markOrderAsPendingApproval(prisma, Math.trunc(deletedItemSnapshot.orderId), approvalResult.message || 'APROVACAO AUTOMATICA');
+    }
 
     return NextResponse.json({ ok: true });
   } catch (err: any) {

@@ -30,6 +30,8 @@ model User {
   userInventoryItemPrices UserInventoryItemPrice[]
   commercialFamilyApprovalUsers CommercialFamilyApprovalUser[]
   commercialFamilyApprovalTypeUsers CommercialFamilyApprovalTypeUser[]
+  approvalDocumentTypeUsers ApprovalDocumentTypeUser[]
+  approvalPendings     ApprovalPending[]
   trustedDevices     TrustedDevice[]
 
   // Gestão FinTI Relations
@@ -765,6 +767,117 @@ model CommercialFamilyApprovalTypeUser {
   @@index([userId], map: "idx_cfatu_user")
   @@index([approvalTypeId], map: "idx_cfatu_type")
   @@map("commercialfamilyapprovaltypeuser")
+}
+
+model ApprovalDocument {
+  id           Int                    @id @default(autoincrement())
+  internalCode String                 @unique @db.VarChar(64)
+  erpId        String?                @unique @db.VarChar(20)
+  description  String                 @db.VarChar(255)
+  moduleCode   String?                @db.VarChar(40)
+  entityName   String?                @db.VarChar(60)
+  actionName   String?                @db.VarChar(20)
+  isActive     Boolean                @default(true)
+  sortOrder    Int                    @default(0)
+  createdAt    DateTime               @default(now())
+  updatedAt    DateTime               @updatedAt
+
+  types        ApprovalDocumentType[]
+  pendings     ApprovalPending[]
+
+  @@index([sortOrder], map: "idx_ad_sort")
+  @@index([moduleCode, entityName, actionName], map: "idx_ad_target")
+  @@map("approvaldocument")
+}
+
+model ApprovalDocumentType {
+  id                 Int                         @id @default(autoincrement())
+  approvalDocumentId Int
+  name               String                      @db.VarChar(64)
+  description        String?                     @db.VarChar(255)
+  sortOrder          Int                         @default(0)
+  isActive           Boolean                     @default(true)
+  createdAt          DateTime                    @default(now())
+  updatedAt          DateTime                    @updatedAt
+
+  approvalDocument   ApprovalDocument            @relation(fields: [approvalDocumentId], references: [id], onDelete: Cascade)
+  fields             ApprovalDocumentTypeField[]
+  assignments        ApprovalDocumentTypeUser[]
+  pendings           ApprovalPending[]
+
+  @@unique([approvalDocumentId, name], map: "uq_adt_document_name")
+  @@index([approvalDocumentId, sortOrder], map: "idx_adt_document_sort")
+  @@map("approvaldocumenttype")
+}
+
+model ApprovalDocumentTypeField {
+  id             Int                        @id @default(autoincrement())
+  approvalTypeId Int
+  label          String                     @db.VarChar(120)
+  fieldType      String                     @db.VarChar(20)
+  required       Boolean                    @default(true)
+  sortOrder      Int                        @default(0)
+  sourceType     String                     @default("MANUAL") @db.VarChar(20)
+  entityFieldKey String?                    @db.VarChar(80)
+  createdAt      DateTime                   @default(now())
+  updatedAt      DateTime                   @updatedAt
+
+  approvalType   ApprovalDocumentType       @relation(fields: [approvalTypeId], references: [id], onDelete: Cascade)
+  assignments    ApprovalDocumentTypeUser[]
+  pendings       ApprovalPending[]
+
+  @@index([approvalTypeId, sortOrder], map: "idx_adtf_type_sort")
+  @@map("approvaldocumenttypefield")
+}
+
+model ApprovalDocumentTypeUser {
+  id             Int                       @id @default(autoincrement())
+  approvalTypeId Int
+  approvalFieldId Int
+  userId         Int
+  rangeFromValue String?                   @db.VarChar(255)
+  rangeToValue   String?                   @db.VarChar(255)
+  createdAt      DateTime                  @default(now())
+  updatedAt      DateTime                  @updatedAt
+
+  approvalType   ApprovalDocumentType      @relation(fields: [approvalTypeId], references: [id], onDelete: Cascade)
+  approvalField  ApprovalDocumentTypeField @relation(fields: [approvalFieldId], references: [id], onDelete: Cascade)
+  user           User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([approvalTypeId, approvalFieldId, userId], map: "uq_adtu_type_field_user")
+  @@index([userId], map: "idx_adtu_user")
+  @@index([approvalTypeId], map: "idx_adtu_type")
+  @@map("approvaldocumenttypeuser")
+}
+
+model ApprovalPending {
+  id                 Int                       @id @default(autoincrement())
+  approvalDocumentId Int
+  approvalTypeId     Int
+  approvalFieldId    Int
+  userId             Int
+  entityName         String                    @db.VarChar(60)
+  entityKey          String                    @db.VarChar(120)
+  rootEntityName     String                    @db.VarChar(60)
+  rootEntityKey      String                    @db.VarChar(120)
+  triggerAction      String                    @db.VarChar(20)
+  status             String                    @default("PENDING") @db.VarChar(20)
+  createdDate        String                    @db.VarChar(10)
+  createdTime        String                    @db.VarChar(8)
+  approvedDate       String?                   @db.VarChar(10)
+  approvedTime       String?                   @db.VarChar(8)
+  createdAt          DateTime                  @default(now())
+  approvedAt         DateTime?
+
+  approvalDocument   ApprovalDocument          @relation(fields: [approvalDocumentId], references: [id], onDelete: Cascade)
+  approvalType       ApprovalDocumentType      @relation(fields: [approvalTypeId], references: [id], onDelete: Cascade)
+  approvalField      ApprovalDocumentTypeField @relation(fields: [approvalFieldId], references: [id], onDelete: Cascade)
+  user               User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([approvalDocumentId, approvalTypeId, approvalFieldId, userId, entityName, entityKey], map: "uq_ap_entity_user")
+  @@index([rootEntityName, rootEntityKey, status], map: "idx_ap_root_status")
+  @@index([userId, status], map: "idx_ap_user_status")
+  @@map("approvalpending")
 }
 
 model PaymentTerm {
