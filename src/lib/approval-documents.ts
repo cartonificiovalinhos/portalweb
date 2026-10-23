@@ -21,7 +21,13 @@ type ApprovalTargetDefinition = {
   moduleLabel: string;
   entityName: ApprovalEntityName;
   entityLabel: string;
+  programCodes: string[];
   actions: Array<{ actionName: ApprovalActionName; actionLabel: string }>;
+};
+
+type ApprovalTargetListOptions = {
+  availableModules?: Array<{ code: string; name: string }>;
+  availablePrograms?: Array<{ code: string; name: string; moduleCode: string; moduleName: string }>;
 };
 
 const TARGET_DEFINITIONS: ApprovalTargetDefinition[] = [
@@ -29,7 +35,8 @@ const TARGET_DEFINITIONS: ApprovalTargetDefinition[] = [
     moduleCode: "SALES",
     moduleLabel: "Vendas",
     entityName: "SALES_ORDER",
-    entityLabel: "Entidade Pedido",
+    entityLabel: "Pedido",
+    programCodes: ["SALES_CREATE_ORDER", "SALES_ORDER_SEARCH"],
     actions: [
       { actionName: "CREATE", actionLabel: "Inclusao" },
       { actionName: "UPDATE", actionLabel: "Alteracao" },
@@ -40,7 +47,8 @@ const TARGET_DEFINITIONS: ApprovalTargetDefinition[] = [
     moduleCode: "SALES",
     moduleLabel: "Vendas",
     entityName: "SALES_ORDER_ITEM",
-    entityLabel: "Entidade Item Pedido",
+    entityLabel: "Item Pedido",
+    programCodes: ["SALES_CREATE_ORDER", "SALES_ORDER_SEARCH"],
     actions: [
       { actionName: "CREATE", actionLabel: "Inclusao" },
       { actionName: "UPDATE", actionLabel: "Alteracao" },
@@ -87,9 +95,62 @@ const ENTITY_FIELDS: Record<ApprovalEntityName, ApprovalEntityFieldDefinition[]>
   ],
 };
 
-export function listApprovalTargetDefinitions() {
-  return TARGET_DEFINITIONS.map((target) => ({
+function getAvailableProgramsByModule(options?: ApprovalTargetListOptions) {
+  const availablePrograms = Array.isArray(options?.availablePrograms) ? options?.availablePrograms : [];
+  const availableModules = Array.isArray(options?.availableModules) ? options?.availableModules : [];
+
+  const moduleNameByCode = new Map(
+    availableModules
+      .map((item) => [String(item.code || "").toUpperCase(), String(item.name || "").trim()])
+      .filter(([code]) => Boolean(code)),
+  );
+
+  const programCodesByModule = new Map<string, Set<string>>();
+  const programNamesByCode = new Map<string, string>();
+
+  for (const program of availablePrograms) {
+    const moduleCode = String(program.moduleCode || "").trim().toUpperCase();
+    const programCode = String(program.code || "").trim().toUpperCase();
+    const moduleName = String(program.moduleName || "").trim();
+    const programName = String(program.name || "").trim();
+    if (!moduleCode || !programCode) continue;
+
+    if (!programCodesByModule.has(moduleCode)) {
+      programCodesByModule.set(moduleCode, new Set<string>());
+    }
+    programCodesByModule.get(moduleCode)!.add(programCode);
+
+    if (moduleName && !moduleNameByCode.has(moduleCode)) {
+      moduleNameByCode.set(moduleCode, moduleName);
+    }
+    if (programName) {
+      programNamesByCode.set(programCode, programName);
+    }
+  }
+
+  return { moduleNameByCode, programCodesByModule, programNamesByCode };
+}
+
+export function listApprovalTargetDefinitions(options?: ApprovalTargetListOptions) {
+  const { moduleNameByCode, programCodesByModule, programNamesByCode } = getAvailableProgramsByModule(options);
+  const hasProgramFilter = Array.isArray(options?.availablePrograms);
+  const hasModuleFilter = Array.isArray(options?.availableModules);
+
+  return TARGET_DEFINITIONS
+    .filter((target) => {
+      const normalizedModuleCode = String(target.moduleCode || "").toUpperCase();
+      if (hasModuleFilter && !moduleNameByCode.has(normalizedModuleCode)) return false;
+      if (!hasProgramFilter) return true;
+      const availableCodes = programCodesByModule.get(String(target.moduleCode || "").toUpperCase());
+      if (!availableCodes || availableCodes.size === 0) return false;
+      return target.programCodes.some((programCode) => availableCodes.has(String(programCode || "").toUpperCase()));
+    })
+    .map((target) => ({
     ...target,
+    moduleLabel: moduleNameByCode.get(String(target.moduleCode || "").toUpperCase()) || target.moduleLabel,
+    programLabels: target.programCodes
+      .map((programCode) => programNamesByCode.get(String(programCode || "").toUpperCase()) || null)
+      .filter(Boolean),
     fields: ENTITY_FIELDS[target.entityName].map((field) => ({
       key: field.key,
       label: field.label,
@@ -108,8 +169,14 @@ export function getApprovalFieldDefinition(entityName: string | null | undefined
   return fields.find((field) => field.key === fieldKey) || null;
 }
 
-export function getApprovalTargetDefinition(moduleCode: string | null | undefined, entityName: string | null | undefined, actionName: string | null | undefined) {
-  const target = TARGET_DEFINITIONS.find((item) => item.moduleCode === moduleCode && item.entityName === entityName);
+export function getApprovalTargetDefinition(
+  moduleCode: string | null | undefined,
+  entityName: string | null | undefined,
+  actionName: string | null | undefined,
+  options?: ApprovalTargetListOptions,
+) {
+  const availableTargets = listApprovalTargetDefinitions(options);
+  const target = availableTargets.find((item) => item.moduleCode === moduleCode && item.entityName === entityName);
   if (!target) return null;
   const action = target.actions.find((item) => item.actionName === actionName);
   if (!action) return null;

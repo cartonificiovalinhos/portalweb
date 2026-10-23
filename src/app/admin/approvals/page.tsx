@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { normalizeApprovalDocumentCode, normalizeApprovalErpId } from "@/lib/approval-documents";
+import { normalizeApprovalErpId } from "@/lib/approval-documents";
 import { sanitizeApprovalTypeName } from "@/lib/approval-type-name";
 
 type ApprovalFieldType = "INTEGER" | "CHAR" | "DATE" | "DECIMAL";
@@ -17,7 +17,6 @@ type ApprovalTarget = {
 };
 type ApprovalDocument = {
   id: number;
-  internalCode: string;
   erpId?: string | null;
   description: string;
   moduleCode?: string | null;
@@ -95,7 +94,7 @@ function blankTypeForm() {
 }
 
 function blankDocumentForm() {
-  return { internalCode: "", erpId: "", description: "", targetKey: "", isActive: true };
+  return { erpId: "", description: "", targetKey: "", isActive: true };
 }
 
 function blankFieldForm() {
@@ -231,7 +230,6 @@ export default function AdminApprovalsPage() {
 
     setDocumentMode("edit");
     setDocumentForm({
-      internalCode: document.internalCode || "",
       erpId: document.erpId || "",
       description: document.description || "",
       targetKey:
@@ -448,7 +446,6 @@ export default function AdminApprovalsPage() {
           method: documentMode === "create" ? "POST" : "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            internalCode: documentForm.internalCode,
             erpId: documentForm.erpId,
             description: documentForm.description,
             moduleCode,
@@ -790,7 +787,7 @@ export default function AdminApprovalsPage() {
                     onClick={() => setSelectedDocumentId(document.id)}
                   >
                     <div className="text-sm font-semibold">{document.description}</div>
-                    <div className="text-xs text-gray-500">{document.internalCode}{document.erpId ? ` • ERP ${document.erpId}` : ""}</div>
+                    <div className="text-xs text-gray-500">{document.erpId ? `ERP ${document.erpId}` : "Sem ID ERP"}</div>
                     <div className="mt-1 text-[11px] text-gray-500">{option?.label || "Sem vinculo automatico"}</div>
                   </button>
                 );
@@ -810,7 +807,7 @@ export default function AdminApprovalsPage() {
                 <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
                   <div>
                     <h3 className="font-medium">Cadastro do Documento da Aprovação</h3>
-                    <p className="text-sm text-gray-500">Defina o identificador interno, o ID ERP, a descricao e, se desejar, o vinculo automatico por modulo, entidade e acao.</p>
+                    <p className="text-sm text-gray-500">Defina o ID ERP, a descricao e, se desejar, o vinculo automatico por modulo, entidade e acao.</p>
                   </div>
                   <div className="flex gap-2">
                     <button className="rounded border px-3 py-2 text-sm hover:bg-gray-50 disabled:opacity-50" onClick={handleCancelDocumentEditor} disabled={savingDocument}>
@@ -824,14 +821,6 @@ export default function AdminApprovalsPage() {
 
                 <div className="grid grid-cols-1 gap-3 lg:grid-cols-12">
                   <div className="lg:col-span-3">
-                    <label className="mb-1 block text-sm font-medium">Codigo interno</label>
-                    <input
-                      className="w-full rounded border px-3 py-2 text-sm"
-                      value={documentForm.internalCode}
-                      onChange={(e) => setDocumentForm((prev) => ({ ...prev, internalCode: normalizeApprovalDocumentCode(e.target.value) }))}
-                    />
-                  </div>
-                  <div className="lg:col-span-3">
                     <label className="mb-1 block text-sm font-medium">ID ERP</label>
                     <input
                       className="w-full rounded border px-3 py-2 text-sm"
@@ -840,7 +829,7 @@ export default function AdminApprovalsPage() {
                       maxLength={20}
                     />
                   </div>
-                  <div className="lg:col-span-4">
+                  <div className="lg:col-span-7">
                     <label className="mb-1 block text-sm font-medium">Descricao</label>
                     <input
                       className="w-full rounded border px-3 py-2 text-sm"

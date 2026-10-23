@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { ensureAdminApprovalAccess, isMissingApprovalConfigTableError } from "@/lib/admin-approvals-auth";
-import { getApprovalTargetDefinition, normalizeApprovalDocumentCode, normalizeApprovalErpId } from "@/lib/approval-documents";
+import { getApprovalTargetDefinition, normalizeApprovalErpId } from "@/lib/approval-documents";
 
 function normalizeText(value: unknown) {
   return String(value || "").trim();
@@ -21,7 +21,6 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
     }
 
     const body = await request.json().catch(() => ({} as any));
-    const internalCode = normalizeApprovalDocumentCode(body?.internalCode);
     const erpId = normalizeApprovalErpId(body?.erpId) || null;
     const description = normalizeText(body?.description);
     const moduleCode = normalizeText(body?.moduleCode) || null;
@@ -29,20 +28,41 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
     const actionName = normalizeText(body?.actionName) || null;
     const isActive = body?.isActive === undefined ? undefined : Boolean(body.isActive);
 
-    if (!internalCode) {
-      return NextResponse.json({ error: "Codigo interno e obrigatorio." }, { status: 400 });
-    }
+    const [activeModules, activePrograms] = await Promise.all([
+      prisma.module.findMany({
+        where: { isActive: true },
+        select: { code: true, name: true },
+      }).catch(() => []),
+      prisma.program.findMany({
+        where: { isActive: true, module: { isActive: true } },
+        select: {
+          code: true,
+          name: true,
+          module: { select: { code: true, name: true } },
+        },
+      }).catch(() => []),
+    ]);
+
+    const targetOptions = {
+      availableModules: activeModules,
+      availablePrograms: activePrograms.map((program) => ({
+        code: String(program.code || ""),
+        name: String(program.name || ""),
+        moduleCode: String(program.module?.code || ""),
+        moduleName: String(program.module?.name || ""),
+      })),
+    };
+
     if (!description) {
       return NextResponse.json({ error: "Descricao e obrigatoria." }, { status: 400 });
     }
-    if ((moduleCode || entityName || actionName) && !getApprovalTargetDefinition(moduleCode, entityName, actionName)) {
+    if ((moduleCode || entityName || actionName) && !getApprovalTargetDefinition(moduleCode, entityName, actionName, targetOptions)) {
       return NextResponse.json({ error: "Modulo, entidade e acao informados sao invalidos." }, { status: 400 });
     }
 
     const saved = await prisma.approvalDocument.update({
       where: { id: Math.trunc(id) },
       data: {
-        internalCode,
         erpId,
         description,
         moduleCode,
@@ -52,7 +72,6 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
       },
       select: {
         id: true,
-        internalCode: true,
         erpId: true,
         description: true,
         moduleCode: true,
@@ -66,7 +85,7 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
       ok: true,
       document: {
         ...saved,
-        target: getApprovalTargetDefinition(saved.moduleCode, saved.entityName, saved.actionName),
+        target: getApprovalTargetDefinition(saved.moduleCode, saved.entityName, saved.actionName, targetOptions),
       },
     });
   } catch (err: any) {
