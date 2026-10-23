@@ -26,7 +26,7 @@ export async function POST(request: Request) {
   try {
     const session = await getServerSession(authOptions);
     const uid = session?.user ? Number((session.user as any).id) : undefined;
-    const entityId = (session as any)?.activeEntityId ?? null;
+    const entityId = (session as any)?.entityId ?? (session as any)?.activeEntityId ?? null;
     if (!uid) return NextResponse.json({ error: 'Não autenticado' }, { status: 401 });
     const allowed = await isProgramAllowed(uid, entityId, 'ADMIN_MODULES');
     if (!allowed) return NextResponse.json({ error: 'Sem permissão' }, { status: 403 });
