@@ -36,6 +36,15 @@ function formatEmailSendError(err: any): string {
     }
   }
 
+  if (Array.isArray(err?.details)) {
+    for (const detail of err.details) {
+      const normalized = String(detail || '').trim();
+      if (normalized && !lines.includes(normalized)) {
+        lines.push(normalized);
+      }
+    }
+  }
+
   return lines.join('\n');
 }
 

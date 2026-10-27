@@ -8,6 +8,12 @@ const SMTP_CONNECTION_TIMEOUT_MS = 10000;
 const SMTP_GREETING_TIMEOUT_MS = 10000;
 const SMTP_SOCKET_TIMEOUT_MS = 20000;
 
+type SmtpConnectionTarget = {
+  connectHost: string;
+  tlsServername?: string;
+  family?: 4;
+};
+
 function withTimeout<T>(promise: Promise<T>, timeoutMs: number, errorMessage: string): Promise<T> {
   return new Promise<T>((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error(errorMessage)), timeoutMs);
@@ -24,18 +30,18 @@ function withTimeout<T>(promise: Promise<T>, timeoutMs: number, errorMessage: st
   });
 }
 
-async function resolveSmtpConnectionTarget(host: string): Promise<{ connectHost: string; tlsServername?: string; family?: 4 }> {
+async function resolveSmtpConnectionTargets(host: string): Promise<SmtpConnectionTarget[]> {
   const trimmedHost = String(host || '').trim();
   if (!trimmedHost) {
-    return { connectHost: '' };
+    return [];
   }
 
   if (net.isIP(trimmedHost) === 4) {
-    return { connectHost: trimmedHost, family: 4 };
+    return [{ connectHost: trimmedHost, family: 4 }];
   }
 
   if (net.isIP(trimmedHost) === 6) {
-    return { connectHost: trimmedHost };
+    return [{ connectHost: trimmedHost }];
   }
 
   try {
@@ -44,19 +50,66 @@ async function resolveSmtpConnectionTarget(host: string): Promise<{ connectHost:
       SMTP_DNS_TIMEOUT_MS,
       'Timeout ao resolver o host SMTP.',
     );
-    const preferredIpv4 = ipv4List.find((item) => String(item || '').trim().length > 0);
-    if (preferredIpv4) {
-      return {
-        connectHost: preferredIpv4,
-        tlsServername: trimmedHost,
-        family: 4,
-      };
+    const uniqueIpv4List = Array.from(
+      new Set(
+        ipv4List
+          .map((item) => String(item || '').trim())
+          .filter((item) => item.length > 0),
+      ),
+    );
+    if (uniqueIpv4List.length > 0) {
+      return [
+        ...uniqueIpv4List.map((ipv4) => ({
+          connectHost: ipv4,
+          tlsServername: trimmedHost,
+          family: 4 as const,
+        })),
+        { connectHost: trimmedHost, tlsServername: trimmedHost },
+      ];
     }
   } catch {
     // If DNS resolution fails here, keep the original host and let nodemailer surface the real error.
   }
 
-  return { connectHost: trimmedHost, tlsServername: trimmedHost };
+  return [{ connectHost: trimmedHost, tlsServername: trimmedHost }];
+}
+
+function shouldTryNextSmtpTarget(err: any): boolean {
+  const code = String(err?.code || '').trim().toUpperCase();
+  const message = String(err?.message || err || '').trim().toLowerCase();
+  return (
+    code === 'ETIMEDOUT' ||
+    code === 'ECONNREFUSED' ||
+    code === 'EHOSTUNREACH' ||
+    code === 'ENETUNREACH' ||
+    code === 'ESOCKET' ||
+    message.includes('connection timeout') ||
+    message.includes('timeout') ||
+    message.includes('connect') ||
+    message.includes('greeting')
+  );
+}
+
+function enrichSmtpError(err: any, meta: { host: string; port: number; secure: boolean; tls: boolean; attemptedHosts: string[] }) {
+  const error = err instanceof Error ? err : new Error(String(err || 'Erro SMTP'));
+  const hostList = meta.attemptedHosts.filter((item) => String(item || '').trim().length > 0);
+  const details = [
+    `Host configurado: ${meta.host}`,
+    `Porta: ${meta.port}`,
+    `SSL: ${meta.secure ? 'Sim' : 'Não'}`,
+    `TLS: ${meta.tls ? 'Sim' : 'Não'}`,
+    hostList.length > 0 ? `Hosts testados: ${hostList.join(', ')}` : '',
+  ].filter(Boolean);
+
+  (error as any).details = Array.isArray((error as any).details)
+    ? [...(error as any).details, ...details]
+    : details;
+
+  if (!String(error.message || '').includes('Host configurado:')) {
+    error.message = `${String(error.message || 'Erro SMTP')}\n${details.join('\n')}`;
+  }
+
+  return error;
 }
 
 export async function sendEmail(options: {
@@ -90,51 +143,82 @@ export async function sendEmail(options: {
     return false;
   }
 
-  const target = await resolveSmtpConnectionTarget(config.smtpHost);
+  const targets = await resolveSmtpConnectionTargets(config.smtpHost);
   const useSsl = config.smtpSsl === 'true';
   const useTls = config.smtpTls === 'true';
 
-  const transport = nodemailer.createTransport({
-    host: target.connectHost || config.smtpHost,
+  const attemptedHosts: string[] = [];
+  let lastError: any = null;
+
+  for (const target of targets.length > 0 ? targets : [{ connectHost: config.smtpHost }]) {
+    const connectHost = target.connectHost || config.smtpHost;
+    attemptedHosts.push(connectHost);
+
+    const transport = nodemailer.createTransport({
+      host: connectHost,
+      port: Number(config.smtpPort) || 587,
+      secure: useSsl,
+      requireTLS: !useSsl && useTls,
+      ignoreTLS: !useSsl && !useTls,
+      family: target.family,
+      connectionTimeout: SMTP_CONNECTION_TIMEOUT_MS,
+      greetingTimeout: SMTP_GREETING_TIMEOUT_MS,
+      socketTimeout: SMTP_SOCKET_TIMEOUT_MS,
+      dnsTimeout: SMTP_DNS_TIMEOUT_MS,
+      auth: {
+        user: config.smtpUser,
+        pass: config.smtpPass
+      },
+      tls: {
+        rejectUnauthorized: false,
+        ...(target.tlsServername ? { servername: target.tlsServername } : {}),
+      }
+    });
+
+    try {
+      const info = await withTimeout(
+        transport.sendMail({
+          from: config.senderEmail || config.smtpUser,
+          to: options.to,
+          subject: options.subject,
+          html: options.html,
+          attachments: options.attachments,
+        }),
+        SMTP_SOCKET_TIMEOUT_MS + 2000,
+        'Timeout ao enviar e-mail. Verifique a configuração SMTP e tente novamente.',
+      );
+      console.log('[Email] Enviado:', info.messageId, { host: connectHost, port: Number(config.smtpPort) || 587 });
+      return true;
+    } catch (err) {
+      lastError = err;
+      console.error('[Email] Erro ao enviar:', {
+        host: connectHost,
+        port: Number(config.smtpPort) || 587,
+        secure: useSsl,
+        tls: useTls,
+        err,
+      });
+      if (!shouldTryNextSmtpTarget(err)) {
+        throw enrichSmtpError(err, {
+          host: config.smtpHost,
+          port: Number(config.smtpPort) || 587,
+          secure: useSsl,
+          tls: useTls,
+          attemptedHosts,
+        });
+      }
+    } finally {
+      transport.close();
+    }
+  }
+
+  throw enrichSmtpError(lastError, {
+    host: config.smtpHost,
     port: Number(config.smtpPort) || 587,
     secure: useSsl,
-    requireTLS: !useSsl && useTls,
-    ignoreTLS: !useSsl && !useTls,
-    family: target.family,
-    connectionTimeout: SMTP_CONNECTION_TIMEOUT_MS,
-    greetingTimeout: SMTP_GREETING_TIMEOUT_MS,
-    socketTimeout: SMTP_SOCKET_TIMEOUT_MS,
-    dnsTimeout: SMTP_DNS_TIMEOUT_MS,
-    auth: {
-      user: config.smtpUser,
-      pass: config.smtpPass
-    },
-    tls: {
-      rejectUnauthorized: false,
-      ...(target.tlsServername ? { servername: target.tlsServername } : {}),
-    }
+    tls: useTls,
+    attemptedHosts,
   });
-
-  try {
-    const info = await withTimeout(
-      transport.sendMail({
-        from: config.senderEmail || config.smtpUser,
-        to: options.to,
-        subject: options.subject,
-        html: options.html,
-        attachments: options.attachments,
-      }),
-      SMTP_SOCKET_TIMEOUT_MS + 2000,
-      'Timeout ao enviar e-mail. Verifique a configuração SMTP e tente novamente.',
-    );
-    console.log('[Email] Enviado:', info.messageId);
-    return true;
-  } catch (err) {
-    console.error('[Email] Erro ao enviar:', err);
-    throw err;
-  } finally {
-    transport.close();
-  }
 }
 
 export async function sendOrderStatusChangeNotification(params: { orderId: number; status: string }) {
