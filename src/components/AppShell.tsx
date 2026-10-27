@@ -16,6 +16,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { data: session, status } = useSession();
   const isLogin = pathname === "/login";
+  const isPublicStandalone = pathname === "/teste";
   const userLabel = session?.user?.name ?? (session?.user as any)?.id ?? '-';
 
   const [perms, setPerms] = useState<Permissions | null>(null);
@@ -46,10 +47,10 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   }, [status, isLogin]);
 
   useEffect(() => {
-    if (status === "unauthenticated" && !isLogin) {
+    if (status === "unauthenticated" && !isLogin && !isPublicStandalone) {
        window.location.href = "/login";
     }
-  }, [status, isLogin]);
+  }, [status, isLogin, isPublicStandalone]);
 
   const loadPerms = useCallback(async () => {
     setLoading(true);
@@ -104,7 +105,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     }
   }, [status, isLogin, refreshCartCount]);
 
-  if (isLogin) {
+  if (isLogin || isPublicStandalone) {
     return <main className="min-h-screen">{children}</main>;
   }
   return (
