@@ -14,6 +14,16 @@ function normalizeDoc(doc: string): string {
   return (doc || '').replace(/\D+/g, '');
 }
 
+function normalizeSalesOrderNotes(value: unknown): string | null {
+  if (value === null || value === undefined) return null;
+  const text = String(value).trim();
+  if (!text) return null;
+  if (text.length > 2000) {
+    throw new Error('Observações devem ter no máximo 2000 caracteres.');
+  }
+  return text;
+}
+
 function parsePositiveInt(raw: unknown): number | null {
   const s = String(raw ?? '').trim();
   const m = s.match(/^\d+/);
@@ -235,6 +245,13 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
     if (typeof body.triangularCustomerDoc === 'string') {
       allowed.triangularCustomerDoc = String(body.triangularCustomerDoc);
     }
+    if (body.notes !== undefined) {
+      try {
+        allowed.notes = normalizeSalesOrderNotes(body.notes);
+      } catch (err: any) {
+        return NextResponse.json({ error: String(err?.message || err || 'Observações inválidas.') }, { status: 400 });
+      }
+    }
     if (typeof body.totalInvoiced === 'number') {
       allowed.totalInvoiced = Number(body.totalInvoiced);
     }
@@ -251,7 +268,8 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
       Object.prototype.hasOwnProperty.call(allowed, 'clientId') ||
       Object.prototype.hasOwnProperty.call(allowed, 'clientOrderNumber') ||
       Object.prototype.hasOwnProperty.call(allowed, 'triangularCustomerName') ||
-      Object.prototype.hasOwnProperty.call(allowed, 'triangularCustomerDoc');
+      Object.prototype.hasOwnProperty.call(allowed, 'triangularCustomerDoc') ||
+      Object.prototype.hasOwnProperty.call(allowed, 'notes');
 
     if (isHeaderSave) {
       const orderValidationError = validateSalesOrderForSave({

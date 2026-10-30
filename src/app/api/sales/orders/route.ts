@@ -144,6 +144,16 @@ function normalizePaymentTermsInput(body: any): string | undefined {
   return undefined;
 }
 
+function normalizeSalesOrderNotes(value: unknown): string | undefined {
+  if (value === null || value === undefined) return undefined;
+  const text = String(value).trim();
+  if (!text) return undefined;
+  if (text.length > 2000) {
+    throw new Error('Observações devem ter no máximo 2000 caracteres.');
+  }
+  return text;
+}
+
 async function resolvePaymentTermByInput(raw: string) {
   const trimmed = String(raw || '').trim();
   if (!trimmed) return null;
@@ -296,6 +306,12 @@ export async function POST(request: Request) {
     const customerDocNorm = typeof customerDoc === 'string' ? normalizeDoc(customerDoc) : undefined;
     const triangularCustomerDocNorm = typeof triangularCustomerDoc === 'string' ? normalizeDoc(triangularCustomerDoc) : undefined;
     const orderClientOrderNumber = typeof clientOrderNumber === 'string' ? clientOrderNumber.trim() || undefined : undefined;
+    let orderNotes: string | undefined;
+    try {
+      orderNotes = normalizeSalesOrderNotes(notes);
+    } catch (err: any) {
+      return NextResponse.json({ error: String(err?.message || err || 'Observações inválidas.') }, { status: 400 });
+    }
 
     let clientId: number | undefined = undefined;
     if (typeof customerId === 'number' && Number.isFinite(customerId) && customerId > 0) {
@@ -593,7 +609,7 @@ export async function POST(request: Request) {
       paymentTerms: paymentTerms !== undefined && paymentTerms !== null ? String(paymentTerms) : undefined,
       carrier: carrier || undefined,
       deliveryDate: parseDate(deliveryDate),
-      notes: notes || undefined,
+      notes: orderNotes,
       createdById: createdById,
       subtotal,
       discountTotal,
@@ -640,7 +656,7 @@ export async function POST(request: Request) {
               paymentTerms !== undefined && paymentTerms !== null ? String(paymentTerms) : null,
               carrier || null,
               parseDate(deliveryDate) ?? null,
-              notes || null,
+              orderNotes || null,
               createdById ?? null,
               subtotal,
               discountTotal,

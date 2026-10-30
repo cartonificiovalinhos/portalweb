@@ -75,6 +75,7 @@ type SalesOrder = {
 import { SalesOrderItemCard, SalesOrderItemRow, supportsSheetDims, supportsCoreDims } from "../components/SalesOrderItemRow";
 
 const ICON_BTN = "inline-flex items-center justify-center w-8 h-8 bg-white border border-gray-300 rounded shadow-sm hover:bg-gray-50 text-gray-700";
+const MAX_ORDER_NOTES_LENGTH = 2000;
 
 function familyName(it: OrderItem): string {
   const cf: any = it.inventoryItem?.commercialFamily;
@@ -207,6 +208,8 @@ function NewSalesOrderContent() {
   const [loading, setLoading] = useState(false);
   const [simulating, setSimulating] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
+  const [notesOpen, setNotesOpen] = useState(false);
+  const [notesDraft, setNotesDraft] = useState('');
 
   useEffect(() => {
     if (!helpOpen) return;
@@ -484,7 +487,7 @@ function NewSalesOrderContent() {
           triangularCustomerDoc: order.triangularCustomerDoc,
           entityCnpj: sessionEntity?.cnpj,
           paymentTerms: order.paymentTerms,
-
+          notes: order.notes,
           deliveryDate: order.deliveryDate,
           items: order.items?.map(it => ({
             inventoryItemId: it.inventoryItem?.id,
@@ -652,6 +655,26 @@ function NewSalesOrderContent() {
   const globalTotalNoTax = globalSubtotal - globalDiscount;
   const globalWeight = globalItems.reduce((s, it) => s + Math.round(computeWeightKg(it)), 0);
 
+  const openNotesModal = () => {
+    setNotesDraft(String(order.notes || ''));
+    setNotesOpen(true);
+  };
+
+  const closeNotesModal = () => {
+    setNotesOpen(false);
+    setNotesDraft('');
+  };
+
+  const saveNotesDraft = () => {
+    const nextNotes = notesDraft.trim();
+    if (nextNotes.length > MAX_ORDER_NOTES_LENGTH) {
+      alert(`Observações devem ter no máximo ${MAX_ORDER_NOTES_LENGTH} caracteres.`);
+      return;
+    }
+    setOrder((prev) => ({ ...prev, notes: nextNotes || null }));
+    closeNotesModal();
+  };
+
   const groups = useMemo(() => {
     const out = new Map<string, OrderItem[]>();
     for (const it of (order.items || [])) {
@@ -722,6 +745,39 @@ function NewSalesOrderContent() {
           </div>
         </div>
       )}
+
+      {notesOpen && (
+        <div className="fixed inset-0 z-50 bg-black bg-opacity-30 flex items-center justify-center p-4" onClick={closeNotesModal}>
+          <div
+            className="bg-white w-full max-w-2xl rounded shadow-lg"
+            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Observações do pedido"
+          >
+            <div className="px-4 py-3 border-b flex items-center">
+              <div className="font-semibold">Observações</div>
+              <button className="ml-auto text-gray-500 hover:text-black" onClick={closeNotesModal} aria-label="Fechar">×</button>
+            </div>
+            <div className="p-4 space-y-3">
+              <textarea
+                className="w-full min-h-[220px] border rounded px-3 py-2 resize-y"
+                maxLength={MAX_ORDER_NOTES_LENGTH}
+                value={notesDraft}
+                onChange={(e) => setNotesDraft(e.target.value)}
+                placeholder="Informe as observações do pedido."
+              />
+              <div className="text-xs text-gray-500 text-right">
+                {notesDraft.length}/{MAX_ORDER_NOTES_LENGTH}
+              </div>
+            </div>
+            <div className="px-4 py-3 border-t flex items-center justify-end gap-2">
+              <button className="px-3 py-1.5 border rounded hover:bg-gray-100" onClick={closeNotesModal}>Cancelar</button>
+              <button className="px-3 py-1.5 rounded bg-blue-600 text-white hover:bg-blue-700" onClick={saveNotesDraft}>Salvar</button>
+            </div>
+          </div>
+        </div>
+      )}
       
       <div className="space-y-3">
         {/* Header */}
@@ -770,6 +826,15 @@ function NewSalesOrderContent() {
                   </button>
                   <button className={`${ICON_BTN} text-green-600 border-green-200 bg-green-50 hover:bg-green-100`} title="Salvar Pedido" onClick={saveOrder}>
                      <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M9 16.17 4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17Z"/></svg>
+                  </button>
+                </div>
+                <div className="flex sm:justify-end">
+                  <button
+                    type="button"
+                    className="px-3 py-1.5 text-sm bg-white border border-gray-300 rounded shadow-sm hover:bg-gray-50 text-gray-700"
+                    onClick={openNotesModal}
+                  >
+                    Observações
                   </button>
                 </div>
               </div>

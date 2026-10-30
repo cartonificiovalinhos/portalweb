@@ -119,6 +119,7 @@ const formatCalendarDateBr = (value?: string | null) => {
 };
 
 const ICON_BTN = "inline-flex items-center justify-center w-8 h-8 bg-white border border-gray-300 rounded shadow-sm hover:bg-gray-50 text-gray-700";
+const MAX_ORDER_NOTES_LENGTH = 2000;
 
 const isDeletableStatus = (status?: string) => {
   const s = (status || '').trim().toUpperCase();
@@ -406,6 +407,9 @@ export default function SalesOrderMaintenancePage() {
   const [shareRecipient, setShareRecipient] = useState('');
   const [shareError, setShareError] = useState<string | null>(null);
   const [sendingShare, setSendingShare] = useState(false);
+  const [notesOpen, setNotesOpen] = useState(false);
+  const [notesDraft, setNotesDraft] = useState('');
+  const [savingNotes, setSavingNotes] = useState(false);
 
   const canEditOrder = isEditableStatus(order?.status);
 
@@ -770,6 +774,50 @@ export default function SalesOrderMaintenancePage() {
     }
   };
 
+  const openNotesModal = () => {
+    setNotesDraft(String(order?.notes || ''));
+    setNotesOpen(true);
+  };
+
+  const closeNotesModal = () => {
+    if (savingNotes) return;
+    setNotesOpen(false);
+    setNotesDraft('');
+  };
+
+  const saveOrderNotes = async () => {
+    if (!order?.id) return;
+    if (!canEditOrder && !isHeaderEditing) {
+      alert('As observações só podem ser alteradas quando o pedido estiver editável.');
+      return;
+    }
+    const nextNotes = notesDraft.trim();
+    if (nextNotes.length > MAX_ORDER_NOTES_LENGTH) {
+      alert(`Observações devem ter no máximo ${MAX_ORDER_NOTES_LENGTH} caracteres.`);
+      return;
+    }
+
+    setSavingNotes(true);
+    try {
+      const res = await fetch(`/api/sales/orders/${order.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ notes: nextNotes || null }),
+      });
+      if (!res.ok) {
+        throw new Error(await parseErrorMessage(res, 'Falha ao salvar observações'));
+      }
+      const updated: SalesOrder = await res.json();
+      setOrder(updated);
+      setNotesOpen(false);
+      setNotesDraft('');
+    } catch (e: any) {
+      alert(e?.message || String(e));
+    } finally {
+      setSavingNotes(false);
+    }
+  };
+
   const fmtCurrency = (n: number | undefined) => (n ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
   const fmtNumber = (n: number | undefined) => (n ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const fmtInt = (n: number | undefined) => Math.round(n ?? 0).toLocaleString('pt-BR', { maximumFractionDigits: 0 });
@@ -1041,6 +1089,45 @@ export default function SalesOrderMaintenancePage() {
         </div>
       )}
 
+      {notesOpen && order && (
+        <div className="fixed inset-0 z-50 bg-black bg-opacity-30 flex items-center justify-center p-4" onClick={closeNotesModal}>
+          <div
+            className="bg-white w-full max-w-2xl rounded shadow-lg"
+            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Observações do pedido"
+          >
+            <div className="px-4 py-3 border-b flex items-center">
+              <div className="font-semibold">Observações</div>
+              <button className="ml-auto text-gray-500 hover:text-black" onClick={closeNotesModal} aria-label="Fechar">×</button>
+            </div>
+            <div className="p-4 space-y-3">
+              <textarea
+                className="w-full min-h-[220px] border rounded px-3 py-2 resize-y"
+                maxLength={MAX_ORDER_NOTES_LENGTH}
+                value={notesDraft}
+                onChange={(e) => setNotesDraft(e.target.value)}
+                placeholder="Informe as observações do pedido."
+              />
+              <div className="text-xs text-gray-500 text-right">
+                {notesDraft.length}/{MAX_ORDER_NOTES_LENGTH}
+              </div>
+            </div>
+            <div className="px-4 py-3 border-t flex items-center justify-end gap-2">
+              <button className="px-3 py-1.5 border rounded hover:bg-gray-100" onClick={closeNotesModal} disabled={savingNotes}>Cancelar</button>
+              <button
+                className={`px-3 py-1.5 rounded bg-blue-600 text-white hover:bg-blue-700 ${savingNotes ? 'opacity-60 cursor-not-allowed' : ''}`}
+                onClick={saveOrderNotes}
+                disabled={savingNotes}
+              >
+                {savingNotes ? 'Salvando...' : 'Salvar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {order && (
         <div className="space-y-3">
           {/* Header do pedido com ícones à direita */}
@@ -1278,6 +1365,16 @@ export default function SalesOrderMaintenancePage() {
                         <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
                           <path d="M20.52 3.48A11.8 11.8 0 0 0 12.12 0C5.54 0 .2 5.34.2 11.92c0 2.1.55 4.16 1.59 5.98L0 24l6.27-1.64a11.84 11.84 0 0 0 5.85 1.49h.01c6.58 0 11.92-5.34 11.92-11.92 0-3.18-1.24-6.17-3.53-8.45Zm-8.4 18.39h-.01a9.86 9.86 0 0 1-5.02-1.38l-.36-.21-3.72.97 1-3.63-.24-.37a9.85 9.85 0 0 1-1.53-5.33c0-5.46 4.43-9.89 9.89-9.89 2.64 0 5.12 1.03 6.99 2.9a9.82 9.82 0 0 1 2.9 6.99c0 5.45-4.44 9.89-9.9 9.89Zm5.42-7.42c-.3-.15-1.77-.88-2.05-.98-.27-.1-.47-.15-.67.15-.2.3-.77.98-.95 1.18-.17.2-.35.22-.65.08-.3-.15-1.26-.46-2.4-1.48-.89-.79-1.49-1.77-1.66-2.07-.17-.3-.02-.46.13-.61.14-.14.3-.35.45-.52.15-.17.2-.3.3-.5.1-.2.05-.37-.03-.52-.08-.15-.67-1.62-.92-2.23-.24-.58-.48-.5-.67-.5h-.57c-.2 0-.52.08-.8.37-.27.3-1.04 1.02-1.04 2.48s1.07 2.87 1.22 3.07c.15.2 2.1 3.2 5.08 4.48.71.31 1.26.49 1.69.63.71.22 1.36.19 1.87.11.57-.08 1.77-.72 2.02-1.42.25-.7.25-1.3.17-1.42-.07-.12-.27-.2-.57-.35Z"></path>
                         </svg>
+                      </button>
+                    </div>
+                    <div className="flex sm:justify-end">
+                      <button
+                        type="button"
+                        className={`px-3 py-1.5 text-sm bg-white border border-gray-300 rounded shadow-sm hover:bg-gray-50 text-gray-700 ${!canEditOrder && !isHeaderEditing ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        onClick={openNotesModal}
+                        disabled={!canEditOrder && !isHeaderEditing}
+                      >
+                        Observações
                       </button>
                     </div>
                   </div>
