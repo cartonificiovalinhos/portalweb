@@ -6,7 +6,14 @@ const SIGNATURE_SIZE = 24;
 
 export const salesOrderMirrorInclude = {
   entity: true,
-  client: true,
+  createdBy: true,
+  client: {
+    include: {
+      contacts: {
+        orderBy: { id: 'asc' },
+      },
+    },
+  },
   items: {
     include: {
       inventoryItem: { include: { commercialFamily: true } }

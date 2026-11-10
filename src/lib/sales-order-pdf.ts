@@ -12,6 +12,34 @@ function normalizeDoc(value: unknown): string {
   return String(value ?? '').replace(/\D+/g, '');
 }
 
+function formatBrazilianDoc(value: unknown): string {
+  const digits = normalizeDoc(value);
+  if (digits.length === 11) {
+    return digits.replace(/^(\d{3})(\d{3})(\d{3})(\d{2})$/, '$1.$2.$3-$4');
+  }
+  if (digits.length === 14) {
+    return digits.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5');
+  }
+  return digits;
+}
+
+function formatCep(value: unknown): string {
+  const digits = String(value ?? '').replace(/\D+/g, '');
+  if (digits.length === 8) return digits.replace(/^(\d{5})(\d{3})$/, '$1-$2');
+  return String(value ?? '').trim();
+}
+
+function formatPhone(value: unknown): string {
+  const digits = String(value ?? '').replace(/\D+/g, '');
+  if (digits.length === 10) {
+    return digits.replace(/^(\d{2})(\d{4})(\d{4})$/, '($1) $2-$3');
+  }
+  if (digits.length === 11) {
+    return digits.replace(/^(\d{2})(\d{5})(\d{4})$/, '($1) $2-$3');
+  }
+  return String(value ?? '').trim();
+}
+
 function firstValue(...values: unknown[]): string {
   for (const value of values) {
     if (value == null || typeof value === 'object') continue;
@@ -103,6 +131,13 @@ function orderRemarks(order: any): string {
   );
 }
 
+function buildStreetLine(...parts: unknown[]): string {
+  return parts
+    .map(value => String(value ?? '').trim())
+    .filter(Boolean)
+    .join(', ');
+}
+
 export function salesOrderPdfFileName(order: any): string {
   const code = String(order?.code || order?.id || 'pedido');
   return `espelho_${code.replace(/[^A-Za-z0-9_-]+/g, '_')}.pdf`;
@@ -178,8 +213,10 @@ export async function renderSalesOrderPdf(order: any): Promise<Buffer> {
   const entity = order?.entity || {};
   const client = order?.client || {};
   const clientAddress = client?.address && typeof client.address === 'object' ? client.address : {};
+  const clientContacts = Array.isArray(client?.contacts) ? client.contacts : [];
+  const primaryContact = clientContacts.find((contact: any) => hasValue(contact?.description) || hasValue(contact?.phone) || hasValue(contact?.email)) || null;
   const customerName = firstValue(order?.customerName, client?.name, client?.companyName);
-  const customerDoc = normalizeDoc(firstValue(client?.doc, client?.cnpj, order?.customerDoc));
+  const customerDoc = formatBrazilianDoc(firstValue(client?.doc, client?.cnpj, order?.customerDoc));
   const customerCode = firstValue(order?.customerCode, client?.code, client?.customerCode);
   const customerOrder = firstValue(
     order?.customerOrderCode,
@@ -334,68 +371,42 @@ export async function renderSalesOrderPdf(order: any): Promise<Buffer> {
     const beforeRight = infoColumns.right.labelX - 7;
     const idLine = [customerCode, customerDoc].filter(Boolean).join(' - ');
     const customerLine = [idLine, customerName].filter(Boolean).join(' ');
-
-    field('Cód.Cli/Nome', customerLine, 'left', rowY(0), fullRowEnd, 9.0);
-    field(
-      'Endereço',
-      firstValue(
-        order?.customerAddress,
+    const addressLine = firstValue(
+      order?.customerAddress,
+      buildStreetLine(
         clientAddress?.street,
+        client?.logradouro,
         client?.street,
         typeof client?.address === 'string' ? client.address : '',
         client?.addressLine1,
       ),
-      'left',
-      rowY(1),
-      fullRowEnd,
     );
-    field(
-      'Bairro',
-      firstValue(clientAddress?.neighborhood, client?.neighborhood, order?.customerNeighborhood),
-      'left',
-      rowY(2),
-      fullRowEnd,
+    const neighborhood = firstValue(clientAddress?.neighborhood, client?.bairro, client?.neighborhood, order?.customerNeighborhood);
+    const city = firstValue(clientAddress?.city, client?.cidade, client?.city, order?.customerCity);
+    const state = firstValue(clientAddress?.state, client?.estado, client?.state, client?.uf, order?.customerState);
+    const zipCode = formatCep(firstValue(clientAddress?.zipCode, client?.cep, client?.zipCode, client?.postalCode, order?.customerZipCode));
+    const contactName = firstValue(client?.contactName, order?.contactName, client?.contact, primaryContact?.description);
+    const phone = formatPhone(firstValue(client?.phone, client?.phoneNumber, order?.customerPhone, primaryContact?.phone));
+    const representative = firstValue(
+      order?.salesRepresentative?.name,
+      order?.representative?.name,
+      order?.representativeName,
+      order?.sellerName,
+      order?.createdBy?.name,
     );
-    field('Estado', firstValue(clientAddress?.state, client?.state, client?.uf, order?.customerState), 'left', rowY(3));
-    field('Cidade', firstValue(clientAddress?.city, client?.city, order?.customerCity), 'middle', rowY(3));
-    field('Contato', firstValue(client?.contactName, order?.contactName, client?.contact), 'right', rowY(3), undefined, 8.5);
-    field('Telefone', firstValue(client?.phone, client?.phoneNumber, order?.customerPhone), 'left', rowY(4));
-    field(
-      'CEP',
-      firstValue(clientAddress?.zipCode, client?.zipCode, client?.postalCode, order?.customerZipCode),
-      'middle',
-      rowY(4),
-      fullRowEnd,
-    );
-    field(
-      'Nat.Operação',
-      firstValue(order?.operationNature, order?.natureOfOperation, order?.operation?.description),
-      'left',
-      rowY(5),
-      fullRowEnd,
-    );
-    field(
-      'Cód.Repres',
-      firstValue(
-        order?.salesRepresentative?.name,
-        order?.representative?.name,
-        order?.representativeName,
-        order?.sellerName,
-      ),
-      'left',
-      rowY(6),
-      beforeRight,
-    );
-    field('Operador', firstValue(order?.operatorName, order?.createdBy?.name, order?.user?.name), 'right', rowY(6), undefined, 8.5);
-    field('Emissão', orderDate, 'left', rowY(7));
-    field('Implantação', implementationDate, 'middle', rowY(7), fullRowEnd);
-    field(
-      'Transportador',
-      firstValue(order?.carrier?.name, order?.transportCompany, order?.carrierName, order?.transporter),
-      'left',
-      rowY(8),
-    );
-    field('Cond.Pagto', paymentTerms, 'middle', rowY(8), fullRowEnd);
+
+    field('Cód.Cli/Nome', customerLine, 'left', rowY(0), fullRowEnd, 9.0);
+    field('Endereço', addressLine, 'left', rowY(1), fullRowEnd);
+    field('Bairro', neighborhood, 'left', rowY(2), beforeRight);
+    field('Contato', contactName, 'right', rowY(2), undefined, 8.5);
+    field('Estado', state, 'left', rowY(3));
+    field('Cidade', city, 'middle', rowY(3));
+    field('Telefone', phone, 'right', rowY(3), undefined, 8.5);
+    field('CEP', zipCode, 'left', rowY(4), beforeRight);
+    field('Cód.Repres', representative, 'left', rowY(5), fullRowEnd);
+    field('Emissão', orderDate, 'left', rowY(6));
+    field('Implantação', implementationDate, 'middle', rowY(6), fullRowEnd);
+    field('Cond.Pagto', paymentTerms, 'middle', rowY(7), fullRowEnd);
   }
 
   function tableGrid(y: number, height: number) {
@@ -533,19 +544,12 @@ export async function renderSalesOrderPdf(order: any): Promise<Buffer> {
   }
 
   // Confirmacao, observacoes e assinatura aparecem somente ao final do pedido.
-  // Aproximar o espaco livre do modelo Word (duas linhas vazias antes de TOTAL).
   const remarks = orderRemarks(order);
   const remarksWidth = contentWidth - 12;
   doc.font('Times-Roman').fontSize(10);
   const remarkHeight = remarks ? doc.heightOfString(remarks, { width: remarksWidth, lineGap: 2 }) : 0;
   const estimatedFooterHeight = 323 + Math.max(0, remarkHeight - 28);
   if (y + 15 + 18 + estimatedFooterHeight > pageBottom) startNewPage();
-  for (let i = 0; i < 2; i++) {
-    if (y + 15 + estimatedFooterHeight <= pageBottom) {
-      drawTableRow(y, {});
-      y += 15;
-    }
-  }
   if (y + 15 + 315 > pageBottom) startNewPage();
 
   drawTableRow(y, {
