@@ -207,8 +207,8 @@ export async function renderSalesOrderPdf(order: any): Promise<Buffer> {
   const pageBottom = pageHeight - 39;
   const headerTop = 63;
   const headerDividerY = 137;
-  const headerBottom = 267;
-  const tableTop = 284;
+  const headerBottom = 253;
+  const tableTop = 270;
 
   const entity = order?.entity || {};
   const client = order?.client || {};
@@ -388,11 +388,11 @@ export async function renderSalesOrderPdf(order: any): Promise<Buffer> {
     const contactName = firstValue(client?.contactName, order?.contactName, client?.contact, primaryContact?.description);
     const phone = formatPhone(firstValue(client?.phone, client?.phoneNumber, order?.customerPhone, primaryContact?.phone));
     const representative = firstValue(
+      order?.createdBy?.name,
       order?.salesRepresentative?.name,
       order?.representative?.name,
       order?.representativeName,
       order?.sellerName,
-      order?.createdBy?.name,
     );
 
     field('Cód.Cli/Nome', customerLine, 'left', rowY(0), fullRowEnd, 9.0);
@@ -403,10 +403,10 @@ export async function renderSalesOrderPdf(order: any): Promise<Buffer> {
     field('Cidade', city, 'middle', rowY(3));
     field('Telefone', phone, 'right', rowY(3), undefined, 8.5);
     field('CEP', zipCode, 'left', rowY(4), beforeRight);
+    field('Cond.Pagto', paymentTerms, 'middle', rowY(4), fullRowEnd);
     field('Cód.Repres', representative, 'left', rowY(5), fullRowEnd);
     field('Emissão', orderDate, 'left', rowY(6));
     field('Implantação', implementationDate, 'middle', rowY(6), fullRowEnd);
-    field('Cond.Pagto', paymentTerms, 'middle', rowY(7), fullRowEnd);
   }
 
   function tableGrid(y: number, height: number) {
