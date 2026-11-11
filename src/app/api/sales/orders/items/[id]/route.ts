@@ -163,7 +163,7 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
       length: candidate.length,
       grammage: candidate.grammage,
     });
-    const dimensionError = validateOrderItemDimensionLimits(candidate);
+    const dimensionError = validateOrderItemDimensionLimits(candidate, { requirePositiveQuantity: false });
     if (dimensionError) {
       return NextResponse.json({ error: dimensionError }, { status: 400 });
     }

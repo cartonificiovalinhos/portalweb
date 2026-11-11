@@ -19,6 +19,10 @@ export type OrderItemWithDimensionLimits = {
   } | null;
 };
 
+export type OrderItemDimensionValidationOptions = {
+  requirePositiveQuantity?: boolean;
+};
+
 function normalizeText(value: unknown): string {
   return String(value ?? '')
     .normalize('NFD')
@@ -98,9 +102,13 @@ export function validateOrderItemDimensionField(
   return buildRangeMessage('Comprimento', numericValue, normalizeOptionalNumber(family.lengthMin), normalizeOptionalNumber(family.lengthMax), item);
 }
 
-export function validateOrderItemDimensionLimits(item: OrderItemWithDimensionLimits): string | null {
+export function validateOrderItemDimensionLimits(
+  item: OrderItemWithDimensionLimits,
+  options: OrderItemDimensionValidationOptions = {},
+): string | null {
+  const requirePositiveQuantity = options.requirePositiveQuantity !== false;
   const quantity = normalizeOptionalNumber(item.quantity);
-  if (quantity === null || quantity <= 0) {
+  if (requirePositiveQuantity && (quantity === null || quantity <= 0)) {
     return buildRequiredPositiveMessage('Quantidade', item);
   }
 

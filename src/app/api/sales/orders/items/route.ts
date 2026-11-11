@@ -68,7 +68,7 @@ export async function POST(request: Request) {
           ...payload,
           inventoryItem: { commercialFamily: invItem.commercialFamily ?? null },
         });
-        const dimensionError = validateOrderItemDimensionLimits(candidate);
+        const dimensionError = validateOrderItemDimensionLimits(candidate, { requirePositiveQuantity: false });
         if (dimensionError) {
           return NextResponse.json({ error: dimensionError }, { status: 400 });
         }
