@@ -432,10 +432,7 @@ export const SalesOrderItemRow = ({
       setHasPendingDimensionChanges(true);
     }
     setLocalItem(updated);
-    const shouldPropagateImmediately = Boolean(onAutoSave);
-    if (shouldPropagateImmediately) {
-      onPreviewUpdate(updated); // Immediate update for UI/Calculations
-    }
+    onPreviewUpdate(updated); // Keep the order state aligned with what is already filled on screen
     if (onAutoSave && !requiresExplicitSave && !hasPendingDimensionChanges) {
         debouncedSave(updated); // Delayed save for API
     }
@@ -897,10 +894,7 @@ export const SalesOrderItemCard = ({
       setHasPendingDimensionChanges(true);
     }
     setLocalItem(updated);
-    const shouldPropagateImmediately = Boolean(onAutoSave);
-    if (shouldPropagateImmediately) {
-      onPreviewUpdate(updated);
-    }
+    onPreviewUpdate(updated);
     if (onAutoSave && !requiresExplicitSave && !hasPendingDimensionChanges) {
         debouncedSave(updated);
     }

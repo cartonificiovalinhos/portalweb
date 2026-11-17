@@ -66,6 +66,12 @@ function fmtDecimal(value: number, digits = 2): string {
   });
 }
 
+function fmtRoundedInt(value: number): string {
+  return Math.round(finiteNumber(value)).toLocaleString('pt-BR', {
+    maximumFractionDigits: 0,
+  });
+}
+
 function fmtDate(value: unknown): string {
   if (!value) return '';
   const str = String(value);
@@ -532,8 +538,8 @@ export async function renderSalesOrderPdf(order: any): Promise<Buffer> {
         description: itemDescription(item),
         quality,
         unitPrice: fmtDecimal(calculated.unitPrice, 4),
-        quantity: fmtDecimal(calculated.quantity, 4),
-        weight: calculated.weight > 0 ? fmtDecimal(calculated.weight, 4) : '',
+        quantity: fmtRoundedInt(calculated.quantity),
+        weight: calculated.weight > 0 ? fmtRoundedInt(calculated.weight) : '',
         pricePerKg: calculated.pricePerKg == null ? '' : fmtDecimal(calculated.pricePerKg, 4),
         total: fmtDecimal(calculated.total, 2),
         ipi: calculated.ipiValue == null ? '' : fmtDecimal(calculated.ipiValue, 2),
@@ -554,8 +560,8 @@ export async function renderSalesOrderPdf(order: any): Promise<Buffer> {
 
   drawTableRow(y, {
     description: 'TOTAL',
-    quantity: fmtDecimal(sumQuantity, 4),
-    weight: fmtDecimal(sumWeight, 4),
+    quantity: fmtRoundedInt(sumQuantity),
+    weight: fmtRoundedInt(sumWeight),
     // Media ponderada: soma do Vl Total / soma dos pesos.
     pricePerKg: sumWeight > 0 ? fmtDecimal(sumTotal / sumWeight, 4) : '',
     total: fmtDecimal(sumTotal, 2),
