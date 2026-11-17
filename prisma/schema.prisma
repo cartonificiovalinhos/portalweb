@@ -80,6 +80,7 @@ model InventoryItem {
   id                 Int               @id @default(autoincrement())
   name               String
   sku                String?           @unique
+  quality            String?           @db.VarChar(20)
   quantity           Int               @default(0)
   unit               String?
   active             Boolean           @default(true)

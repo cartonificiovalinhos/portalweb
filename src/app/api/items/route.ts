@@ -164,6 +164,10 @@ export async function POST(request: Request) {
   const body = await request.json();
   const data: any = { name: String(body.name || '').trim() };
   if (body.sku !== undefined) data.sku = String(body.sku || '').trim();
+  if (body.quality !== undefined) {
+    const quality = String(body.quality || '').trim();
+    data.quality = quality ? quality.slice(0, 20) : null;
+  }
   if (body.unit !== undefined) data.unit = String(body.unit || '').trim();
   if (body.active !== undefined) data.active = await buildInventoryItemPatchData(prisma, { active: body.active }).then((patch) => patch.active ?? true);
   if (body.quantity !== undefined) data.quantity = Number(body.quantity);

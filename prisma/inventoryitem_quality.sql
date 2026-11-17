@@ -1,0 +1,2 @@
+ALTER TABLE inventoryitem
+  ADD COLUMN IF NOT EXISTS quality VARCHAR(20) NULL AFTER sku;

@@ -56,6 +56,10 @@ export async function buildInventoryItemPatchData(
 
   if (body.name !== undefined) data.name = String(body.name || '').trim();
   if (body.sku !== undefined) data.sku = String(body.sku || '').trim();
+  if (body.quality !== undefined) {
+    const quality = String(body.quality || '').trim();
+    data.quality = quality ? quality.slice(0, 20) : null;
+  }
   if (body.unit !== undefined) data.unit = String(body.unit || '').trim();
   if (body.active !== undefined) data.active = parseOptionalBoolean(body.active);
   if (body.width !== undefined) data.width = body.width === null || body.width === '' ? null : Number(body.width);

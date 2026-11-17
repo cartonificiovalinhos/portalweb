@@ -5,6 +5,7 @@ type Item = {
   id: number;
   name: string;
   sku?: string | null;
+  quality?: string | null;
   unit?: string | null;
   active?: boolean | null;
   width?: number | null;
@@ -27,7 +28,7 @@ export default function BaseItemMaintenancePage() {
   // Formulário unificado (inclusão/alteração)
   const [formOpen, setFormOpen] = useState<boolean>(false);
   const [editingId, setEditingId] = useState<number | null>(null);
-  const [form, setForm] = useState<{ sku: string; name: string; unit: string; active: boolean; width: string; length: string; grammage: string; commercialFamilyId: number | null }>({ sku: "", name: "", unit: "", active: true, width: "", length: "", grammage: "", commercialFamilyId: null });
+  const [form, setForm] = useState<{ sku: string; name: string; quality: string; unit: string; active: boolean; width: string; length: string; grammage: string; commercialFamilyId: number | null }>({ sku: "", name: "", quality: "", unit: "", active: true, width: "", length: "", grammage: "", commercialFamilyId: null });
   const [saving, setSaving] = useState<boolean>(false);
   const [saveMsg, setSaveMsg] = useState<string>("");
   // Busca de família comercial
@@ -105,7 +106,7 @@ export default function BaseItemMaintenancePage() {
 
   const openAddForm = () => {
     setEditingId(null);
-    setForm({ sku: "", name: "", unit: "", active: true, width: "", length: "", grammage: "", commercialFamilyId: null });
+    setForm({ sku: "", name: "", quality: "", unit: "", active: true, width: "", length: "", grammage: "", commercialFamilyId: null });
     setFamilyQuery("");
     setFamilySug([]);
     setShowFamilySug(false);
@@ -122,6 +123,7 @@ export default function BaseItemMaintenancePage() {
       setForm({
         sku: full?.sku || "",
         name: full?.name || "",
+        quality: full?.quality || "",
         unit: full?.unit || "",
         active: full?.active !== false,
         width: full?.width != null ? String(full.width) : "",
@@ -133,6 +135,7 @@ export default function BaseItemMaintenancePage() {
       setForm({
         sku: item.sku || "",
         name: item.name || "",
+        quality: item.quality || "",
         unit: item.unit || "",
         active: item.active !== false,
         width: item.width != null ? String(item.width) : "",
@@ -154,7 +157,7 @@ export default function BaseItemMaintenancePage() {
   const cancelForm = () => {
     setFormOpen(false);
     setEditingId(null);
-    setForm({ sku: "", name: "", unit: "", active: true, width: "", length: "", grammage: "", commercialFamilyId: null });
+    setForm({ sku: "", name: "", quality: "", unit: "", active: true, width: "", length: "", grammage: "", commercialFamilyId: null });
     setFamilyQuery("");
     setFamilySug([]);
     setShowFamilySug(false);
@@ -169,6 +172,7 @@ export default function BaseItemMaintenancePage() {
     const payload = {
       sku: form.sku.trim(),
       name: form.name.trim(),
+      quality: form.quality.trim().slice(0, 20),
       unit: form.unit.trim(),
       active: form.active,
       width: form.width.trim() === '' ? null : Number(form.width),
@@ -266,6 +270,15 @@ export default function BaseItemMaintenancePage() {
                 <div className="md:col-span-2">
                   <label className="text-xs text-gray-600">Descrição do item</label>
                   <input value={form.name} onChange={(e)=>setForm((f)=>({ ...f, name: e.target.value }))} className="w-full border rounded px-2 py-1 text-sm" />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-600">Qualidade</label>
+                  <input
+                    value={form.quality}
+                    onChange={(e)=>setForm((f)=>({ ...f, quality: e.target.value.slice(0, 20) }))}
+                    maxLength={20}
+                    className="w-full border rounded px-2 py-1 text-sm"
+                  />
                 </div>
                 <div>
                   <label className="text-xs text-gray-600">Unidade de medida</label>
