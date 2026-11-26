@@ -286,12 +286,13 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
     const session = await getServerSession(authOptions);
-    const createdById = session?.user ? Number((session.user as any).id) : undefined;
+    let createdById = session?.user ? Number((session.user as any).id) : undefined;
     const normalizedPaymentTerms = normalizePaymentTermsInput(body);
     const {
       customerName,
       customerDoc,
       customerId,
+      representativeDoc,
       erpOrderNumber,
       clientOrderNumber,
       triangularCustomerName,
@@ -306,6 +307,7 @@ export async function POST(request: Request) {
     } = body || {};
     const customerDocNorm = typeof customerDoc === 'string' ? normalizeDoc(customerDoc) : undefined;
     const triangularCustomerDocNorm = typeof triangularCustomerDoc === 'string' ? normalizeDoc(triangularCustomerDoc) : undefined;
+    const representativeDocNorm = typeof representativeDoc === 'string' ? normalizeDoc(representativeDoc) : undefined;
     const normalizedErpOrderNumber = erpOrderNumber === null || erpOrderNumber === undefined
       ? undefined
       : String(erpOrderNumber).trim() || undefined;
@@ -323,6 +325,16 @@ export async function POST(request: Request) {
     } else if (customerDocNorm) {
       const c = await prisma.client.findFirst({ where: { doc: customerDocNorm }, select: { id: true } }).catch(() => null);
       if (c?.id) clientId = Number(c.id);
+    }
+    if (representativeDocNorm) {
+      const representativeUser = await prisma.user.findUnique({
+        where: { doc: representativeDocNorm },
+        select: { id: true },
+      }).catch(() => null);
+      if (!representativeUser?.id) {
+        return NextResponse.json({ error: 'Representante não encontrado para o representativeDoc informado.' }, { status: 400 });
+      }
+      createdById = Number(representativeUser.id);
     }
     const parseDate = (value: any): Date | undefined => {
       if (!value) return undefined;
