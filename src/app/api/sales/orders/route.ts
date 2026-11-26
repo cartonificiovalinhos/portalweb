@@ -331,6 +331,7 @@ export async function POST(request: Request) {
         let d: number;
         const iso = /^(\d{4})-(\d{2})-(\d{2})/;
         const dmy = /^(\d{2})\/(\d{2})\/(\d{4})$/;
+        const dmyHyphen = /^(\d{2})-(\d{2})-(\d{4})$/;
         const ymd = /^(\d{4})(\d{2})(\d{2})$/;
         let mRes = v.match(iso);
         if (mRes) {
@@ -341,6 +342,14 @@ export async function POST(request: Request) {
           return isNaN(dt.getTime()) ? undefined : dt;
         }
         mRes = v.match(dmy);
+        if (mRes) {
+          d = Number(mRes[1]);
+          m = Number(mRes[2]) - 1;
+          y = Number(mRes[3]);
+          const dt = new Date(y, m, d);
+          return isNaN(dt.getTime()) ? undefined : dt;
+        }
+        mRes = v.match(dmyHyphen);
         if (mRes) {
           d = Number(mRes[1]);
           m = Number(mRes[2]) - 1;
@@ -409,7 +418,7 @@ export async function POST(request: Request) {
         clientOrderNumber: typeof it.clientOrderNumber === 'string' ? String(it.clientOrderNumber).trim() || undefined : undefined,
         clientItemCode: it.clientItemCode || undefined,
         clientOrderItemNumber: it.clientOrderItemNumber ? Number(it.clientOrderItemNumber) : undefined,
-        itemDeliveryDate: parseDate(it.itemDeliveryDate),
+        itemDeliveryDate: parseDate(it.itemDeliveryDate ?? it.deliveryDate),
         internalResin: !!it.internalResin,
         externalResin: !!it.externalResin,
         creases: it.creases || undefined,

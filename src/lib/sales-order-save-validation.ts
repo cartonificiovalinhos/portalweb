@@ -50,6 +50,19 @@ function parseDateInput(value: string | Date | null | undefined): Date | null {
     return null;
   }
 
+  const brHyphen = raw.match(/^(\d{2})-(\d{2})-(\d{4})$/);
+  if (brHyphen) {
+    const dt = new Date(Number(brHyphen[3]), Number(brHyphen[2]) - 1, Number(brHyphen[1]));
+    if (
+      dt.getFullYear() === Number(brHyphen[3]) &&
+      dt.getMonth() === Number(brHyphen[2]) - 1 &&
+      dt.getDate() === Number(brHyphen[1])
+    ) {
+      return dt;
+    }
+    return null;
+  }
+
   const parsed = new Date(raw);
   return Number.isFinite(parsed.getTime()) ? parsed : null;
 }
