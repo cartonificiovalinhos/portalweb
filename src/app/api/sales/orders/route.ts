@@ -630,8 +630,10 @@ export async function POST(request: Request) {
       }
     }
 
+    const externalIntegratedStatus = normalizedErpOrderNumber ? 'Integrado' : undefined;
     const baseOrderCreateData = {
       entityId,
+      status: externalIntegratedStatus,
       customerName,
       customerDoc: customerDocNorm || undefined,
       clientId: clientId,
@@ -659,7 +661,7 @@ export async function POST(request: Request) {
           data: orderCreateData,
           include: { items: true },
         });
-        const finalOrder = await applyOrderCreateApproval(created.id);
+        const finalOrder = normalizedErpOrderNumber ? created : await applyOrderCreateApproval(created.id);
         return NextResponse.json(finalOrder || created, { status: 201 });
       } catch (e: any) {
         if (isUniqueSalesOrderCodeError(e)) continue;
@@ -675,10 +677,11 @@ export async function POST(request: Request) {
 
              await tx.$executeRawUnsafe(
               `INSERT INTO salesorder
-                (id, code, entityId, customerName, customerDoc, clientId, erpOrderNumber, clientOrderNumber, triangularCustomerName, triangularCustomerDoc, paymentTerms, carrier, deliveryDate, notes, createdById, subtotal, discountTotal, total, createdAt, updatedAt)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
+                (id, code, status, entityId, customerName, customerDoc, clientId, erpOrderNumber, clientOrderNumber, triangularCustomerName, triangularCustomerDoc, paymentTerms, carrier, deliveryDate, notes, createdById, subtotal, discountTotal, total, createdAt, updatedAt)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
               Math.trunc(nextOrderId),
               code,
+              externalIntegratedStatus ?? 'OPEN',
               entityId ?? null,
               customerName,
               customerDocNorm || null,
@@ -743,7 +746,9 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'Falha ao obter ID do pedido após criação (fallback)' }, { status: 500 });
           }
 
-          const finalOrder = await applyOrderCreateApproval(Math.trunc(createdId));
+          const finalOrder = normalizedErpOrderNumber
+            ? await prisma.salesOrder.findUnique({ where: { id: Math.trunc(createdId) }, include: { items: true } })
+            : await applyOrderCreateApproval(Math.trunc(createdId));
           return NextResponse.json(finalOrder || { id: createdId }, { status: 201 });
         } catch (fallbackErr: any) {
           if (isUniqueSalesOrderCodeError(fallbackErr)) continue;
