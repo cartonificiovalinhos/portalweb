@@ -128,6 +128,26 @@ function lineBase(it: { quantity?: number | null; unitPrice?: number | null; uni
   return qty * price;
 }
 
+function normalizeOptionalItemNumber(value: unknown): number | undefined {
+  if (value === undefined || value === null || value === '') return undefined;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+function preferPositiveExternalDimension(
+  providedValue: unknown,
+  fallbackValue: unknown,
+  useFallback: boolean,
+): number | undefined {
+  const provided = normalizeOptionalItemNumber(providedValue);
+  if (!useFallback) return provided;
+  if (provided !== undefined && provided > 0) return provided;
+
+  const fallback = normalizeOptionalItemNumber(fallbackValue);
+  if (fallback !== undefined && fallback > 0) return fallback;
+  return provided;
+}
+
 function normalizePaymentTermsInput(body: any): string | undefined {
   const candidates = [
     body?.paymentTerms,
@@ -415,26 +435,82 @@ export async function POST(request: Request) {
       }
     }
     const rawItems = Array.isArray(items) ? items : [];
+    const isExternalIntegration = !session?.user || Boolean(normalizedErpOrderNumber);
+    const rawInventoryItemIds = Array.from(
+      new Set(
+        rawItems
+          .map((it: any) => Number(it?.inventoryItemId))
+          .filter((n: number) => Number.isFinite(n) && n > 0)
+          .map((n: number) => Math.trunc(n))
+      )
+    );
+    const rawSkus = Array.from(
+      new Set(
+        rawItems
+          .map((it: any) => (typeof it?.sku === 'string' ? it.sku.trim() : ''))
+          .filter((sku: string) => Boolean(sku))
+      )
+    );
+    const inventoryItemLookupWhere: any[] = [];
+    if (rawInventoryItemIds.length > 0) {
+      inventoryItemLookupWhere.push({ id: { in: rawInventoryItemIds } });
+    }
+    if (rawSkus.length > 0) {
+      inventoryItemLookupWhere.push({ sku: { in: rawSkus } });
+    }
+    const inventoryItemsForFallback = inventoryItemLookupWhere.length > 0
+      ? await prisma.inventoryItem.findMany({
+          where: { OR: inventoryItemLookupWhere },
+          select: {
+            id: true,
+            sku: true,
+            width: true,
+            length: true,
+            grammage: true,
+          },
+        })
+      : [];
+    const inventoryItemById = new Map<number, (typeof inventoryItemsForFallback)[number]>();
+    const inventoryItemBySku = new Map<string, (typeof inventoryItemsForFallback)[number]>();
+    for (const inventoryItem of inventoryItemsForFallback) {
+      inventoryItemById.set(Number(inventoryItem.id), inventoryItem);
+      const inventorySku = String(inventoryItem.sku || '').trim();
+      if (inventorySku) inventoryItemBySku.set(inventorySku, inventoryItem);
+    }
 
     const normalizedItems = await Promise.all(rawItems.map(async (it: any) => {
       const qty = it.quantity !== undefined ? Number(it.quantity) : 1;
       const price = Number(it.unitPrice || 0);
       const disc = Number(it.discountPct || 0);
-      const inventoryItemId = it.inventoryItemId ? Number(it.inventoryItemId) : undefined;
+      const requestedInventoryItemId = it.inventoryItemId ? Number(it.inventoryItemId) : undefined;
+      const sku = typeof it.sku === 'string' ? it.sku.trim() : '';
+      const fallbackInventoryItem =
+        (requestedInventoryItemId && Number.isFinite(requestedInventoryItemId) && requestedInventoryItemId > 0
+          ? inventoryItemById.get(Math.trunc(requestedInventoryItemId))
+          : undefined) ||
+        (sku ? inventoryItemBySku.get(sku) : undefined);
+      const inventoryItemId = requestedInventoryItemId && Number.isFinite(requestedInventoryItemId) && requestedInventoryItemId > 0
+        ? Math.trunc(requestedInventoryItemId)
+        : fallbackInventoryItem?.id
+        ? Number(fallbackInventoryItem.id)
+        : undefined;
+      const width = preferPositiveExternalDimension(it.width, fallbackInventoryItem?.width, isExternalIntegration);
+      const length = preferPositiveExternalDimension(it.length, fallbackInventoryItem?.length, isExternalIntegration);
+      const grammage = preferPositiveExternalDimension(it.grammage, fallbackInventoryItem?.grammage, isExternalIntegration);
       const base = lineBase(
         {
           quantity: qty,
           unitPrice: price,
           unit: it.unit || undefined,
-          width: it.width !== undefined ? Number(it.width) : undefined,
-          length: it.length !== undefined ? Number(it.length) : undefined,
-          grammage: it.grammage !== undefined ? Number(it.grammage) : undefined,
+          width,
+          length,
+          grammage,
         },
       );
       const lineTotal = base * (1 - disc / 100);
       const normalizedItem = {
         inventoryItemId,
-        sku: it.sku || undefined,
+        sku: sku || undefined,
         name: String(it.name || it.productName || 'Produto'),
         quantity: qty,
         weightKg: it.weightKg !== undefined
@@ -445,9 +521,9 @@ export async function POST(request: Request) {
         unit: it.unit || undefined,
         unitPrice: price,
         discountPct: disc,
-        width: it.width !== undefined ? Number(it.width) : undefined,
-        length: it.length !== undefined ? Number(it.length) : undefined,
-        grammage: it.grammage !== undefined ? Number(it.grammage) : undefined,
+        width,
+        length,
+        grammage,
         diameter: it.diameter !== undefined ? Number(it.diameter) : undefined,
         tube: it.tube !== undefined ? Number(it.tube) : undefined,
         clientOrderNumber: typeof it.clientOrderNumber === 'string' ? String(it.clientOrderNumber).trim() || undefined : undefined,
