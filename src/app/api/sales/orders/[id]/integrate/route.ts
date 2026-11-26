@@ -77,6 +77,9 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
 
       if (!customerDocRaw) return NextResponse.json({ error: 'CNPJ do cliente não encontrado.' }, { status: 400 });
       if (!entityDoc) return NextResponse.json({ error: 'Representante (Entidade) não identificado no pedido.' }, { status: 400 });
+      const outboundErpOrderNumber = order.erpOrderNumber && String(order.erpOrderNumber).trim()
+        ? Number(String(order.erpOrderNumber).trim())
+        : null;
 
       // Parse optional resource from body
       let resource = "inserePedido";
@@ -103,6 +106,7 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
             branchId: "01",
             id: order.id,
             code: order.code,
+            erpOrderNumber: Number.isFinite(outboundErpOrderNumber) ? outboundErpOrderNumber : null,
             customerDoc: customerDocRaw.replace(/\D/g, ''),
             triangularCustomerDoc: order.triangularCustomerDoc ? order.triangularCustomerDoc.replace(/\D/g, '') : "",
             discountOrd: "0",
