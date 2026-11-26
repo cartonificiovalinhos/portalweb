@@ -292,6 +292,7 @@ export async function POST(request: Request) {
       customerName,
       customerDoc,
       customerId,
+      erpOrderNumber,
       clientOrderNumber,
       triangularCustomerName,
       triangularCustomerDoc,
@@ -305,6 +306,9 @@ export async function POST(request: Request) {
     } = body || {};
     const customerDocNorm = typeof customerDoc === 'string' ? normalizeDoc(customerDoc) : undefined;
     const triangularCustomerDocNorm = typeof triangularCustomerDoc === 'string' ? normalizeDoc(triangularCustomerDoc) : undefined;
+    const normalizedErpOrderNumber = erpOrderNumber === null || erpOrderNumber === undefined
+      ? undefined
+      : String(erpOrderNumber).trim() || undefined;
     const orderClientOrderNumber = typeof clientOrderNumber === 'string' ? clientOrderNumber.trim() || undefined : undefined;
     let orderNotes: string | undefined;
     try {
@@ -384,6 +388,20 @@ export async function POST(request: Request) {
       const u = await prisma.user.findUnique({ where: { id: createdById }, select: { lastEntityId: true } });
       if (u?.lastEntityId) entityId = u.lastEntityId;
     }
+    if (normalizedErpOrderNumber) {
+      const existingErpOrder = await prisma.salesOrder.findFirst({
+        where: { erpOrderNumber: normalizedErpOrderNumber },
+        select: { id: true, code: true },
+      });
+      if (existingErpOrder) {
+        return NextResponse.json(
+          {
+            error: `Já existe pedido com este número ERP: ${normalizedErpOrderNumber} (${String(existingErpOrder.code || existingErpOrder.id)})`,
+          },
+          { status: 400 },
+        );
+      }
+    }
     const rawItems = Array.isArray(items) ? items : [];
 
     const normalizedItems = await Promise.all(rawItems.map(async (it: any) => {
@@ -407,6 +425,11 @@ export async function POST(request: Request) {
         sku: it.sku || undefined,
         name: String(it.name || it.productName || 'Produto'),
         quantity: qty,
+        weightKg: it.weightKg !== undefined
+          ? Number(it.weightKg)
+          : it.weight !== undefined
+          ? Number(it.weight)
+          : undefined,
         unit: it.unit || undefined,
         unitPrice: price,
         discountPct: disc,
@@ -612,6 +635,7 @@ export async function POST(request: Request) {
       customerName,
       customerDoc: customerDocNorm || undefined,
       clientId: clientId,
+      erpOrderNumber: normalizedErpOrderNumber,
       clientOrderNumber: orderClientOrderNumber,
       triangularCustomerName: triangularCustomerName || undefined,
       triangularCustomerDoc: triangularCustomerDocNorm || undefined,
@@ -649,16 +673,17 @@ export async function POST(request: Request) {
             const nextOrderId = nextOrderIdRows?.[0]?.id ? Number(nextOrderIdRows[0].id) : null;
             if (!nextOrderId || !Number.isFinite(nextOrderId) || nextOrderId <= 0) return null;
 
-            await tx.$executeRawUnsafe(
+             await tx.$executeRawUnsafe(
               `INSERT INTO salesorder
-                (id, code, entityId, customerName, customerDoc, clientId, clientOrderNumber, triangularCustomerName, triangularCustomerDoc, paymentTerms, carrier, deliveryDate, notes, createdById, subtotal, discountTotal, total, createdAt, updatedAt)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
+                (id, code, entityId, customerName, customerDoc, clientId, erpOrderNumber, clientOrderNumber, triangularCustomerName, triangularCustomerDoc, paymentTerms, carrier, deliveryDate, notes, createdById, subtotal, discountTotal, total, createdAt, updatedAt)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
               Math.trunc(nextOrderId),
               code,
               entityId ?? null,
               customerName,
               customerDocNorm || null,
               clientId ?? null,
+               normalizedErpOrderNumber ?? null,
                orderClientOrderNumber ?? null,
               triangularCustomerName || null,
               triangularCustomerDocNorm || null,
